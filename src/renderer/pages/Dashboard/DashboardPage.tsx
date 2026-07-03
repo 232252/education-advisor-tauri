@@ -251,6 +251,24 @@ export function DashboardPage() {
     loadData()
   }, [loadData])
 
+  // 手动刷新：先清空 EAA 读缓存，再重新加载（强制重新拉取最新数据）
+  const handleRefresh = useCallback(async () => {
+    setLoading(true)
+    try {
+      await getAPI().eaa.invalidateCache()
+    } catch {
+      /* 清缓存失败不阻塞，仍继续加载 */
+    }
+    await loadData()
+  }, [loadData])
+
+  // class_id → 班级名称 映射
+  const classIdToName = useMemo(() => {
+    const m: Record<string, string> = {}
+    for (const c of classList) m[c.class_id] = c.name
+    return m
+  }, [classList])
+
   // 活跃班级列表
   const activeClassList = useMemo(() => classList.filter((c) => !c.archived), [classList])
 
@@ -562,9 +580,9 @@ export function DashboardPage() {
           </button>
           <button
             type="button"
-            onClick={loadData}
-            className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700
-                       px-4 py-2 rounded-lg text-sm transition-all duration-200 hover:shadow-sm active:scale-[0.97]"
+            onClick={handleRefresh}
+            className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700
+                       px-4 py-2 rounded-lg text-sm transition-all duration-200 shadow-sm hover:shadow-md"
           >
             🔄 {t('page.dashboard.refresh')}
           </button>
