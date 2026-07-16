@@ -42,7 +42,15 @@
     ],
     "resources": [
       "../config",
-      "../resources/eaa-binaries"
+      "../resources/eaa-binaries",
+      "../agents",
+      "../sidecar",
+      "../dist/sidecar",
+      "../dist/main",
+      "../vendor/pi-ai/dist",
+      "../vendor/pi-ai/package.json",
+      "../package.json",
+      "../package-lock.json"
     ],
     "copyright": "MIT",
     "category": "Education",
