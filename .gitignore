@@ -12,6 +12,9 @@ build/
 # of those packages; not Electron build output).
 !vendor/**/dist/
 
+# ===== Tauri build-time runtime binaries (copied in by build, not source) =====
+resources/node.exe
+
 # ===== Generated outputs (runtime artifacts, not source) =====
 dogfood-output/
 eaa-dashboard/

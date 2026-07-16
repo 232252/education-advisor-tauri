@@ -44,7 +44,7 @@
     "build:icon": "node scripts/build-icon.mjs",
     "build:eaa": "node scripts/build-eaa.mjs",
     "build:sidecar": "vite build --config vite.config.sidecar.ts",
-    "build:tauri": "npm run build:sidecar && npm run build",
+    "build:tauri": "npm run build:sidecar && node scripts/copy-sidecar-deps.mjs && npm run build",
     "tauri": "tauri",
     "tauri:dev": "npm run build:sidecar && tauri dev",
     "tauri:build": "npm run build:tauri && tauri build",

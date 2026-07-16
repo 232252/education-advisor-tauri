@@ -43,10 +43,12 @@
     "resources": [
       "../config",
       "../resources/eaa-binaries",
+      "../resources/node.exe",
       "../agents",
       "../sidecar",
       "../dist/sidecar",
       "../dist/main",
+      "../dist/node_modules",
       "../vendor/pi-ai/dist",
       "../vendor/pi-ai/package.json",
       "../package.json",

@@ -324,13 +324,29 @@ fn is_packaged() -> bool {
 }
 
 fn which_node() -> Result<String, String> {
-    // 1. NODE_PATH 环境变量
+    // 1. EDU_NODE_BIN 环境变量
     if let Ok(p) = std::env::var("EDU_NODE_BIN") {
         if std::path::Path::new(&p).exists() {
             return Ok(p);
         }
     }
-    // 2. PATH 里的 node
+    // 2. resource_dir/node.exe (打包模式: node.exe 随 Tauri resources 分发)
+    if let Ok(rd) = std::env::var("EDU_RESOURCE_DIR") {
+        let p = std::path::Path::new(&rd).join("node.exe");
+        if p.exists() {
+            return Ok(p.to_string_lossy().to_string());
+        }
+    }
+    // 3. exe 同级目录的 node.exe (兜底)
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(parent) = exe.parent() {
+            let p = parent.join("node.exe");
+            if p.exists() {
+                return Ok(p.to_string_lossy().to_string());
+            }
+        }
+    }
+    // 4. PATH 里的 node
     let candidates = ["node", "node.exe"];
     for c in candidates {
         // L-6 修复: 检查退出码 success() 而非仅 spawn 成功 is_ok()
