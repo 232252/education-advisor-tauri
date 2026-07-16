@@ -6,7 +6,6 @@
 
 import type { ClassEntity, EAARiskLevel, EAAStudent } from '@shared/types'
 import { useEffect, useMemo, useState } from 'react'
-import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { useT } from '../../i18n'
 import { getAPI } from '../../lib/ipc-client'
 import { riskColor } from '../../lib/ui-utils'
