@@ -32,6 +32,7 @@
 - [Built-in tools & features](#-built-in-tools--features)
 - [Configuration](#-configuration)
 - [Build, package, distribute](#-build-package-distribute)
+- [Build guide](#-build-guide) — [`BUILD.md`](./BUILD.md)
 - [Project layout](#-project-layout)
 - [Privacy, security, and the Rust bridge](#-privacy-security-and-the-rust-bridge)
 - [Contributing](#-contributing)
@@ -201,6 +202,8 @@ This produces native installers in `src-tauri/target/release/bundle/`:
 
 - `nsis/Education Advisor_0.1.0_x64-setup.exe` — Windows NSIS installer
 - `msi/Education Advisor_0.1.0_x64_en-US.msi` — Windows MSI installer
+
+> 📖 **完整构建流程见 [`BUILD.md`](./BUILD.md)** —— 环境要求、分步构建、产物说明、清理重建与常见问题排查的权威指南。
 
 The legacy Electron packaging path (`npm run build` + `npm run package`) is also retained for backward compatibility and produces `release/Education Advisor-Setup-0.1.0.exe`.
 
