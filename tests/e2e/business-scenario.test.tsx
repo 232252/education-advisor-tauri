@@ -14,7 +14,7 @@
 // =============================================================
 
 import { spawn, type ChildProcess } from 'node:child_process'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -72,10 +72,27 @@ function eaaRun(args: string[], opts: { json?: boolean; timeout?: number } = {})
 }
 
 /** 重置 eaa 数据（清空学生和事件） */
-function resetEaaData(): void {
+async function resetEaaData(): Promise<void> {
+  // 清理可能残留的 .lock 文件（防止上一个 eaa 进程未完全退出导致读写冲突）
+  const lockFile = join(TEST_DATA, '.lock')
+  if (existsSync(lockFile)) {
+    try { rmSync(lockFile) } catch { /* ignore */ }
+  }
+  // 彻底清空 entities/ 和 events/ 子目录（含缓存文件 *.cache.json、events.jsonl 等），
+  // 再重建空数据文件。eaa 会在下次运行时按需重建缓存。
+  for (const sub of ['entities', 'events'] as const) {
+    const dir = join(TEST_DATA, sub)
+    try {
+      for (const f of readdirSync(dir)) {
+        try { rmSync(join(dir, f), { recursive: true, force: true }) } catch { /* ignore */ }
+      }
+    } catch { /* dir may not exist yet */ }
+  }
   writeFileSync(join(TEST_DATA, 'entities', 'entities.json'), '{"entities":{}}')
   writeFileSync(join(TEST_DATA, 'entities', 'name_index.json'), '{}')
   writeFileSync(join(TEST_DATA, 'events', 'events.json'), '[]')
+  // 等待文件系统刷新 + 上一个 eaa 子进程完全退出
+  await new Promise((r) => setTimeout(r, 150))
 }
 
 async function eaaAddStudent(name: string): Promise<void> {
@@ -163,41 +180,56 @@ const mockApi = {
       const r = (await eaaRun(['ranking', String(n), '-O', 'json'], { json: true })) as {
         ranking: Array<{ rank: number; name: string; entity_id: string; class_id?: string | null; score: number }>
       }
-      // 增强: 用 listStudents 的 class_id 填充 ranking (与 IPC handler 逻辑一致)
-      try {
-        const students = (await eaaRun(['list-students', '-O', 'json'], { json: true })) as {
-          students: Array<{ entity_id: string; class_id?: string | null }>
-        }
-        const classIdMap: Record<string, string | null> = {}
-        for (const s of students.students) {
-          classIdMap[s.entity_id] = s.class_id ?? null
-        }
-        for (const item of r.ranking) {
-          item.class_id = classIdMap[item.entity_id] ?? null
-        }
-      } catch { /* enrichment failure is non-fatal */ }
+      // 增强: 仅在 ranking 项缺 class_id 时用 listStudents 补全;
+      // 不覆盖已有的非空值（避免 list-students 读到半刷新数据时把正确的 class_id 冲掉）
+      const needsEnrich = r.ranking.some((it) => it.class_id == null)
+      if (needsEnrich) {
+        try {
+          const students = (await eaaRun(['list-students', '-O', 'json'], { json: true })) as {
+            students: Array<{ entity_id: string; class_id?: string | null }>
+          }
+          const classIdMap: Record<string, string | null> = {}
+          for (const s of students.students) {
+            classIdMap[s.entity_id] = s.class_id ?? null
+          }
+          for (const item of r.ranking) {
+            if (item.class_id == null) {
+              item.class_id = classIdMap[item.entity_id] ?? null
+            }
+          }
+        } catch { /* enrichment failure is non-fatal */ }
+      }
       return { success: true, data: r }
     }),
     summary: vi.fn(async () => {
       const r = (await eaaRun(['summary', '-O', 'json'], { json: true })) as Record<string, unknown>
-      // 增强: 用 listStudents 的 class_id 填充 top_gainers/top_losers
-      try {
-        const students = (await eaaRun(['list-students', '-O', 'json'], { json: true })) as {
-          students: Array<{ name: string; class_id?: string | null }>
-        }
-        const nameToClassId: Record<string, string | null> = {}
-        for (const s of students.students) {
-          nameToClassId[s.name] = s.class_id ?? null
-        }
-        for (const group of ['top_gainers', 'top_losers'] as const) {
-          const items = r[group]
-          if (Array.isArray(items)) {
-            for (const item of items as Array<{ name: string; class_id?: string | null }>) {
-              item.class_id = nameToClassId[item.name] ?? null
+      // 增强: 仅在缺 class_id 时用 listStudents 补全,不覆盖已有非空值
+      const groups = ['top_gainers', 'top_losers'] as const
+      const needsEnrich = groups.some((g) => {
+        const items = r[g]
+        return Array.isArray(items) && (items as Array<{ class_id?: string | null }>).some((it) => it.class_id == null)
+      })
+      if (needsEnrich) {
+        try {
+          const students = (await eaaRun(['list-students', '-O', 'json'], { json: true })) as {
+            students: Array<{ name: string; class_id?: string | null }>
+          }
+          const nameToClassId: Record<string, string | null> = {}
+          for (const s of students.students) {
+            nameToClassId[s.name] = s.class_id ?? null
+          }
+          for (const group of groups) {
+            const items = r[group]
+            if (Array.isArray(items)) {
+              for (const item of items as Array<{ name: string; class_id?: string | null }>) {
+                if (item.class_id == null) {
+                  item.class_id = nameToClassId[item.name] ?? null
+                }
+              }
             }
           }
-        }
-      } catch { /* enrichment failure is non-fatal */ }
+        } catch { /* enrichment failure is non-fatal */ }
+      }
       return { success: true, data: r }
     }),
     stats: vi.fn(async () => {
@@ -289,11 +321,11 @@ beforeAll(async () => {
   expect(typeof info).toBe('string')
 })
 
-beforeEach(() => {
+beforeEach(async () => {
   // 重置 classList
   classList.length = 0
   // 重置 eaa 数据（避免测试间数据污染）
-  resetEaaData()
+  await resetEaaData()
   // 清理 DOM
   cleanup()
 })

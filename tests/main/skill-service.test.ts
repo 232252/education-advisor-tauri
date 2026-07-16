@@ -58,77 +58,77 @@ describe('skillService', () => {
     }
   })
 
-  it('listSkills 应返回数组', () => {
-    const skills = skillService.listSkills()
+  it('listSkills 应返回数组', async () => {
+    const skills = await skillService.listSkills()
     expect(Array.isArray(skills)).toBe(true)
   })
 
-  it('saveSkill + getSkill 应往返一致', () => {
-    const result = skillService.saveSkill('test-skill', '# Test Skill\n\nBody content')
+  it('saveSkill + getSkill 应往返一致', async () => {
+    const result = await skillService.saveSkill('test-skill', '# Test Skill\n\nBody content')
     expect(result.success).toBe(true)
-    const got = skillService.getSkill('test-skill')
+    const got = await skillService.getSkill('test-skill')
     expect(got).toBeTruthy()
     expect(got?.content).toBe('# Test Skill\n\nBody content')
     expect(got?.name).toBe('test-skill')
     expect(got?.source).toBe('user')
   })
 
-  it('listSkills 应包含已保存的 skill', () => {
-    skillService.saveSkill('skill-a', 'Content A')
-    skillService.saveSkill('skill-b', 'Content B')
-    const skills = skillService.listSkills()
+  it('listSkills 应包含已保存的 skill', async () => {
+    await skillService.saveSkill('skill-a', 'Content A')
+    await skillService.saveSkill('skill-b', 'Content B')
+    const skills = await skillService.listSkills()
     const names = skills.map((s) => s.name)
     expect(names).toContain('skill-a')
     expect(names).toContain('skill-b')
   })
 
-  it('deleteSkill 应移除 user skill', () => {
-    skillService.saveSkill('temp-skill', 'temp')
-    const delResult = skillService.deleteSkill('temp-skill')
+  it('deleteSkill 应移除 user skill', async () => {
+    await skillService.saveSkill('temp-skill', 'temp')
+    const delResult = await skillService.deleteSkill('temp-skill')
     expect(delResult.success).toBe(true)
-    expect(skillService.getSkill('temp-skill')).toBeNull()
+    expect(await skillService.getSkill('temp-skill')).toBeNull()
   })
 
-  it('getSkill 不存在应返回 null', () => {
-    expect(skillService.getSkill('nonexistent-xxx')).toBeNull()
+  it('getSkill 不存在应返回 null', async () => {
+    expect(await skillService.getSkill('nonexistent-xxx')).toBeNull()
   })
 
-  it('saveSkill 含特殊字符名称应被拒绝', () => {
-    const result = skillService.saveSkill('invalid/name', 'x')
+  it('saveSkill 含特殊字符名称应被拒绝', async () => {
+    const result = await skillService.saveSkill('invalid/name', 'x')
     expect(result.success).toBe(false)
     expect(result.error).toMatch(/reserved|invalid/i)
   })
 
-  it('saveSkill 含空名称应被拒绝', () => {
-    const result = skillService.saveSkill('', 'x')
+  it('saveSkill 含空名称应被拒绝', async () => {
+    const result = await skillService.saveSkill('', 'x')
     expect(result.success).toBe(false)
   })
 
-  it('overwrite saveSkill 应替换内容', () => {
-    skillService.saveSkill('overwrite-skill', 'first')
-    skillService.saveSkill('overwrite-skill', 'second')
-    const got = skillService.getSkill('overwrite-skill')
+  it('overwrite saveSkill 应替换内容', async () => {
+    await skillService.saveSkill('overwrite-skill', 'first')
+    await skillService.saveSkill('overwrite-skill', 'second')
+    const got = await skillService.getSkill('overwrite-skill')
     expect(got?.content).toBe('second')
   })
 
-  it('YAML frontmatter 描述解析', () => {
+  it('YAML frontmatter 描述解析', async () => {
     const content = '---\ndescription: 我的自定义技能\n---\n\n# Title\n\nContent'
-    skillService.saveSkill('fm-skill', content)
-    const got = skillService.getSkill('fm-skill')
+    await skillService.saveSkill('fm-skill', content)
+    const got = await skillService.getSkill('fm-skill')
     expect(got?.description).toBe('我的自定义技能')
   })
 
-  it('无 frontmatter 时取首段非标题文字', () => {
+  it('无 frontmatter 时取首段非标题文字', async () => {
     const content = '这是第一段描述。\n\n# Title'
-    skillService.saveSkill('no-fm-skill', content)
-    const got = skillService.getSkill('no-fm-skill')
+    await skillService.saveSkill('no-fm-skill', content)
+    const got = await skillService.getSkill('no-fm-skill')
     expect(got?.description).toBe('这是第一段描述。')
   })
 
-  it('中文 / emoji 描述应正常保存', () => {
+  it('中文 / emoji 描述应正常保存', async () => {
     const content = '中文 content / emoji 🎉 / <html>tags</html>'
-    skillService.saveSkill('unicode-skill', content)
-    const got = skillService.getSkill('unicode-skill')
+    await skillService.saveSkill('unicode-skill', content)
+    const got = await skillService.getSkill('unicode-skill')
     expect(got?.content).toBe(content)
   })
 })
