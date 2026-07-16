@@ -1,0 +1,171 @@
+# ===== Build artifacts =====
+node_modules/
+dist/
+release-v*/
+_apply_edits.cjs
+perf-report.json
+release/
+out/
+build/
+*.tsbuildinfo
+# Un-ignore vendored package dist directories (they ARE the source
+# of those packages; not Electron build output).
+!vendor/**/dist/
+
+# ===== Generated outputs (runtime artifacts, not source) =====
+dogfood-output/
+eaa-dashboard/
+perf-report.md
+
+# ===== Logs (debug + runtime) =====
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# ===== Local environment =====
+.env
+.env.*
+!.env.example
+*.local
+.vscode/
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.DS_Store
+Thumbs.db
+
+# ===== Test / coverage =====
+coverage/
+.nyc_output/
+*.lcov
+.cache/
+
+# ===== 测试运行时数据 (dogfood 自动化测试产生的隔离用户数据) =====
+# 包含 SQLite 数据库、EAA 数据、keystore、日志等运行时状态,不应提交
+test-user-data/
+
+# ===== dogfood 测试结果 JSON (运行时产物,会被每次测试覆盖) =====
+# 保留测试脚本 *.cjs 和报告 *.md,但忽略 *-result.json 等运行时输出
+dogfood-output/*-result.json
+dogfood-output/*-results.json
+dogfood-output/comprehensive-result.json
+dogfood-output/r*-results.json
+dogfood-output/r*-result.json
+dogfood-output/stress-result.json
+
+# ===== Temporary debug / verification artifacts =====
+# (These files were development-time verification scripts; they must not be committed.)
+verify-*.ps1
+verify-*.py
+verify-*.jpg.png
+verify-*.jpg
+verify-*.png
+test-cdp-*.js
+check-cdp*.js
+check-*.js
+e2e-test.mjs
+e2e-*.mjs
+check_db.js
+
+# Generated link-analysis reports (Python tooling outputs)
+scripts/link*.txt
+scripts/link*.json
+
+# Download scratch (used by scripts/download-eaa-binaries.mjs and matrix MCP helpers)
+.tmp-eaa-download/
+/.tmp-*
+/*.tmp.json
+/.tmp-ico-prompt.json
+/.tmp-upload.json
+
+# ===== AI / tool runtime state =====
+# (These directories are created by various AI coding tools and IDE helpers.
+#  They should not be tracked in the source tree.)
+.agent_history/
+.arts/
+.atomcode/
+.codeartsdoer/
+.mavis/
+.office-claw/
+.opencode/
+.team/
+.aider*
+.cursor*
+.continue*
+.files/
+files/
+
+# ===== OS / shell quirks =====
+nul
+# Windows reparse-point residues
+desktop.ini
+ehthumbs.db
+ehthumbs_vista.db
+$RECYCLE.BIN/
+
+# ===== Editor backups =====
+*~
+*.swp
+*.swo
+*.bak
+*.orig
+*.rej
+
+# ===== Secrets (should NEVER be committed) =====
+# Note: keystore-service encrypts API keys at runtime; this section is a
+# safety net in case someone mistakenly writes them to disk in plaintext.
+secrets/
+*.pem
+*.key
+*.pfx
+*.p12
+
+# ===== Workspace-level locks =====
+# Allow package-lock.json to be committed (npm convention) but ignore yarn/pnpm
+yarn.lock
+pnpm-lock.yaml
+bun.lockb
+
+# ===== Misc =====
+.history/
+.tmp/
+.tmp/*
+# Rust build artifacts (Cargo.lock IS committed, like package-lock.json)
+core/**/target/
+
+# 临时数据/构建
+data/
+core/eaa-cli/data/
+resources/eaa-binaries/linux-x64/
+
+# Agent 运行时输出产物
+data_archive/agent_outputs/
+
+# Tauri 迁移产物
+src-tauri/target/
+test-tauri-data/
+src-tauri/gen/
+
+# 测试产生的临时数据目录 (test-*-data / test-*-debug 等运行时产物)
+test-tauri-data*/
+test-tuari-data*/
+test-tuari-data-*/
+test-volume-data/
+test-user-data/
+test-loop-data/
+test-loop-data-*/
+test-sqlite-direct/
+test-batch-debug*/
+test-debug-*/
+test-cache-data/
+test-field-debug/
+test-results/

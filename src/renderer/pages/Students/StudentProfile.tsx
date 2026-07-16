@@ -1,0 +1,1995 @@
+// =============================================================
+// 学生档案组件 — 多选项卡详细视图
+// 选项卡: 概览 | 档案 | 事件 | 学业 | AI分析
+// =============================================================
+
+import type {
+  AgentListItem,
+  EAAEventRecord,
+  EAAHistoryData,
+  EAAHistoryEvent,
+  EAAReasonCode,
+  EAAStudent,
+  EAAStudentScore,
+  ExamDef,
+  GradeRecord,
+  StudentProfileData,
+} from '@shared/types'
+import { BarChart, LineChart } from 'echarts/charts'
+import { GridComponent, LegendComponent, TooltipComponent } from 'echarts/components'
+import * as echarts from 'echarts/core'
+import { CanvasRenderer } from 'echarts/renderers'
+import ReactEChartsCore from 'echarts-for-react/lib/core'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { ConfirmDialog } from '../../components/ConfirmDialog'
+import { useAutoDismiss } from '../../hooks/useAutoDismiss'
+import { useTheme } from '../../hooks/useTheme'
+import { useT } from '../../i18n'
+import { getAPI, getErrorMessage } from '../../lib/ipc-client'
+import { riskColor } from '../../lib/ui-utils'
+import { useAgentStore } from '../../stores/agentStore'
+import { toast } from '../../stores/toastStore'
+
+echarts.use([LineChart, BarChart, GridComponent, TooltipComponent, LegendComponent, CanvasRenderer])
+
+/** 将 EAAEventRecord（search/range 返回）映射为 EAAHistoryEvent 兼容结构 */
+function eventRecordToHistory(rec: EAAEventRecord): EAAHistoryEvent {
+  return {
+    event_id: rec.event_id,
+    timestamp: rec.timestamp,
+    event_type: rec.event_type,
+    reason_code: rec.reason_code,
+    score_delta: rec.score_delta,
+    cumulative: 0, // search/range 结果无累计值
+    note: rec.note,
+    tags: rec.tags,
+    reverted: !rec.is_valid, // is_valid=false 视为已撤销
+  }
+}
+
+interface StudentProfileProps {
+  student: EAAStudent
+  onClose: () => void
+  onRefresh: () => void
+}
+
+type TabId = 'overview' | 'profile' | 'events' | 'academics' | 'ai'
+
+// 模块级常量 — StudentProfile 的 tabs 固定不变
+const STUDENT_PROFILE_TABS: Array<{ id: TabId; label: string; icon: string }> = [
+  { id: 'overview', label: '概览', icon: '📊' },
+  { id: 'profile', label: '档案', icon: '📋' },
+  { id: 'events', label: '事件', icon: '📝' },
+  { id: 'academics', label: '学业', icon: '📚' },
+  { id: 'ai', label: 'AI分析', icon: '🤖' },
+]
+
+export function StudentProfile({ student, onClose, onRefresh }: StudentProfileProps) {
+  const { t } = useT()
+  const [activeTab, setActiveTab] = useState<TabId>('overview')
+  const [score, setScore] = useState<EAAStudentScore | null>(null)
+  const [history, setHistory] = useState<EAAHistoryData | null>(null)
+  const [reasonCodes, setReasonCodes] = useState<EAAReasonCode[]>([])
+  const [profileData, setProfileData] = useState<StudentProfileData>({})
+  const [_profileLoaded, setProfileLoaded] = useState(false)
+  const [agents, setAgents] = useState<AgentListItem[]>([])
+  const [selectedAgents, setSelectedAgents] = useState<Set<string>>(new Set())
+  const [aiRunning, setAiRunning] = useState(false)
+  const [aiOutput, setAiOutput] = useState('')
+  const [aiMessage, setAiMessage] = useState('')
+  const setAiMessageAuto = useAutoDismiss<string>(setAiMessage, '')
+  const [eventFilter, setEventFilter] = useState<'all' | 'bonus' | 'deduct'>('all')
+  const [eventTimeRange, setEventTimeRange] = useState<'all' | 'week' | 'month' | 'semester'>('all')
+  const [showAddEvent, setShowAddEvent] = useState(false)
+  const [actionMsg, setActionMsg] = useState('')
+  const setActionMsgAuto = useAutoDismiss<string>(setActionMsg, '')
+  const [aiSaved, setAiSaved] = useState(false)
+  // 事件搜索/日期范围状态
+  const [searchQuery, setSearchQuery] = useState('')
+  const [dateStart, setDateStart] = useState('')
+  const [dateEnd, setDateEnd] = useState('')
+  const theme = useTheme()
+  const isDark = theme === 'dark'
+
+  // P2-7 修复: loadProfileData 原本在 useCallback(loadAllData) 之后声明,
+  // 但 loadAllData 内部又调用 loadProfileData,产生 TDZ,跑起来 ReferenceError。
+  // 提前并用 useCallback 包裹。
+  // P2-1: 加 currentNameRef 守卫,旧请求完成时若已切换则不更新
+  const currentNameRef = useRef<string>(student.name)
+  useEffect(() => {
+    currentNameRef.current = student.name
+  }, [student.name])
+  const loadProfileData = useCallback(async (name: string) => {
+    try {
+      const result = await getAPI().profile.get(name)
+      if (currentNameRef.current !== name) return
+      if (result.success && result.data) {
+        setProfileData(result.data)
+      }
+    } catch (err) {
+      if (currentNameRef.current !== name) return
+      console.warn('[Profile] Load profile data error:', err)
+    }
+    if (currentNameRef.current === name) setProfileLoaded(true)
+  }, [])
+
+  const loadAllData = useCallback(async () => {
+    try {
+      // P1 优化: profile.get 并行化 — 之前是串行调用,额外增加一次 IPC 往返
+      // 现在 5 个请求全部并行,总时间由最慢的 history(~275ms)决定,不再叠加 profile.get 的 ~5ms
+      const [scoreSettled, historySettled, codesSettled, agentsSettled, profileSettled] =
+        await Promise.allSettled([
+          getAPI().eaa.score(student.name),
+          getAPI().eaa.history(student.name),
+          getAPI().eaa.codes(),
+          getAPI().agent.list(),
+          getAPI().profile.get(student.name),
+        ])
+      if (scoreSettled.status === 'fulfilled' && scoreSettled.value.success) {
+        setScore(scoreSettled.value.data)
+      } else if (scoreSettled.status === 'rejected') {
+        console.warn('[Profile] score request failed:', scoreSettled.reason)
+      }
+      if (historySettled.status === 'fulfilled' && historySettled.value.success) {
+        setHistory(historySettled.value.data)
+      } else if (historySettled.status === 'rejected') {
+        console.warn('[Profile] history request failed:', historySettled.reason)
+      }
+      if (
+        codesSettled.status === 'fulfilled' &&
+        codesSettled.value.success &&
+        codesSettled.value.data?.codes
+      ) {
+        setReasonCodes(codesSettled.value.data.codes)
+      } else if (codesSettled.status === 'rejected') {
+        console.warn('[Profile] codes request failed:', codesSettled.reason)
+      }
+      if (agentsSettled.status === 'fulfilled' && agentsSettled.value) {
+        setAgents(agentsSettled.value)
+      } else if (agentsSettled.status === 'rejected') {
+        console.warn('[Profile] agent list request failed:', agentsSettled.reason)
+      }
+      // P1 优化: profile 数据从并行批次获取,不再串行
+      if (profileSettled.status === 'fulfilled' && profileSettled.value.success) {
+        if (currentNameRef.current === student.name) {
+          setProfileData(profileSettled.value.data)
+        }
+      } else if (profileSettled.status === 'rejected') {
+        console.warn('[Profile] profile.get request failed:', profileSettled.reason)
+      }
+      if (currentNameRef.current === student.name) setProfileLoaded(true)
+    } catch (err) {
+      console.error('[Profile] Load error:', err)
+    }
+  }, [student.name])
+
+  useEffect(() => {
+    loadAllData()
+  }, [loadAllData])
+
+  const toggleAgent = (id: string) => {
+    setSelectedAgents((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) {
+        next.delete(id)
+      } else {
+        next.add(id)
+      }
+      return next
+    })
+  }
+
+  const runSelectedAgents = async () => {
+    if (selectedAgents.size === 0) {
+      setAiMessageAuto('请至少选择一个Agent')
+      return
+    }
+    setAiRunning(true)
+    setAiOutput('')
+    setAiSaved(false)
+
+    // High 修复: 改用 agentStore.subscribeStatus 派生订阅,并通过 agentId 过滤避免事件串扰
+    // 之前直接 getAPI().agent.onStatusUpdate 会绕过 agentStore 的去重逻辑,
+    // 多个组件同时订阅时收到重复事件;且不过滤 agentId 时,其他 agent 的事件会串扰到此处
+    const selectedAgentIds = new Set(selectedAgents)
+    const unsub = useAgentStore.getState().subscribeStatus((data) => {
+      // 仅处理当前选中的 agent 发出的状态事件
+      if (!selectedAgentIds.has(data.agentId)) return
+      if (data.output) {
+        setAiOutput((prev) => prev + data.output)
+      }
+      if (data.result) {
+        setAiOutput((prev) => `${prev}\n\n--- 执行完成 (${data.result?.durationMs}ms) ---\n`)
+      }
+      if (data.error) {
+        setAiOutput((prev) => `${prev}\n[错误] ${data.error}\n`)
+      }
+    })
+
+    try {
+      for (const agentId of selectedAgents) {
+        setAiOutput((prev) => `${prev}\n=== 🤖 ${agentId} ===\n`)
+        const prompt = `请分析学生"${student.name}"的操行情况。基本信息：- 分数：${student.score}\n- 风险等级：${student.risk}\n- 事件数：${student.events_count}\n\n请从以下维度进行分析：\n1. 操行总结\n2. 风险预警\n3. 行为模式\n4. 教育建议`
+        await getAPI().agent.runManual(agentId, prompt)
+        // 等待一段时间让流式输出到达
+        await new Promise((r) => setTimeout(r, 1500))
+      }
+      setAiMessageAuto('AI 分析完成')
+    } catch (err) {
+      setAiMessageAuto(`分析失败: ${err instanceof Error ? err.message : String(err)}`)
+    } finally {
+      unsub()
+      setAiRunning(false)
+    }
+  }
+
+  const runAllAgents = async () => {
+    const allIds = agents.filter((a) => a.enabled).map((a) => a.id)
+    if (allIds.length === 0) {
+      setAiMessageAuto('没有可用的Agent')
+      return
+    }
+    setSelectedAgents(new Set(allIds))
+    setAiRunning(true)
+    setAiOutput('')
+    setAiSaved(false)
+
+    // High 修复: 改用 agentStore.subscribeStatus 派生订阅,并通过 agentId 过滤避免事件串扰
+    const allAgentIds = new Set(allIds)
+    const unsub = useAgentStore.getState().subscribeStatus((data) => {
+      if (!allAgentIds.has(data.agentId)) return
+      if (data.output) {
+        setAiOutput((prev) => prev + data.output)
+      }
+      if (data.result) {
+        setAiOutput((prev) => `${prev}\n\n--- 执行完成 (${data.result?.durationMs}ms) ---\n`)
+      }
+      if (data.error) {
+        setAiOutput((prev) => `${prev}\n[错误] ${data.error}\n`)
+      }
+    })
+
+    try {
+      for (const agentId of allIds) {
+        setAiOutput((prev) => `${prev}\n=== 🤖 ${agentId} ===\n`)
+        const prompt = `请分析学生"${student.name}"的操行情况。基本信息：- 分数：${student.score}\n- 风险等级：${student.risk}\n- 事件数：${student.events_count}\n\n请从以下维度进行分析：\n1. 操行总结\n2. 风险预警\n3. 行为模式\n4. 教育建议`
+        await getAPI().agent.runManual(agentId, prompt)
+        await new Promise((r) => setTimeout(r, 1500))
+      }
+      setAiMessageAuto('AI 分析完成')
+    } catch (err) {
+      setAiMessageAuto(`分析失败: ${err instanceof Error ? err.message : String(err)}`)
+    } finally {
+      unsub()
+      setAiRunning(false)
+    }
+  }
+
+  const saveAiResult = async () => {
+    try {
+      const result = await getAPI().profile.set(student.name, {
+        ...profileData,
+        aiAnalysis: aiOutput,
+        aiAnalyzedAt: Date.now(),
+      })
+      if (result.success) {
+        setAiSaved(true)
+        toast.success(t('toast.profile.analysisSaved'))
+      }
+    } catch (_err) {
+      toast.error(t('toast.common.saveFailed'))
+    }
+  }
+
+  const filteredEvents = useMemo(() => {
+    let events = history?.events ?? []
+    if (eventFilter === 'bonus') events = events.filter((e) => e.score_delta > 0)
+    if (eventFilter === 'deduct') events = events.filter((e) => e.score_delta < 0)
+    if (eventTimeRange !== 'all') {
+      const ranges: Record<string, number> = {
+        week: 7 * 24 * 60 * 60 * 1000,
+        month: 30 * 24 * 60 * 60 * 1000,
+        semester: 120 * 24 * 60 * 60 * 1000,
+      }
+      // now 在 useMemo 内部计算，避免每次渲染都使 memo 失效
+      const cutoff = Date.now() - ranges[eventTimeRange]
+      events = events.filter((e) => new Date(e.timestamp).getTime() > cutoff)
+    }
+    return events
+  }, [history, eventFilter, eventTimeRange])
+
+
+  // tabs 已提升为模块级常量 STUDENT_PROFILE_TABS
+
+  return (
+    <div className="h-full flex flex-col bg-white dark:bg-gray-900">
+      {/* 头部 */}
+      <div className="p-4 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-gray-50 to-blue-50 dark:from-gray-800 dark:to-gray-800/80">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-lg shadow-lg">
+              {student.name[0]}
+            </div>
+            <div>
+              <h2 className="text-xl font-bold">{student.name}</h2>
+              <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                <span className={riskColor(student.risk)}>风险: {student.risk}</span>
+                <span className="text-gray-300 dark:text-gray-600">|</span>
+                <span>
+                  分数:{' '}
+                  <span className="font-mono font-bold text-blue-600 dark:text-blue-400">
+                    {student.score.toFixed(1)}
+                  </span>
+                </span>
+                <span className="text-gray-300 dark:text-gray-600">|</span>
+                <span>{student.events_count} 事件</span>
+              </div>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-2xl transition-colors"
+          >
+            &times;
+          </button>
+        </div>
+
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => setShowAddEvent(!showAddEvent)}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg text-xs transition-colors shadow-sm"
+          >
+            {showAddEvent ? '取消添加' : '+ 添加事件'}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              loadAllData()
+              onRefresh()
+            }}
+            className="bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-600 px-3 py-1.5 rounded-lg text-xs transition-colors shadow-sm"
+          >
+            🔄 刷新
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('ai')}
+            className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white px-3 py-1.5 rounded-lg text-xs transition-colors shadow-sm"
+          >
+            🤖 AI 分析
+          </button>
+        </div>
+      </div>
+
+      {actionMsg && (
+        <div className="px-4 py-2 bg-blue-500/20 text-blue-600 dark:text-blue-300 text-xs">
+          {actionMsg}
+        </div>
+      )}
+
+      {showAddEvent && (
+        <AddEventInline
+          studentName={student.name}
+          reasonCodes={reasonCodes}
+          onDone={() => {
+            setShowAddEvent(false)
+            loadAllData()
+            onRefresh()
+            setActionMsgAuto('事件已添加')
+          }}
+        />
+      )}
+
+      {/* 选项卡导航 */}
+      <div className="flex border-b border-gray-200 dark:border-gray-700 px-4 bg-gray-50/50 dark:bg-gray-800/50">
+        {STUDENT_PROFILE_TABS.map((tab) => (
+          <button
+            type="button"
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={
+              'px-4 py-2.5 text-sm border-b-2 transition-colors ' +
+              (activeTab === tab.id
+                ? 'border-blue-500 text-blue-600 dark:text-blue-400 font-medium'
+                : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300')
+            }
+          >
+            <span className="mr-1.5">{tab.icon}</span>
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* 选项卡内容 */}
+      <div className="flex-1 overflow-y-auto p-4">
+        {activeTab === 'overview' && (
+          <OverviewTab student={student} score={score} history={history} isDark={isDark} />
+        )}
+        {activeTab === 'profile' && (
+          <ProfileTab student={student} profileData={profileData} onUpdate={() => loadAllData()} />
+        )}
+        {activeTab === 'events' && (
+          <EventsTab
+            events={filteredEvents}
+            eventFilter={eventFilter}
+            onFilterChange={setEventFilter}
+            timeRange={eventTimeRange}
+            onTimeRangeChange={setEventTimeRange}
+            reasonCodes={reasonCodes}
+            studentName={student.name}
+            searchQuery={searchQuery}
+            onSearchQueryChange={setSearchQuery}
+            dateStart={dateStart}
+            onDateStartChange={setDateStart}
+            dateEnd={dateEnd}
+            onDateEndChange={setDateEnd}
+            onRefresh={() => {
+              loadAllData()
+              onRefresh()
+            }}
+          />
+        )}
+        {activeTab === 'academics' && (
+          <AcademicsTab studentName={student.name} isDark={isDark} />
+        )}
+        {activeTab === 'ai' && (
+          <AIAnalysisTab
+            agents={agents}
+            selectedAgents={selectedAgents}
+            onToggleAgent={toggleAgent}
+            onRunSelected={runSelectedAgents}
+            onRunAll={runAllAgents}
+            running={aiRunning}
+            output={aiOutput}
+            message={aiMessage}
+            aiSaved={aiSaved}
+            onSaveResult={saveAiResult}
+          />
+        )}
+      </div>
+    </div>
+  )
+}
+
+// =============================================================
+// 概览选项卡 — 迷你趋势图 + 事件时间线
+// =============================================================
+
+function OverviewTab({
+  student,
+  score,
+  history,
+  isDark,
+}: {
+  student: EAAStudent
+  score: EAAStudentScore | null
+  history: EAAHistoryData | null
+  isDark: boolean
+}) {
+  const recentEvents = history?.events?.slice(0, 5) ?? []
+  const bonusCount = history?.events?.filter((e) => e.score_delta > 0).length ?? 0
+  const deductCount = history?.events?.filter((e) => e.score_delta < 0).length ?? 0
+
+  const scoreTimeline = useMemo(() => {
+    if (!history?.events || history.events.length === 0)
+      return { dates: [] as string[], scores: [] as number[] }
+    let cumulative = 0
+    const dates: string[] = []
+    const scores: number[] = []
+    const events = history.events.slice(-20)
+    for (const evt of events) {
+      cumulative += evt.score_delta
+      dates.push(new Date(evt.timestamp).toLocaleDateString([], { month: 'short', day: 'numeric' }))
+      scores.push(cumulative)
+    }
+    return { dates, scores }
+  }, [history])
+
+  const axisColor = isDark ? '#9ca3af' : '#6b7280'
+  const gridColor = isDark ? '#1f2937' : '#e5e7eb'
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <MetricCard label="当前分数" value={student.score.toFixed(1)} color="blue" />
+        <MetricCard
+          label="分数变动"
+          value={(student.delta >= 0 ? '+' : '') + student.delta.toFixed(1)}
+          color={student.delta >= 0 ? 'green' : 'red'}
+        />
+        <MetricCard label="加分事件" value={bonusCount} color="green" />
+        <MetricCard label="扣分事件" value={deductCount} color="red" />
+      </div>
+
+      {scoreTimeline.dates.length > 1 && (
+        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 shadow-sm">
+          <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+            📈 分数变化趋势
+          </h4>
+          <ReactEChartsCore
+            echarts={echarts}
+            style={{ height: 200 }}
+            option={{
+              animation: true,
+              animationDuration: 800,
+              grid: { left: 8, right: 16, top: 8, bottom: 0, containLabel: true },
+              tooltip: { trigger: 'axis' },
+              xAxis: {
+                type: 'category',
+                data: scoreTimeline.dates,
+                axisLabel: { color: axisColor, fontSize: 10 },
+                axisLine: { lineStyle: { color: gridColor } },
+              },
+              yAxis: {
+                type: 'value',
+                axisLabel: { color: axisColor },
+                splitLine: { lineStyle: { color: gridColor, type: 'dashed' } },
+              },
+              series: [
+                {
+                  type: 'line',
+                  data: scoreTimeline.scores,
+                  smooth: true,
+                  lineStyle: { color: '#3b82f6', width: 2 },
+                  itemStyle: { color: '#3b82f6' },
+                  areaStyle: {
+                    color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                      { offset: 0, color: 'rgba(59,130,246,0.3)' },
+                      { offset: 1, color: 'rgba(59,130,246,0.02)' },
+                    ]),
+                  },
+                  symbol: 'circle',
+                  symbolSize: 4,
+                },
+              ],
+            }}
+          />
+        </div>
+      )}
+
+      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 shadow-sm">
+        <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">基本信息</h4>
+        <div className="grid grid-cols-2 gap-2 text-sm">
+          <InfoRow label="状态" value={score?.status ?? 'Active'} />
+          <InfoRow label="风险等级" value={student.risk} highlight={riskColor(student.risk)} />
+          <InfoRow label="班级" value={score?.class_id ?? '未设置'} />
+          <InfoRow label="分组" value={student.groups.join(', ') || '无'} />
+          <InfoRow label="角色" value={student.roles.join(', ') || '无'} />
+          <InfoRow label="事件总数" value={student.events_count} />
+          {score?.last_event_at && (
+            <InfoRow label="最近事件" value={new Date(score.last_event_at).toLocaleDateString()} />
+          )}
+        </div>
+      </div>
+
+      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 shadow-sm">
+        <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">📋 最近事件</h4>
+        {recentEvents.length === 0 ? (
+          <div className="text-gray-400 dark:text-gray-500 text-sm py-4 text-center">暂无事件</div>
+        ) : (
+          <div className="space-y-0">
+            {recentEvents.map((evt, idx) => (
+              <div key={evt.event_id} className="flex gap-3">
+                <div className="flex flex-col items-center">
+                  <div
+                    className={
+                      'w-2.5 h-2.5 rounded-full mt-1.5 ' +
+                      (evt.score_delta > 0
+                        ? 'bg-green-400'
+                        : evt.score_delta < 0
+                          ? 'bg-red-400'
+                          : 'bg-gray-300')
+                    }
+                  />
+                  {idx < recentEvents.length - 1 && (
+                    <div className="w-0.5 flex-1 bg-gray-200 dark:bg-gray-700 my-0.5" />
+                  )}
+                </div>
+                <div className="flex-1 pb-3">
+                  <EventMiniCard event={evt} />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// =============================================================
+// 档案选项卡
+// =============================================================
+
+function ProfileTab({
+  student,
+  profileData,
+  onUpdate,
+}: {
+  student: EAAStudent
+  profileData: StudentProfileData
+  onUpdate: () => void
+}) {
+  const [editing, setEditing] = useState(false)
+  const [form, setForm] = useState<StudentProfileData>(profileData)
+  const [saving, setSaving] = useState(false)
+  const [msg, setMsg] = useState('')
+  const setMsgAuto = useAutoDismiss<string>(setMsg, '')
+
+  useEffect(() => {
+    setForm(profileData)
+  }, [profileData])
+
+  const handleSave = async () => {
+    setSaving(true)
+    try {
+      const result = await getAPI().profile.set(student.name, form)
+      if (!result.success) {
+        setMsgAuto(`保存失败: ${result.error ?? '未知错误'}`)
+        return
+      }
+      // 同步 EAA class_id: 有值则设置, 空值则清空 (修复: 之前清空时不触发 --clear-class-id)
+      if (form.classId) {
+        await getAPI().eaa.setStudentMeta({ name: student.name, classId: form.classId as string })
+      } else {
+        await getAPI().eaa.setStudentMeta({ name: student.name, clearClassId: true })
+      }
+      setMsgAuto('档案已保存')
+      onUpdate()
+    } catch (err) {
+      setMsgAuto(`保存失败: ${err instanceof Error ? err.message : String(err)}`)
+    }
+    setSaving(false)
+    setEditing(false)
+  }
+
+  const updateForm = (key: string, value: string) => setForm((f) => ({ ...f, [key]: value }))
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">学生档案</h4>
+        <button
+          type="button"
+          onClick={() => (editing ? handleSave() : setEditing(true))}
+          disabled={saving}
+          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1.5 rounded-lg text-xs transition-colors disabled:opacity-50 shadow-sm"
+        >
+          {saving ? '保存中...' : editing ? '💾 保存' : '✏️ 编辑'}
+        </button>
+      </div>
+      {msg && (
+        <div className={`text-xs ${msg.includes('失败') ? 'text-red-500' : 'text-green-500'}`}>
+          {msg}
+        </div>
+      )}
+
+      {/* 基础信息 */}
+      <ProfileSection title="基础信息" icon="👤">
+        <div className="grid grid-cols-2 gap-3">
+          <ProfileField label="姓名" value={student.name} editing={false} />
+          <ProfileField
+            label="性别"
+            value={form.gender ?? ''}
+            editing={editing}
+            type="select"
+            options={['男', '女']}
+            onChange={(v) => updateForm('gender', v)}
+          />
+          <ProfileField
+            label="出生日期"
+            value={form.birthDate ?? ''}
+            editing={editing}
+            type="date"
+            onChange={(v) => updateForm('birthDate', v)}
+          />
+          <ProfileField
+            label="身份证号"
+            value={form.idCard ?? ''}
+            editing={editing}
+            onChange={(v) => updateForm('idCard', v)}
+          />
+          <ProfileField
+            label="班级"
+            value={(form.classId as string) ?? student.class_id ?? ''}
+            editing={editing}
+            onChange={(v) => updateForm('classId', v)}
+          />
+          <ProfileField
+            label="入学日期"
+            value={form.enrollmentDate ?? ''}
+            editing={editing}
+            type="date"
+            onChange={(v) => updateForm('enrollmentDate', v)}
+          />
+        </div>
+      </ProfileSection>
+
+      {/* 联系方式 */}
+      <ProfileSection title="联系方式" icon="📞">
+        <div className="grid grid-cols-2 gap-3">
+          <ProfileField
+            label="电话"
+            value={form.phone ?? ''}
+            editing={editing}
+            onChange={(v) => updateForm('phone', v)}
+          />
+          <ProfileField
+            label="邮箱"
+            value={(form.email as string) ?? ''}
+            editing={editing}
+            onChange={(v) => updateForm('email', v)}
+          />
+          <ProfileField
+            label="家庭住址"
+            value={form.address ?? ''}
+            editing={editing}
+            onChange={(v) => updateForm('address', v)}
+            spanFull
+          />
+        </div>
+      </ProfileSection>
+
+      {/* 家庭信息 */}
+      <ProfileSection title="家庭信息" icon="🏠">
+        <div className="grid grid-cols-2 gap-3">
+          <ProfileField
+            label="父亲姓名"
+            value={(form.fatherName as string) ?? ''}
+            editing={editing}
+            onChange={(v) => updateForm('fatherName', v)}
+          />
+          <ProfileField
+            label="父亲电话"
+            value={(form.fatherPhone as string) ?? ''}
+            editing={editing}
+            onChange={(v) => updateForm('fatherPhone', v)}
+          />
+          <ProfileField
+            label="母亲姓名"
+            value={(form.motherName as string) ?? ''}
+            editing={editing}
+            onChange={(v) => updateForm('motherName', v)}
+          />
+          <ProfileField
+            label="母亲电话"
+            value={(form.motherPhone as string) ?? ''}
+            editing={editing}
+            onChange={(v) => updateForm('motherPhone', v)}
+          />
+        </div>
+      </ProfileSection>
+
+      {/* 健康信息 */}
+      <ProfileSection title="健康信息" icon="🏥">
+        <div className="grid grid-cols-2 gap-3">
+          <ProfileField
+            label="血型"
+            value={(form.bloodType as string) ?? ''}
+            editing={editing}
+            type="select"
+            options={['A', 'B', 'AB', 'O']}
+            onChange={(v) => updateForm('bloodType', v)}
+          />
+          <ProfileField
+            label="过敏史"
+            value={(form.allergy as string) ?? ''}
+            editing={editing}
+            onChange={(v) => updateForm('allergy', v)}
+          />
+          <ProfileField
+            label="特殊需求"
+            value={(form.specialNeeds as string) ?? ''}
+            editing={editing}
+            onChange={(v) => updateForm('specialNeeds', v)}
+            spanFull
+          />
+        </div>
+      </ProfileSection>
+
+      {/* 在校信息 */}
+      <ProfileSection title="在校信息" icon="🏫">
+        <div className="grid grid-cols-2 gap-3">
+          <ProfileField
+            label="学号"
+            value={(form.studentNumber as string) ?? ''}
+            editing={editing}
+            onChange={(v) => updateForm('studentNumber', v)}
+          />
+          <ProfileField
+            label="宿舍号"
+            value={(form.dormNumber as string) ?? ''}
+            editing={editing}
+            onChange={(v) => updateForm('dormNumber', v)}
+          />
+          <ProfileField
+            label="床号"
+            value={(form.bedNumber as string) ?? ''}
+            editing={editing}
+            onChange={(v) => updateForm('bedNumber', v)}
+          />
+          <ProfileField
+            label="出勤率(%)"
+            value={form.attendanceRate?.toString() ?? ''}
+            editing={editing}
+            type="number"
+            onChange={(v) => updateForm('attendanceRate', v)}
+          />
+        </div>
+      </ProfileSection>
+
+      {/* 奖惩记录 */}
+      <ProfileSection title="奖惩记录" icon="🏆">
+        <div className="grid grid-cols-1 gap-3">
+          <ProfileField
+            label="荣誉称号"
+            value={(form.honors as string) ?? ''}
+            editing={editing}
+            multiline
+            onChange={(v) => updateForm('honors', v)}
+            spanFull
+          />
+          <ProfileField
+            label="处分记录"
+            value={(form.punishments as string) ?? ''}
+            editing={editing}
+            multiline
+            onChange={(v) => updateForm('punishments', v)}
+            spanFull
+          />
+        </div>
+      </ProfileSection>
+
+      {/* 备注 */}
+      <ProfileSection title="备注" icon="📝">
+        <ProfileField
+          label=""
+          value={form.comments ?? ''}
+          editing={editing}
+          multiline
+          onChange={(v) => updateForm('comments', v)}
+          spanFull
+        />
+      </ProfileSection>
+
+      {/* EAA 元数据 */}
+      <ProfileSection title="EAA 系统数据" icon="⚙️">
+        <div className="grid grid-cols-2 gap-2 text-sm">
+          <InfoRow label="分组" value={student.groups.join(', ') || '无'} />
+          <InfoRow label="角色" value={student.roles.join(', ') || '无'} />
+          <InfoRow label="状态" value={student.status} />
+        </div>
+      </ProfileSection>
+    </div>
+  )
+}
+
+// =============================================================
+// 事件选项卡 — 搜索 / 日期范围 / 撤销
+// =============================================================
+
+function EventsTab({
+  events,
+  eventFilter,
+  onFilterChange,
+  timeRange,
+  onTimeRangeChange,
+  reasonCodes,
+  studentName,
+  searchQuery,
+  onSearchQueryChange,
+  dateStart,
+  onDateStartChange,
+  dateEnd,
+  onDateEndChange,
+  onRefresh,
+}: {
+  events: EAAHistoryEvent[]
+  eventFilter: 'all' | 'bonus' | 'deduct'
+  onFilterChange: (f: 'all' | 'bonus' | 'deduct') => void
+  timeRange: 'all' | 'week' | 'month' | 'semester'
+  onTimeRangeChange: (t: 'all' | 'week' | 'month' | 'semester') => void
+  reasonCodes: EAAReasonCode[]
+  studentName: string
+  searchQuery: string
+  onSearchQueryChange: (q: string) => void
+  dateStart: string
+  onDateStartChange: (d: string) => void
+  dateEnd: string
+  onDateEndChange: (d: string) => void
+  onRefresh: () => void
+}) {
+  const { t } = useT()
+  const [expandedEvent, setExpandedEvent] = useState<string | null>(null)
+  // 搜索/范围结果（替换 history 事件）
+  const [searchEvents, setSearchEvents] = useState<EAAHistoryEvent[] | null>(null)
+  const [searchLoading, setSearchLoading] = useState(false)
+  // 自定义确认对话框（替代 window.confirm）
+  const [revertConfirm, setRevertConfirm] = useState<{ open: boolean; eventId: string }>({
+    open: false,
+    eventId: '',
+  })
+
+  // 实际展示的事件列表：有搜索/范围结果时用结果，否则用 props.events
+  const displayEvents = searchEvents ?? events
+
+  // 搜索防抖
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // MEDIUM 修复: 组件卸载时清理 searchTimerRef,防止内存泄漏与卸载后 setState
+  useEffect(() => {
+    return () => {
+      if (searchTimerRef.current) {
+        clearTimeout(searchTimerRef.current)
+        searchTimerRef.current = null
+      }
+    }
+  }, [])
+
+  // 用 ref 持有 performSearch 引用，避免回调依赖变化时频繁重建
+  const performSearchRef = useRef<((q: string, s: string, e: string) => Promise<void>) | null>(null)
+
+  const handleSearchChange = useCallback(
+    (value: string) => {
+      onSearchQueryChange(value)
+      // 清空搜索词时恢复 history 事件
+      if (!value.trim() && !dateStart && !dateEnd) {
+        setSearchEvents(null)
+        return
+      }
+      // 防抖 300ms
+      if (searchTimerRef.current) clearTimeout(searchTimerRef.current)
+      searchTimerRef.current = setTimeout(() => {
+        performSearchRef.current?.(value, dateStart, dateEnd)
+      }, 300)
+    },
+    [dateStart, dateEnd, onSearchQueryChange],
+  )
+
+  const handleDateChange = useCallback(
+    (start: string, end: string) => {
+      onDateStartChange(start)
+      onDateEndChange(end)
+      // 无日期范围且无搜索词时恢复 history 事件
+      if (!start && !end && !searchQuery.trim()) {
+        setSearchEvents(null)
+        return
+      }
+      // 防抖 300ms
+      if (searchTimerRef.current) clearTimeout(searchTimerRef.current)
+      searchTimerRef.current = setTimeout(() => {
+        performSearchRef.current?.(searchQuery, start, end)
+      }, 300)
+    },
+    [searchQuery, onDateStartChange, onDateEndChange],
+  )
+
+  const performSearch = async (query: string, start: string, end: string) => {
+    setSearchLoading(true)
+    try {
+      // 优先级：日期范围 > 关键词搜索
+      if (start && end) {
+        const result = await getAPI().eaa.range(start, end, 100)
+        if (result.success && result.data?.events) {
+          setSearchEvents(result.data.events.map(eventRecordToHistory))
+        } else {
+          setSearchEvents([])
+        }
+      } else if (query.trim()) {
+        const result = await getAPI().eaa.search(query, 100)
+        if (result.success && result.data?.events) {
+          setSearchEvents(result.data.events.map(eventRecordToHistory))
+        } else {
+          setSearchEvents([])
+        }
+      } else {
+        setSearchEvents(null)
+      }
+    } catch (err) {
+      console.warn('[EventsTab] search/range error:', err)
+      toast.error(t('toast.profile.queryEventFailed'))
+      setSearchEvents([])
+    }
+    setSearchLoading(false)
+  }
+
+  // 同步 performSearch 引用到 ref（用于在 useCallback 中调用）
+  performSearchRef.current = performSearch
+
+  const handleRevert = async (eventId: string) => {
+    setRevertConfirm({ open: true, eventId })
+  }
+
+  const executeRevert = async () => {
+    const eventId = revertConfirm.eventId
+    setRevertConfirm({ open: false, eventId: '' })
+    try {
+      const result = await getAPI().eaa.revertEvent(eventId, `由 ${studentName} 档案页撤销`)
+      if (result.success) {
+        toast.success(t('toast.profile.eventReverted'))
+        onRefresh()
+      } else {
+        toast.error(getErrorMessage(result, '撤销失败'))
+      }
+    } catch (err) {
+      console.warn('[EventsTab] revert error:', err)
+      toast.error(t('toast.profile.revertFailed'))
+    }
+  }
+
+  const filterBtn = (val: string, label: string, active: boolean, onClick: () => void) => (
+    <button
+      type="button"
+      key={val}
+      onClick={onClick}
+      className={
+        'px-3 py-1 rounded-lg text-xs transition-colors ' +
+        (active
+          ? 'bg-blue-600 text-white shadow-sm'
+          : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600')
+      }
+    >
+      {label}
+    </button>
+  )
+
+  // 搜索/范围模式指示
+  const isSearchMode = searchEvents !== null
+
+  return (
+    <div className="space-y-3">
+      {/* 搜索框 + 日期范围选择器 */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={(e) => handleSearchChange(e.target.value)}
+          placeholder="搜索事件..."
+          className="flex-1 min-w-[140px] bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-blue-500 dark:focus:border-blue-400 placeholder:text-gray-400 dark:placeholder:text-gray-500"
+        />
+        <input
+          type="date"
+          value={dateStart}
+          onChange={(e) => handleDateChange(e.target.value, dateEnd)}
+          className="bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-blue-500 dark:focus:border-blue-400 text-gray-700 dark:text-gray-300"
+        />
+        <span className="text-xs text-gray-400 dark:text-gray-500">至</span>
+        <input
+          type="date"
+          value={dateEnd}
+          onChange={(e) => handleDateChange(dateStart, e.target.value)}
+          className="bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-blue-500 dark:focus:border-blue-400 text-gray-700 dark:text-gray-300"
+        />
+        {isSearchMode && (
+          <button
+            type="button"
+            onClick={() => {
+              onSearchQueryChange('')
+              onDateStartChange('')
+              onDateEndChange('')
+              setSearchEvents(null)
+            }}
+            className="text-xs text-gray-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400 transition-colors"
+            title="清除搜索/筛选"
+          >
+            ✕ 重置
+          </button>
+        )}
+        {searchLoading && <span className="text-xs text-blue-500 animate-pulse">查询中...</span>}
+      </div>
+
+      {/* 类型 + 时间筛选栏 */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-xs text-gray-500 dark:text-gray-400">类型:</span>
+        {filterBtn('all', '全部', eventFilter === 'all', () => onFilterChange('all'))}
+        {filterBtn('bonus', '加分', eventFilter === 'bonus', () => onFilterChange('bonus'))}
+        {filterBtn('deduct', '扣分', eventFilter === 'deduct', () => onFilterChange('deduct'))}
+        <span className="text-xs text-gray-300 dark:text-gray-600 mx-1">|</span>
+        <span className="text-xs text-gray-500 dark:text-gray-400">时间:</span>
+        {filterBtn('all', '全部', timeRange === 'all', () => onTimeRangeChange('all'))}
+        {filterBtn('week', '本周', timeRange === 'week', () => onTimeRangeChange('week'))}
+        {filterBtn('month', '本月', timeRange === 'month', () => onTimeRangeChange('month'))}
+        {filterBtn('semester', '本学期', timeRange === 'semester', () =>
+          onTimeRangeChange('semester'),
+        )}
+        <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">
+          {isSearchMode ? `搜索结果 ${displayEvents.length} 条` : `共 ${displayEvents.length} 条`}
+        </span>
+      </div>
+
+      {displayEvents.length === 0 ? (
+        <div className="text-gray-400 dark:text-gray-500 text-sm text-center py-12">
+          {searchLoading ? '查询中...' : isSearchMode ? '未找到匹配的事件' : '暂无事件记录'}
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {displayEvents.map((evt) => (
+            <EventCard
+              key={evt.event_id}
+              event={evt}
+              expanded={expandedEvent === evt.event_id}
+              onToggle={() =>
+                setExpandedEvent(expandedEvent === evt.event_id ? null : evt.event_id)
+              }
+              reasonLabel={reasonCodes.find((c) => c.code === evt.reason_code)?.label}
+              onRevert={!evt.reverted ? () => handleRevert(evt.event_id) : undefined}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* 撤销事件确认对话框 */}
+      <ConfirmDialog
+        open={revertConfirm.open}
+        title="撤销事件"
+        message="确定要撤销此事件吗？撤销后分数将回退。"
+        confirmText="撤销"
+        variant="danger"
+        onConfirm={executeRevert}
+        onCancel={() => setRevertConfirm({ open: false, eventId: '' })}
+      />
+    </div>
+  )
+}
+
+// =============================================================
+// 学业选项卡 — 从学业模块(academic:* IPC)加载成绩,与 AcademicsPage 联动
+// =============================================================
+
+// 科目 ID → 中文名 (与学业模块保持一致)
+const ACADEMIC_SUBJECT_MAP: Record<string, string> = {
+  chinese: '语文', math: '数学', english: '英语', physics: '物理', chemistry: '化学',
+  biology: '生物', politics: '政治', history: '历史', geography: '地理', pe: '体育',
+}
+
+function AcademicsTab({
+  studentName,
+  isDark,
+}: {
+  studentName: string
+  isDark: boolean
+}) {
+  const [exams, setExams] = useState<ExamDef[]>([])
+  const [grades, setGrades] = useState<GradeRecord[]>([])
+  const [loading, setLoading] = useState(true)
+
+  // 从学业模块加载考试列表和该学生成绩
+  const loadData = useCallback(async () => {
+    setLoading(true)
+    try {
+      const [examRes, gradeRes] = await Promise.allSettled([
+        getAPI().academic.listExams(),
+        getAPI().academic.getGrades(studentName),
+      ])
+      if (examRes.status === 'fulfilled' && examRes.value.success && examRes.value.data) {
+        setExams(examRes.value.data)
+      }
+      if (gradeRes.status === 'fulfilled' && gradeRes.value.success && gradeRes.value.data) {
+        setGrades(gradeRes.value.data)
+      }
+    } catch (err) {
+      console.warn('[StudentProfile.Academics] Load failed:', err)
+    } finally {
+      setLoading(false)
+    }
+  }, [studentName])
+
+  useEffect(() => {
+    loadData()
+  }, [loadData])
+
+  // 按日期升序排列的考试 (有成绩的)
+  const sortedExams = useMemo(() => {
+    const examIdsWithGrades = new Set(grades.map((g) => g.examId))
+    return exams
+      .filter((e) => examIdsWithGrades.has(e.id))
+      .sort((a, b) => (a.date ?? '').localeCompare(b.date ?? ''))
+  }, [exams, grades])
+
+  // 成绩按考试分组: examId → GradeRecord[]
+  const gradesByExam = useMemo(() => {
+    const m: Record<string, GradeRecord[]> = {}
+    for (const g of grades) {
+      if (!m[g.examId]) m[g.examId] = []
+      m[g.examId].push(g)
+    }
+    return m
+  }, [grades])
+
+  // 偏科分析: 计算各科目平均分
+  const subjectAnalysis = useMemo(() => {
+    const subjectScores: Record<string, number[]> = {}
+    for (const g of grades) {
+      if (g.score != null && g.score > 0) {
+        if (!subjectScores[g.subjectId]) subjectScores[g.subjectId] = []
+        subjectScores[g.subjectId].push(g.score)
+      }
+    }
+    const avgs = Object.entries(subjectScores).map(([subId, scores]) => ({
+      subjectId: subId,
+      subject: ACADEMIC_SUBJECT_MAP[subId] ?? subId,
+      avg: scores.reduce((a, b) => a + b, 0) / scores.length,
+    }))
+    avgs.sort((a, b) => b.avg - a.avg)
+    return {
+      strongest: avgs[0] ?? null,
+      weakest: avgs[avgs.length - 1] ?? null,
+      all: avgs,
+    }
+  }, [grades])
+
+  // 趋势图数据: x轴=考试名, series=各科目分数
+  const trendData = useMemo(() => {
+    if (sortedExams.length === 0) return null
+    const labels = sortedExams.map((e) => e.name)
+    // 收集所有出现过的科目
+    const subjectIds = new Set<string>()
+    for (const exam of sortedExams) {
+      const gs = gradesByExam[exam.id] ?? []
+      for (const g of gs) subjectIds.add(g.subjectId)
+    }
+    const series = Array.from(subjectIds).map((subId) => ({
+      name: ACADEMIC_SUBJECT_MAP[subId] ?? subId,
+      data: sortedExams.map((exam) => {
+        const g = (gradesByExam[exam.id] ?? []).find((gr) => gr.subjectId === subId)
+        return g?.score ?? null
+      }),
+    })).filter((s) => s.data.some((v) => v != null))
+    return { labels, series }
+  }, [sortedExams, gradesByExam])
+
+  const gridColor = isDark ? '#1f2937' : '#e5e7eb'
+  const axisColor = isDark ? '#9ca3af' : '#6b7280'
+  const colors = ['#3b82f6', '#ef4444', '#22c55e', '#a855f7', '#f97316', '#06b6d4', '#ec4899', '#eab308', '#14b8a6', '#6366f1']
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12 text-sm text-gray-400">
+        加载学业数据...
+      </div>
+    )
+  }
+
+  if (grades.length === 0) {
+    return (
+      <div className="space-y-3">
+        <div className="text-center py-8 text-sm text-gray-400 dark:text-gray-500">
+          📚 暂无学业成绩
+        </div>
+        <div className="text-center text-xs text-gray-400 dark:text-gray-500">
+          请到「学业」页面录入考试成绩,数据将自动同步至此
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">学业成绩</h4>
+        <span className="text-xs text-gray-400 dark:text-gray-500">
+          {grades.length} 条成绩 · {sortedExams.length} 场考试
+        </span>
+      </div>
+
+      {/* 各考试成绩卡片 */}
+      <div className="grid grid-cols-2 gap-3">
+        {sortedExams.map((exam) => {
+          const examGrades = gradesByExam[exam.id] ?? []
+          const avg = examGrades.length > 0
+            ? examGrades.filter((g) => g.score != null).reduce((sum, g) => sum + (g.score ?? 0), 0) / examGrades.filter((g) => g.score != null).length
+            : 0
+          return (
+            <div
+              key={exam.id}
+              className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 shadow-sm"
+            >
+              <h5 className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-3 flex items-center justify-between">
+                <span>{exam.name}</span>
+                <span className="text-[10px] text-gray-400">{exam.date}</span>
+              </h5>
+              <div className="space-y-1.5">
+                {examGrades.map((g) => (
+                  <div key={`${g.examId}-${g.subjectId}`} className="flex items-center justify-between text-sm">
+                    <span className="text-gray-600 dark:text-gray-300">
+                      {ACADEMIC_SUBJECT_MAP[g.subjectId] ?? g.subjectId}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-gray-700 dark:text-gray-200">
+                        {g.score ?? '-'}
+                      </span>
+                      {g.fullMark != null && (
+                        <span className="text-[10px] text-gray-400">/{g.fullMark}</span>
+                      )}
+                      {g.classRank != null && (
+                        <span className="text-[10px] text-blue-500">#{g.classRank}</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {examGrades.some((g) => g.score != null) && (
+                <div className="mt-3 pt-2 border-t border-gray-100 dark:border-gray-700 text-xs text-gray-500 dark:text-gray-400 flex justify-between">
+                  <span>平均分</span>
+                  <span className="font-mono font-bold text-blue-600 dark:text-blue-400">
+                    {avg.toFixed(1)}
+                  </span>
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+
+      {/* 成绩趋势图 */}
+      {trendData && trendData.series.length > 0 && (
+        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 shadow-sm">
+          <h5 className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-3">📈 成绩趋势</h5>
+          <ReactEChartsCore
+            echarts={echarts}
+            style={{ height: 280 }}
+            option={{
+              animation: true,
+              animationDuration: 1000,
+              tooltip: { trigger: 'axis' },
+              legend: {
+                data: trendData.series.map((s) => s.name),
+                bottom: 0,
+                textStyle: { color: axisColor, fontSize: 11 },
+              },
+              grid: { left: 8, right: 8, top: 8, bottom: 36, containLabel: true },
+              xAxis: {
+                type: 'category',
+                data: trendData.labels,
+                axisLabel: { color: axisColor, fontSize: 11 },
+                axisLine: { lineStyle: { color: gridColor } },
+              },
+              yAxis: {
+                type: 'value',
+                axisLabel: { color: axisColor },
+                splitLine: { lineStyle: { color: gridColor, type: 'dashed' } },
+              },
+              series: trendData.series.map((s, i) => ({
+                name: s.name,
+                type: 'line',
+                data: s.data,
+                smooth: true,
+                lineStyle: { color: colors[i % colors.length], width: 2 },
+                itemStyle: { color: colors[i % colors.length] },
+                symbol: 'circle',
+                symbolSize: 5,
+              })),
+            }}
+          />
+        </div>
+      )}
+
+      {/* 偏科分析 */}
+      {subjectAnalysis.all.length > 0 && (
+        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 shadow-sm">
+          <h5 className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-3">📊 偏科分析</h5>
+          <div className="grid grid-cols-2 gap-4 mb-3">
+            {subjectAnalysis.strongest && (
+              <div className="bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/10 dark:to-emerald-900/10 rounded-lg p-3 border border-green-200/50 dark:border-green-700/30">
+                <div className="text-xs text-green-600 dark:text-green-400 font-medium">
+                  🏆 最强科目
+                </div>
+                <div className="flex items-baseline gap-2 mt-1">
+                  <span className="text-lg font-bold text-green-700 dark:text-green-300">
+                    {subjectAnalysis.strongest.subject}
+                  </span>
+                  <span className="text-sm text-green-500">
+                    {subjectAnalysis.strongest.avg.toFixed(1)}分
+                  </span>
+                </div>
+              </div>
+            )}
+            {subjectAnalysis.weakest && subjectAnalysis.all.length > 1 && (
+              <div className="bg-gradient-to-br from-red-50 to-rose-50 dark:from-red-900/10 dark:to-rose-900/10 rounded-lg p-3 border border-red-200/50 dark:border-red-700/30">
+                <div className="text-xs text-red-600 dark:text-red-400 font-medium">⚠️ 最弱科目</div>
+                <div className="flex items-baseline gap-2 mt-1">
+                  <span className="text-lg font-bold text-red-700 dark:text-red-300">
+                    {subjectAnalysis.weakest.subject}
+                  </span>
+                  <span className="text-sm text-red-500">
+                    {subjectAnalysis.weakest.avg.toFixed(1)}分
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+          <ReactEChartsCore
+            echarts={echarts}
+            style={{ height: 180 }}
+            option={{
+              animation: true,
+              animationDuration: 800,
+              grid: { left: 38, right: 8, top: 8, bottom: 0, containLabel: true },
+              tooltip: { trigger: 'axis' },
+              xAxis: {
+                type: 'category',
+                data: subjectAnalysis.all.map((a) => a.subject),
+                axisLabel: { color: axisColor, fontSize: 11 },
+                axisLine: { lineStyle: { color: gridColor } },
+              },
+              yAxis: {
+                type: 'value',
+                axisLabel: { color: axisColor },
+                splitLine: { lineStyle: { color: gridColor, type: 'dashed' } },
+              },
+              series: [
+                {
+                  type: 'bar',
+                  data: subjectAnalysis.all.map((a, i) => ({
+                    value: a.avg.toFixed(1),
+                    itemStyle: {
+                      borderRadius: [4, 4, 0, 0],
+                      color: colors[i % colors.length],
+                    },
+                  })),
+                  barWidth: '40%',
+                },
+              ],
+            }}
+          />
+        </div>
+      )}
+    </div>
+  )
+}
+
+// =============================================================
+// AI 分析选项卡
+// =============================================================
+
+function AIAnalysisTab({
+  agents,
+  selectedAgents,
+  onToggleAgent,
+  onRunSelected,
+  onRunAll,
+  running,
+  output,
+  message,
+  aiSaved,
+  onSaveResult,
+}: {
+  agents: AgentListItem[]
+  selectedAgents: Set<string>
+  onToggleAgent: (id: string) => void
+  onRunSelected: () => void
+  onRunAll: () => void
+  running: boolean
+  output: string
+  message: string
+  aiSaved: boolean
+  onSaveResult: () => void
+}) {
+  const enabledAgents = useMemo(() => agents.filter((a) => a.enabled), [agents])
+
+  const sections = useMemo(() => {
+    if (!output) return []
+    const result: { title: string; content: string }[] = []
+    const lines = output.split('\n')
+    let currentTitle = '分析输出'
+    let currentContent = ''
+    for (const line of lines) {
+      if (
+        line.match(/^(===\s*|##\s*|【.+】)/) ||
+        line.includes('操行总结') ||
+        line.includes('风险预警') ||
+        line.includes('行为模式') ||
+        line.includes('教育建议')
+      ) {
+        if (currentContent.trim()) {
+          result.push({ title: currentTitle, content: currentContent.trim() })
+        }
+        currentTitle = line
+          .replace(/^[=\-#\s【】]+/g, '')
+          .replace(/[\s=]+$/g, '')
+          .trim()
+        currentContent = ''
+      } else {
+        currentContent += `${line}\n`
+      }
+    }
+    if (currentContent.trim()) {
+      result.push({ title: currentTitle, content: currentContent.trim() })
+    }
+    return result.length > 0 ? result : [{ title: '分析输出', content: output }]
+  }, [output])
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">AI 分析</h4>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={onRunSelected}
+            disabled={running || selectedAgents.size === 0}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg text-xs transition-colors disabled:opacity-50 shadow-sm"
+          >
+            {running ? '运行中...' : `🚀 运行选中 (${selectedAgents.size})`}
+          </button>
+          <button
+            type="button"
+            onClick={onRunAll}
+            disabled={running || enabledAgents.length === 0}
+            className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white px-3 py-1.5 rounded-lg text-xs transition-colors disabled:opacity-50 shadow-sm"
+          >
+            🤖 运行全部
+          </button>
+          {output && !running && (
+            <button
+              type="button"
+              onClick={onSaveResult}
+              className={
+                'px-3 py-1.5 rounded-lg text-xs transition-colors shadow-sm ' +
+                (aiSaved
+                  ? 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400'
+                  : 'bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300')
+              }
+            >
+              {aiSaved ? '✅ 已保存' : '💾 保存结果'}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {message && (
+        <div className={`text-xs ${message.includes('失败') ? 'text-red-500' : 'text-green-500'}`}>
+          {message}
+        </div>
+      )}
+
+      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 shadow-sm">
+        <h5 className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">
+          选择分析 Agent
+        </h5>
+        <div className="space-y-1.5 max-h-48 overflow-y-auto">
+          {enabledAgents.length === 0 ? (
+            <div className="text-gray-400 dark:text-gray-500 text-xs py-4 text-center">
+              暂无可用 Agent
+            </div>
+          ) : (
+            enabledAgents.map((agent) => (
+              <div
+                key={agent.id}
+                role="button"
+                tabIndex={0}
+                onClick={() => onToggleAgent(agent.id)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    onToggleAgent(agent.id)
+                  }
+                }}
+                className={
+                  'flex items-center gap-3 p-2.5 rounded-lg cursor-pointer transition-colors ' +
+                  (selectedAgents.has(agent.id)
+                    ? 'bg-blue-500/10 border border-blue-500/30'
+                    : 'hover:bg-gray-50 dark:hover:bg-gray-700/50 border border-transparent')
+                }
+              >
+                <input
+                  type="checkbox"
+                  checked={selectedAgents.has(agent.id)}
+                  onChange={() => {}}
+                  className="rounded accent-blue-500"
+                />
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium truncate">{agent.name}</div>
+                  <div className="text-xs text-gray-400 dark:text-gray-500 truncate">
+                    {agent.description}
+                  </div>
+                </div>
+                <span
+                  className={
+                    'text-[10px] px-2 py-0.5 rounded-full ' +
+                    (agent.status === 'idle'
+                      ? 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400'
+                      : agent.status === 'running'
+                        ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
+                        : 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400')
+                  }
+                >
+                  {agent.status === 'idle'
+                    ? '待机'
+                    : agent.status === 'running'
+                      ? '运行中'
+                      : '错误'}
+                </span>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+
+      {output && (
+        <div className="space-y-3">
+          {sections.map((section) => (
+            <div
+              key={section.title}
+              className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden"
+            >
+              <div className="px-4 py-2.5 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 border-b border-gray-100 dark:border-gray-700">
+                <h5 className="text-xs font-semibold text-gray-700 dark:text-gray-200">
+                  {section.title}
+                </h5>
+              </div>
+              <div className="p-4">
+                <pre className="text-xs text-gray-600 dark:text-gray-300 whitespace-pre-wrap font-sans leading-relaxed">
+                  {section.content}
+                </pre>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="bg-gradient-to-br from-gray-50 to-blue-50 dark:from-gray-800/50 dark:to-blue-900/10 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
+        <h5 className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">
+          📋 分析维度建议
+        </h5>
+        <div className="grid grid-cols-2 gap-2 text-xs text-gray-600 dark:text-gray-300">
+          <div className="flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-blue-400"></span>操行分数趋势分析
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-red-400"></span>风险等级评估与预警
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-purple-400"></span>行为模式识别
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-green-400"></span>学业与操行关联性分析
+          </div>
+          <div className="flex items-center gap-1.5 col-span-2">
+            <span className="w-1.5 h-1.5 rounded-full bg-yellow-400"></span>个性化教育建议
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// =============================================================
+// 内联添加事件组件
+// =============================================================
+
+function AddEventInline({
+  studentName,
+  reasonCodes,
+  onDone,
+}: {
+  studentName: string
+  reasonCodes: EAAReasonCode[]
+  onDone: () => void
+}) {
+  const [reasonCode, setReasonCode] = useState('')
+  const [delta, setDelta] = useState('')
+  const [note, setNote] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+
+  const handleSubmit = async () => {
+    if (!reasonCode) return
+    setSubmitting(true)
+    try {
+      const result = await getAPI().eaa.addEvent({
+        studentName,
+        reasonCode,
+        delta: delta ? Number.parseFloat(delta) : undefined,
+        note: note || undefined,
+      })
+      if (result.success) {
+        onDone()
+      } else {
+        toast.error(`添加失败: ${getErrorMessage(result)}`)
+      }
+    } catch (err) {
+      toast.error(`提交失败: ${err instanceof Error ? err.message : String(err)}`)
+    }
+    setSubmitting(false)
+  }
+
+  return (
+    <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/10 dark:to-purple-900/10">
+      <div className="grid grid-cols-3 gap-2 mb-2">
+        <select
+          value={reasonCode}
+          onChange={(e) => {
+            setReasonCode(e.target.value)
+            const code = reasonCodes.find((c) => c.code === e.target.value)
+            if (code?.score_delta != null) setDelta(String(code.score_delta))
+          }}
+          className="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg px-2 py-2 text-sm col-span-2 focus:outline-none focus:border-blue-500"
+        >
+          <option value="">选择原因码...</option>
+          {reasonCodes.map((c) => (
+            <option key={c.code} value={c.code}>
+              {c.label} ({c.code}){' '}
+              {c.score_delta != null ? `[${c.score_delta > 0 ? '+' : ''}${c.score_delta}]` : ''}
+            </option>
+          ))}
+        </select>
+        <input
+          type="number"
+          value={delta}
+          onChange={(e) => setDelta(e.target.value)}
+          placeholder="分数"
+          step="0.5"
+          className="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg px-2 py-2 text-sm focus:outline-none focus:border-blue-500"
+        />
+      </div>
+      <input
+        type="text"
+        value={note}
+        onChange={(e) => setNote(e.target.value)}
+        placeholder="备注（可选）"
+        className="w-full bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg px-2 py-2 text-sm mb-2 focus:outline-none focus:border-blue-500"
+      />
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={handleSubmit}
+          disabled={submitting || !reasonCode}
+          className="bg-green-600 hover:bg-green-700 text-white px-4 py-1.5 rounded-lg text-xs transition-colors disabled:opacity-50 shadow-sm"
+        >
+          {submitting ? '提交中...' : '确认添加'}
+        </button>
+        <button
+          type="button"
+          onClick={onDone}
+          className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-200 text-xs px-2"
+        >
+          取消
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// =============================================================
+// 小型组件
+// =============================================================
+
+function MetricCard({
+  label,
+  value,
+  color,
+}: {
+  label: string
+  value: string | number
+  color: string
+}) {
+  const g: Record<string, string> = {
+    blue: 'from-blue-500/10 to-blue-600/5 border-blue-500/20 text-blue-600 dark:text-blue-400',
+    green:
+      'from-green-500/10 to-green-600/5 border-green-500/20 text-green-600 dark:text-green-400',
+    red: 'from-red-500/10 to-red-600/5 border-red-500/20 text-red-600 dark:text-red-400',
+    yellow:
+      'from-yellow-500/10 to-yellow-600/5 border-yellow-500/20 text-yellow-600 dark:text-yellow-400',
+  }
+  return (
+    <div className={`rounded-xl border p-3 bg-gradient-to-br ${g[color] ?? ''} shadow-sm`}>
+      <div className="text-xs opacity-70">{label}</div>
+      <div className="text-xl font-bold mt-1">{value}</div>
+    </div>
+  )
+}
+
+function InfoRow({
+  label,
+  value,
+  highlight,
+}: {
+  label: string
+  value: unknown
+  highlight?: string
+}) {
+  return (
+    <div className="flex items-center justify-between py-1.5 border-b border-gray-50 dark:border-gray-700/50 last:border-0">
+      <span className="text-gray-500 dark:text-gray-400 text-xs">{label}</span>
+      <span className={`font-medium text-sm ${highlight ?? ''}`}>{String(value)}</span>
+    </div>
+  )
+}
+
+function ProfileSection({
+  title,
+  icon,
+  children,
+}: {
+  title: string
+  icon: string
+  children: React.ReactNode
+}) {
+  return (
+    <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
+      <div className="px-4 py-2.5 bg-gray-50 dark:bg-gray-800/80 border-b border-gray-100 dark:border-gray-700 flex items-center gap-2">
+        <span>{icon}</span>
+        <h5 className="text-xs font-semibold text-gray-600 dark:text-gray-300">{title}</h5>
+      </div>
+      <div className="p-4">{children}</div>
+    </div>
+  )
+}
+
+function ProfileField({
+  label,
+  value,
+  editing,
+  type,
+  options,
+  onChange,
+  multiline,
+  spanFull,
+}: {
+  label: string
+  value: string
+  editing: boolean
+  type?: string
+  options?: string[]
+  onChange?: (v: string) => void
+  multiline?: boolean
+  spanFull?: boolean
+}) {
+  const baseClass =
+    'w-full bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 transition-colors'
+  return (
+    <div className={spanFull ? 'col-span-2' : ''}>
+      {label && (
+        <div className="text-[11px] text-gray-400 dark:text-gray-500 font-medium">{label}</div>
+      )}
+      {editing ? (
+        multiline ? (
+          <textarea
+            value={value}
+            onChange={(e) => onChange?.(e.target.value)}
+            className={baseClass + (label ? ' mt-1' : '')}
+            rows={3}
+          />
+        ) : type === 'select' && options ? (
+          <select
+            value={value}
+            onChange={(e) => onChange?.(e.target.value)}
+            className={baseClass + (label ? ' mt-1' : '')}
+          >
+            <option value="">未选择</option>
+            {options.map((o) => (
+              <option key={o} value={o}>
+                {o}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <input
+            type={type ?? 'text'}
+            value={value}
+            onChange={(e) => onChange?.(e.target.value)}
+            className={baseClass + (label ? ' mt-1' : '')}
+          />
+        )
+      ) : (
+        <div
+          className={`${label ? 'mt-1 ' : ''}text-sm font-medium text-gray-700 dark:text-gray-200`}
+        >
+          {value || '-'}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function EventMiniCard({ event }: { event: EAAHistoryEvent }) {
+  const isBonus = event.score_delta > 0
+  return (
+    <div className="flex items-center justify-between text-sm p-2.5 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-100 dark:border-gray-700/50">
+      <div className="flex items-center gap-2 min-w-0">
+        <span className={`font-mono font-bold ${isBonus ? 'text-green-500' : 'text-red-500'}`}>
+          {isBonus ? '+' : ''}
+          {event.score_delta.toFixed(1)}
+        </span>
+        <span className="text-[10px] bg-gray-200 dark:bg-gray-700 px-1.5 py-0.5 rounded font-mono">
+          {event.reason_code}
+        </span>
+        {event.note && (
+          <span className="text-xs text-gray-400 dark:text-gray-500 truncate">{event.note}</span>
+        )}
+      </div>
+      <span className="text-[10px] text-gray-400 dark:text-gray-500 ml-2 flex-shrink-0">
+        {new Date(event.timestamp).toLocaleDateString()}
+      </span>
+    </div>
+  )
+}
+
+function EventCard({
+  event,
+  expanded,
+  onToggle,
+  reasonLabel,
+  onRevert,
+}: {
+  event: EAAHistoryEvent
+  expanded: boolean
+  onToggle: () => void
+  reasonLabel?: string
+  onRevert?: () => void
+}) {
+  const isBonus = event.score_delta > 0
+  const isDeduct = event.score_delta < 0
+  return (
+    <div
+      className={
+        'rounded-xl border p-3.5 transition-all ' +
+        (event.reverted
+          ? 'bg-gray-50 dark:bg-gray-800/50 opacity-60 border-gray-100 dark:border-gray-700'
+          : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md')
+      }
+    >
+      <div
+        className="flex items-center justify-between cursor-pointer"
+        role="button"
+        tabIndex={0}
+        onClick={onToggle}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            onToggle()
+          }
+        }}
+      >
+        <div className="flex items-center gap-2 min-w-0">
+          <span
+            className={`font-mono font-bold text-sm ${isBonus ? 'text-green-500' : isDeduct ? 'text-red-500' : 'text-gray-500'}`}
+          >
+            {isBonus ? '+' : ''}
+            {event.score_delta.toFixed(1)}
+          </span>
+          <span className="text-xs bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded-full font-medium">
+            {reasonLabel ?? event.reason_code}
+          </span>
+          {event.reverted && (
+            <span className="text-[10px] bg-red-100 dark:bg-red-900/30 text-red-500 px-1.5 py-0.5 rounded">
+              已撤销
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-2 text-xs text-gray-400 dark:text-gray-500 flex-shrink-0">
+          <span>{new Date(event.timestamp).toLocaleDateString()}</span>
+          <span className="text-gray-300 dark:text-gray-600">{expanded ? '▲' : '▼'}</span>
+        </div>
+      </div>
+      {expanded && (
+        <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700 text-xs space-y-1.5">
+          {event.note && <div className="text-gray-600 dark:text-gray-300">📝 {event.note}</div>}
+          <div className="flex gap-4 text-gray-500 dark:text-gray-400">
+            <span>
+              累计: <span className="font-mono">{event.cumulative.toFixed(1)}</span>
+            </span>
+            <span>标签: {event.tags.join(', ') || '无'}</span>
+          </div>
+          {/* 撤销按钮：仅未撤销事件显示 */}
+          {onRevert && !event.reverted && (
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onRevert()
+                }}
+                className="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 text-xs font-medium transition-colors"
+              >
+                ↩ 撤销此事件
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}

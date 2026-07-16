@@ -1,0 +1,196 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+# Cancel in-progress runs for the same tag.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  # ----------------------------------------------------------------
+  # Build all platform installers.
+  # ----------------------------------------------------------------
+  build:
+    name: Build ${{ matrix.target }} (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Windows x64 — NSIS + portable
+          - os: windows-latest
+            target: win
+            arch: x64
+          # macOS x64 (Intel) — dmg
+          - os: macos-latest
+            target: mac
+            arch: x64
+          # macOS arm64 (Apple Silicon) — dmg
+          - os: macos-latest
+            target: mac
+            arch: arm64
+          # Linux x64 — AppImage + deb
+          - os: ubuntu-22.04
+            target: linux
+            arch: x64
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        shell: bash
+        run: npm ci
+
+      - name: Typecheck
+        shell: bash
+        run: npm run typecheck
+
+      - name: Lint
+        shell: bash
+        run: npm run lint
+
+      - name: Test
+        shell: bash
+        run: npm run test
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build Rust EAA binary from source
+        # We build from source (core/eaa-cli/) rather than downloading a
+        # prebuilt release: the Rust source IS in this monorepo, so there
+        # is no need to keep a separate release pipeline in sync. The
+        # binary is then placed in the location electron-builder expects.
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd core/eaa-cli
+          cargo build --release
+          cd ../..
+          PLATFORM_DIR="$(node -e 'const o=require("os"); console.log(o.platform()+"-"+o.arch())')"
+          TARGET="resources/eaa-binaries/${PLATFORM_DIR}"
+          mkdir -p "$TARGET"
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            cp "core/eaa-cli/target/release/eaa.exe" "$TARGET/eaa.exe"
+          else
+            cp "core/eaa-cli/target/release/eaa" "$TARGET/eaa"
+            chmod +x "$TARGET/eaa"
+          fi
+          ls -la "$TARGET/"
+
+      - name: Build
+        shell: bash
+        run: npm run build
+
+      - name: Package
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Code signing environment variables (set in repo settings)
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        shell: bash
+        run: |
+          # electron-builder treats an EMPTY CSC_LINK as "set" and then
+          # path.resolve(currentDir, '') resolves to the project root,
+          # which is a directory not a file → "X not a file" error.
+          # Unset the code-signing env vars when they are empty so
+          # electron-builder skips code signing entirely.
+          for var in CSC_LINK CSC_KEY_PASSWORD APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID; do
+            if [ -z "${!var}" ]; then unset "$var"; fi
+          done
+          npx electron-builder \
+            --${{ matrix.target }} \
+            --${{ matrix.arch }} \
+            --publish never \
+            --config.extraMetadata.version=${GITHUB_REF_NAME#v}
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: installer-${{ matrix.target }}-${{ matrix.arch }}
+          path: |
+            release/*.exe
+            release/*.dmg
+            release/*.AppImage
+            release/*.deb
+          retention-days: 14
+          if-no-files-found: error
+
+  # ----------------------------------------------------------------
+  # Publish the GitHub Release.
+  # ----------------------------------------------------------------
+  publish:
+    name: Publish GitHub Release
+    runs-on: ubuntu-latest
+    needs: build
+    permissions:
+      contents: write
+      id-token: write # for sigstore / cosign signing
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Generate checksums
+        shell: bash
+        run: |
+          cd artifacts
+          find . -type f \( -name "*.exe" -o -name "*.dmg" -o -name "*.AppImage" -o -name "*.deb" \) \
+            -exec sha256sum {} \; > SHA256SUMS
+          cat SHA256SUMS
+
+      - name: Sign checksums (cosign)
+        # Cosign keyless OIDC signing requires a Fulcio server reachable
+        # from the runner AND OIDC token exchange. For pre-releases and
+        # local builds we just skip it. For GA releases, set the
+        # \`SIGN_CHECKSUMS\` repository variable to "true\" to enable.
+        if: startsWith(github.ref, 'refs/tags/v') && vars.SIGN_CHECKSUMS == 'true'
+        env:
+          COSIGN_EXPERIMENTAL: "1"
+        run: |
+          cosign sign-blob --yes \
+            --output-signature artifacts/SHA256SUMS.sig \
+            --output-certificate artifacts/SHA256SUMS.pem \
+            artifacts/SHA256SUMS
+        continue-on-error: true
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-rc') || contains(github.ref_name, '-beta') || contains(github.ref_name, '-alpha') }}
+          generate_release_notes: true
+          files: |
+            artifacts/**/*.exe
+            artifacts/**/*.dmg
+            artifacts/**/*.AppImage
+            artifacts/**/*.deb
+            artifacts/SHA256SUMS
+            artifacts/SHA256SUMS.sig
+            artifacts/SHA256SUMS.pem
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

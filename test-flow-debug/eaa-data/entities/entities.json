@@ -1,0 +1,112 @@
+{
+  "entities": {
+    "ent_458a70c5e0e4": {
+      "id": "ent_458a70c5e0e4",
+      "name": "临时删除测试学生",
+      "aliases": [],
+      "status": "DELETED",
+      "created_at": "2026-07-12T11:11:32+08:00",
+      "metadata": {
+        "deleted_at": "2026-07-12T11:11:32+08:00",
+        "delete_reason": "测试删除"
+      }
+    },
+    "ent_9041a52c374f": {
+      "id": "ent_9041a52c374f",
+      "name": "batch_000",
+      "aliases": [],
+      "status": "ACTIVE",
+      "created_at": "2026-07-12T11:11:32+08:00",
+      "metadata": {}
+    },
+    "ent_a3e9aa444023": {
+      "id": "ent_a3e9aa444023",
+      "name": "batch_009",
+      "aliases": [],
+      "status": "ACTIVE",
+      "created_at": "2026-07-12T11:11:33+08:00",
+      "metadata": {}
+    },
+    "ent_a5a92699eae1": {
+      "id": "ent_a5a92699eae1",
+      "name": "缓存测试学生B",
+      "aliases": [],
+      "status": "ACTIVE",
+      "created_at": "2026-07-12T11:11:32+08:00",
+      "metadata": {}
+    },
+    "ent_38d1d8a9fe37": {
+      "id": "ent_38d1d8a9fe37",
+      "name": "batch_007",
+      "aliases": [],
+      "status": "ACTIVE",
+      "created_at": "2026-07-12T11:11:33+08:00",
+      "metadata": {}
+    },
+    "ent_2e8ff019b928": {
+      "id": "ent_2e8ff019b928",
+      "name": "batch_008",
+      "aliases": [],
+      "status": "ACTIVE",
+      "created_at": "2026-07-12T11:11:33+08:00",
+      "metadata": {}
+    },
+    "ent_c355b12618d1": {
+      "id": "ent_c355b12618d1",
+      "name": "batch_001",
+      "aliases": [],
+      "status": "ACTIVE",
+      "created_at": "2026-07-12T11:11:33+08:00",
+      "metadata": {}
+    },
+    "ent_3a2749a24e5b": {
+      "id": "ent_3a2749a24e5b",
+      "name": "batch_004",
+      "aliases": [],
+      "status": "ACTIVE",
+      "created_at": "2026-07-12T11:11:33+08:00",
+      "metadata": {}
+    },
+    "ent_4d87838ff026": {
+      "id": "ent_4d87838ff026",
+      "name": "batch_003",
+      "aliases": [],
+      "status": "ACTIVE",
+      "created_at": "2026-07-12T11:11:33+08:00",
+      "metadata": {}
+    },
+    "ent_f1a89478cb99": {
+      "id": "ent_f1a89478cb99",
+      "name": "batch_006",
+      "aliases": [],
+      "status": "ACTIVE",
+      "created_at": "2026-07-12T11:11:33+08:00",
+      "metadata": {}
+    },
+    "ent_79d3f85b37f1": {
+      "id": "ent_79d3f85b37f1",
+      "name": "batch_005",
+      "aliases": [],
+      "status": "ACTIVE",
+      "created_at": "2026-07-12T11:11:33+08:00",
+      "metadata": {}
+    },
+    "ent_c16c0225dfeb": {
+      "id": "ent_c16c0225dfeb",
+      "name": "batch_002",
+      "aliases": [],
+      "status": "ACTIVE",
+      "created_at": "2026-07-12T11:11:33+08:00",
+      "metadata": {}
+    },
+    "ent_d6f3f5a61d8a": {
+      "id": "ent_d6f3f5a61d8a",
+      "name": "缓存测试学生A",
+      "aliases": [],
+      "status": "ACTIVE",
+      "created_at": "2026-07-12T11:11:32+08:00",
+      "metadata": {},
+      "class_id": "TEST-CLASS-1"
+    }
+  }
+}

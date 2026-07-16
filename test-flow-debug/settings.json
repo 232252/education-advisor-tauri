@@ -1,0 +1,75 @@
+{
+  "general": {
+    "dataDir": "C:\\Users\\sq199\\Documents\\GitHub\\education-advisor-tuari\\test-flow-debug\\eaa-data",
+    "defaultOperator": "",
+    "theme": "dark",
+    "language": "zh-CN",
+    "autoUpdate": true,
+    "updateUrl": "",
+    "telemetry": false,
+    "logLevel": "info",
+    "autoStart": false,
+    "minimizeToTray": true,
+    "closeBehavior": "ask",
+    "timezone": "Asia/Shanghai"
+  },
+  "models": {
+    "defaultProvider": "",
+    "defaultModel": "",
+    "highQualityModel": "",
+    "lowCostModel": "",
+    "enabledModels": [],
+    "transport": "auto",
+    "cacheRetention": "short",
+    "retry": {
+      "enabled": true,
+      "maxRetries": 3,
+      "baseDelayMs": 1000,
+      "providerTimeoutMs": 60000
+    },
+    "providerBlacklist": [],
+    "customModels": {}
+  },
+  "chat": {
+    "compaction": {
+      "enabled": true,
+      "reserveTokens": 8000,
+      "keepRecentTokens": 16000
+    },
+    "steeringMode": "all",
+    "followUpMode": "all",
+    "showImages": true,
+    "maxTokens": 32768,
+    "conversationLogging": true,
+    "thinkingLevel": "medium"
+  },
+  "privacy": {
+    "enabled": false,
+    "autoAnonymize": false
+  },
+  "feishu": {
+    "appId": "",
+    "appSecret": "",
+    "userOpenId": "",
+    "bitableAppToken": "",
+    "bitableTableId": "",
+    "bitableSync": {
+      "enabled": false,
+      "syncInterval": "0 */6 * * *"
+    }
+  },
+  "advanced": {
+    "shellPath": "",
+    "sessionDir": "",
+    "httpIdleTimeoutMs": 120000
+  },
+  "shortcuts": {
+    "chat.new": "Ctrl+N",
+    "chat.send": "Enter",
+    "chat.abort": "Escape",
+    "nav.agents": "Ctrl+Shift+A",
+    "nav.models": "Ctrl+Shift+M",
+    "nav.settings": "Ctrl+,",
+    "nav.scheduler": "Ctrl+Shift+T"
+  }
+}

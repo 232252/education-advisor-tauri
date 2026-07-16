@@ -1,0 +1,17 @@
+[
+  {
+    "event_id": "evt_df16ae63c840",
+    "entity_id": "ent_d6f3f5a61d8a",
+    "event_type": "CONDUCT_DEDUCT",
+    "category_tags": [],
+    "reason_code": "SPEAK_IN_CLASS",
+    "original_reason": "SPEAK_IN_CLASS",
+    "score_delta": -2.0,
+    "evidence_ref": "cli:manual",
+    "operator": "班主任",
+    "timestamp": "2026-07-12T11:11:32+08:00",
+    "is_valid": true,
+    "reverted_by": null,
+    "note": "缓存失效测试"
+  }
+]
