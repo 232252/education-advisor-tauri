@@ -40,24 +40,39 @@
       "icons/128x128@2x.png",
       "icons/icon.ico"
     ],
-    "resources": [
-      "../config",
-      "../resources/eaa-binaries",
-      "../resources/node.exe",
-      "../agents",
-      "../sidecar",
-      "../dist/sidecar",
-      "../dist/main",
-      "../dist/node_modules",
-      "../vendor/pi-ai/dist",
-      "../vendor/pi-ai/package.json",
-      "../package.json",
-      "../package-lock.json"
-    ],
+    "resources": {
+      "../config": "config",
+      "../resources/eaa-binaries": "eaa-binaries",
+      "../resources/node.exe": "node.exe",
+      "../agents": "agents",
+      "../sidecar": "sidecar",
+      "../dist/sidecar": "dist/sidecar",
+      "../dist/main": "dist/main",
+      "../dist/node_modules": "dist/node_modules",
+      "../vendor/pi-ai/dist": "vendor/pi-ai/dist",
+      "../vendor/pi-ai/package.json": "vendor/pi-ai/package.json",
+      "../package.json": "package.json",
+      "../package-lock.json": "package-lock.json"
+    },
     "copyright": "MIT",
     "category": "Education",
-    "shortDescription": "Multi-agent education management desktop app",
-    "longDescription": "Education Advisor — the desktop edition of the open-source multi-agent education management system, migrated to Tauri."
+    "shortDescription": "多智能体教育管理桌面应用",
+    "longDescription": "教育顾问 —— 开源多智能体教育管理系统的桌面版，基于 Tauri 构建。",
+    "windows": {
+      "nsis": {
+        "languages": ["SimpChinese"],
+        "displayLanguageSelector": false,
+        "installMode": "currentUser",
+        "compression": "lzma",
+        "installerIcon": "nsis/installer.ico",
+        "headerImage": "nsis/header.bmp",
+        "sidebarImage": "nsis/sidebar.bmp",
+        "installerHooks": "nsis/hooks.nsh"
+      },
+      "wix": {
+        "language": "zh-CN"
+      }
+    }
   },
   "plugins": {}
 }

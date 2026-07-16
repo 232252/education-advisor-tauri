@@ -46,15 +46,27 @@ fn main() {
             std::fs::create_dir_all(&app_data_dir).ok();
 
             // 资源目录 (config/ 与 eaa-binaries 解包后的位置)
-            let resource_dir = app
+            // NSIS 打包: "../" 前缀的资源被放到 _up_/ 子目录,需要优先使用
+            let resource_dir_raw = app
                 .path()
                 .resource_dir()
                 .unwrap_or_else(|_| app_data_dir.clone());
+            let resource_dir = {
+                let up_dir = resource_dir_raw.join("_up_");
+                if up_dir.join("config").exists() || up_dir.join("sidecar").exists() {
+                    up_dir
+                } else {
+                    resource_dir_raw
+                }
+            };
 
             // ---- 启动 Node sidecar ----
             // 开发模式: 直接 `node sidecar/edu-sidecar.mjs`
             // 生产模式: 同样用 node 启动 (打包时 sidecar/ 和 dist/ 都在 resource_dir 下)
-            // 路径搜索顺序: cwd / cwd.parent / resource_dir / exe 所在目录
+            // 路径搜索顺序: cwd / cwd.parent / resource_dir / exe 所在目录 / _up_(NSIS 打包)
+            //
+            // NSIS 打包说明: tauri.conf.json 中 resources 使用 "../" 前缀时,NSIS 会把
+            // 这些文件放到 exe 同级的 "_up_" 子目录中。所以生产模式下需要额外检查 _up_。
             let cwd = std::env::current_dir().unwrap_or_default();
             let exe_dir = std::env::current_exe()
                 .ok()
@@ -65,6 +77,9 @@ fn main() {
                 cwd.join("..").join("sidecar").join("edu-sidecar.mjs"),
                 resource_dir.join("sidecar").join("edu-sidecar.mjs"),
                 exe_dir.join("sidecar").join("edu-sidecar.mjs"),
+                // NSIS 打包: resources 在 _up_/ 下
+                exe_dir.join("_up_").join("sidecar").join("edu-sidecar.mjs"),
+                resource_dir.join("_up_").join("sidecar").join("edu-sidecar.mjs"),
             ];
             let sidecar_script = candidates
                 .iter()

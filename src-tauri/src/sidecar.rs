@@ -330,9 +330,17 @@ fn which_node() -> Result<String, String> {
             return Ok(p);
         }
     }
-    // 2. resource_dir/node.exe (打包模式: node.exe 随 Tauri resources 分发)
+    // 2. resource_dir 下的 node.exe (打包模式: node.exe 随 Tauri resources 分发)
+    //    NSIS 打包时路径可能是 resource_dir/node.exe 或 resource_dir/resources/node.exe
     if let Ok(rd) = std::env::var("EDU_RESOURCE_DIR") {
-        let p = std::path::Path::new(&rd).join("node.exe");
+        let rd_path = std::path::Path::new(&rd);
+        // 直接在 resource_dir 下
+        let p = rd_path.join("node.exe");
+        if p.exists() {
+            return Ok(p.to_string_lossy().to_string());
+        }
+        // NSIS 打包: node.exe 在 resources/ 子目录下
+        let p = rd_path.join("resources").join("node.exe");
         if p.exists() {
             return Ok(p.to_string_lossy().to_string());
         }
@@ -341,6 +349,11 @@ fn which_node() -> Result<String, String> {
     if let Ok(exe) = std::env::current_exe() {
         if let Some(parent) = exe.parent() {
             let p = parent.join("node.exe");
+            if p.exists() {
+                return Ok(p.to_string_lossy().to_string());
+            }
+            // NSIS _up_ 目录
+            let p = parent.join("_up_").join("resources").join("node.exe");
             if p.exists() {
                 return Ok(p.to_string_lossy().to_string());
             }

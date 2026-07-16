@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>下载 Education Advisor — Windows 安装包</title>
+  <meta name="description" content="下载 Education Advisor v0.1.0。选择 NSIS 安装程序或 MSI 安装包，适用于 Windows 10/11 x64。支持 GitHub 与 Gitee 双源加速下载。">
+  <meta name="theme-color" content="#fffbf7">
+  <link rel="canonical" href="https://eea.qdzwwqd.top/download.html">
+  <link rel="icon" type="image/svg+xml" href="assets/img/favicon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+SC:wght@400;500;600;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/style.css?v=20260716c">
+  <style>
+    .download-hero { padding-top: calc(var(--nav-height) + 80px); padding-bottom: 60px; }
+    .download-hero .section-header { margin-bottom: 48px; }
+    .download-grid { display: grid; grid-template-columns: 1fr; gap: 24px; margin-bottom: 64px; }
+    @media (min-width: 640px) { .download-grid { grid-template-columns: repeat(2, 1fr); } }
+    .download-platform { background: var(--bg-elevated); border: 1px solid var(--border); border-radius: var(--radius-xl); padding: 40px; display: flex; flex-direction: column; gap: 24px; transition: transform var(--transition), box-shadow var(--transition); }
+    .download-platform:hover { transform: translateY(-4px); box-shadow: var(--shadow-lg); }
+    .platform-header { display: flex; align-items: center; gap: 16px; }
+    .platform-icon { width: 56px; height: 56px; border-radius: var(--radius); background: color-mix(in srgb, var(--primary) 10%, transparent); color: var(--primary); display: flex; align-items: center; justify-content: center; }
+    .platform-icon svg { width: 28px; height: 28px; }
+    .platform-title { font-size: 1.3rem; font-weight: 700; margin: 0; }
+    .platform-subtitle { color: var(--text-secondary); font-size: 0.95rem; margin: 4px 0 0; }
+    .platform-meta { display: flex; flex-wrap: wrap; gap: 12px; }
+    .platform-meta span { font-size: 0.85rem; color: var(--text-tertiary); background: var(--bg-soft); padding: 6px 12px; border-radius: var(--radius-full); border: 1px solid var(--border); }
+    .platform-cta { margin-top: auto; display: flex; flex-direction: column; gap: 10px; }
+    .platform-cta .btn { width: 100%; }
+    .source-label { font-size: 0.78rem; color: var(--text-tertiary); font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: -4px; }
+    .release-notes { background: var(--bg-soft); border: 1px solid var(--border); border-radius: var(--radius-xl); padding: 40px; }
+    .release-notes h2 { font-size: 1.4rem; font-weight: 800; margin: 0 0 24px; }
+    .release-notes-content { color: var(--text-secondary); line-height: 1.7; }
+    .release-notes-content h1, .release-notes-content h2, .release-notes-content h3 { color: var(--text); margin-top: 24px; margin-bottom: 12px; }
+    .release-notes-content p { margin: 0 0 12px; }
+    .release-notes-content ul { padding-left: 20px; margin: 0 0 16px; }
+    .release-notes-content li { margin-bottom: 8px; }
+    .release-notes-content code { background: var(--bg-muted); padding: 2px 6px; border-radius: 4px; font-size: 0.9em; }
+    .loading { color: var(--text-tertiary); font-style: italic; }
+    .error { color: var(--accent-rose); }
+    .gitee-banner { display: flex; align-items: center; gap: 12px; padding: 16px 24px; background: color-mix(in srgb, var(--accent-emerald) 8%, transparent); border: 1px solid color-mix(in srgb, var(--accent-emerald) 20%, transparent); border-radius: var(--radius-lg); margin-bottom: 48px; }
+    .gitee-banner svg { flex-shrink: 0; color: var(--accent-emerald); }
+    .gitee-banner p { margin: 0; font-size: 0.9rem; color: var(--text-secondary); }
+    .gitee-banner strong { color: var(--text); }
+  </style>
+</head>
+<body>
+  <header class="nav" id="nav">
+    <div class="container nav-inner">
+      <a class="logo" href="/" aria-label="Education Advisor 首页">
+        <svg class="logo-mark" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <defs>
+            <linearGradient id="logoGrad" x1="0" y1="0" x2="40" y2="40" gradientUnits="userSpaceOnUse">
+              <stop stop-color="#3b82f6"/>
+              <stop offset="1" stop-color="#6366f1"/>
+            </linearGradient>
+          </defs>
+          <rect width="40" height="40" rx="10" fill="url(#logoGrad)"/>
+          <path d="M12 26.5V13.5L20 10L28 13.5V26.5L20 30L12 26.5Z" stroke="white" stroke-width="2" stroke-linejoin="round" fill="none"/>
+          <path d="M20 18V26" stroke="white" stroke-width="2" stroke-linecap="round"/>
+          <circle cx="20" cy="15" r="1.5" fill="white"/>
+        </svg>
+        <span class="logo-text">Education Advisor</span>
+      </a>
+      <nav class="nav-links" aria-label="主导航">
+        <a href="/">首页</a>
+        <a href="/#features">核心特性</a>
+        <a href="/#architecture">架构</a>
+        <a href="/#faq">常见问题</a>
+        <a href="https://github.com/232252/education-advisor-tauri" target="_blank" rel="noopener noreferrer">GitHub</a>
+      </nav>
+      <div class="nav-actions">
+        <button class="theme-toggle" id="themeToggle" aria-label="切换主题">
+          <span class="theme-icon-light" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+          </span>
+          <span class="theme-icon-dark" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+          </span>
+        </button>
+        <button class="nav-toggle" id="navToggle" aria-label="打开菜单" aria-expanded="false">
+          <span></span><span></span><span></span>
+        </button>
+      </div>
+    </div>
+    <div class="nav-mobile" id="navMobile">
+      <a href="/">首页</a>
+      <a href="/#features">核心特性</a>
+      <a href="/#architecture">架构</a>
+      <a href="/#faq">常见问题</a>
+      <a href="https://github.com/232252/education-advisor-tauri" target="_blank" rel="noopener noreferrer">GitHub</a>
+      <button class="theme-toggle-mobile" id="navMobileTheme">☀️ 切换主题</button>
+    </div>
+  </header>
+
+  <main>
+    <section class="download-hero">
+      <div class="container">
+        <div class="section-header">
+          <span class="section-tag">下载</span>
+          <h1 class="section-title">获取 Education Advisor</h1>
+          <p class="section-desc">当前最新版本为 v0.1.0。提供 NSIS 与 MSI 两种安装方式，支持 GitHub 与 Gitee 双源下载。</p>
+        </div>
+
+        <div class="gitee-banner">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+          <p><strong>国内用户加速：</strong>Gitee 镜像已同步，下载速度更快。若 GitHub 下载缓慢，请选择 Gitee 源。</p>
+        </div>
+
+        <div class="download-grid">
+          <div class="download-platform" id="windows-nsis">
+            <div class="platform-header">
+              <div class="platform-icon">
+                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M0 3.449L9.75 2.1v9.451H0M10.949 1.949L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.9-1.801"/></svg>
+              </div>
+              <div>
+                <h2 class="platform-title">NSIS 安装版</h2>
+                <p class="platform-subtitle">推荐大多数用户使用，安装向导简洁。</p>
+              </div>
+            </div>
+            <div class="platform-meta">
+              <span>v0.1.0</span>
+              <span>38.30 MB</span>
+              <span>x64</span>
+            </div>
+            <div class="platform-cta">
+              <div class="source-label">GitHub 源</div>
+              <a class="btn btn-primary btn-lg" href="https://github.com/232252/education-advisor-tauri/releases/download/v0.1.0/Education.Advisor_0.1.0_x64-setup.exe">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+                <span>GitHub 下载 .exe</span>
+              </a>
+              <div class="source-label">Gitee 加速源</div>
+              <a class="btn btn-secondary btn-lg" href="https://gitee.com/qdzwwqd/education-advisor-tauri/releases/download/v0.1.0/EA_setup.exe">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+                <span>Gitee 加速下载 .exe</span>
+              </a>
+            </div>
+          </div>
+
+          <div class="download-platform" id="windows-msi">
+            <div class="platform-header">
+              <div class="platform-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/></svg>
+              </div>
+              <div>
+                <h2 class="platform-title">MSI 安装包</h2>
+                <p class="platform-subtitle">企业部署友好，支持组策略与标准化安装。</p>
+              </div>
+            </div>
+            <div class="platform-meta">
+              <span>v0.1.0</span>
+              <span>73.53 MB</span>
+              <span>x64</span>
+            </div>
+            <div class="platform-cta">
+              <div class="source-label">GitHub 源</div>
+              <a class="btn btn-primary btn-lg" href="https://github.com/232252/education-advisor-tauri/releases/download/v0.1.0/Education.Advisor_0.1.0_x64_zh-CN.msi">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+                <span>GitHub 下载 .msi</span>
+              </a>
+              <div class="source-label">Gitee 加速源</div>
+              <a class="btn btn-secondary btn-lg" href="https://gitee.com/qdzwwqd/education-advisor-tauri/releases/download/v0.1.0/EA_setup.msi">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+                <span>Gitee 加速下载 .msi</span>
+              </a>
+            </div>
+          </div>
+        </div>
+
+        <div class="release-notes">
+          <h2>v0.1.0 更新日志</h2>
+          <div class="release-notes-content" id="releaseNotes">
+            <p class="loading">正在从 GitHub 加载最新 release 信息...</p>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="container footer-bottom">
+      <p>© 2026 Education Advisor. Released under MIT License.</p>
+      <p><a href="/">返回首页</a> · <a href="legal.html">隐私政策</a></p>
+    </div>
+  </footer>
+
+  <script src="assets/js/main.js?v=20260716c" defer></script>
+  <script src="assets/js/download.js?v=20260716c" defer></script>
+</body>
+</html>
