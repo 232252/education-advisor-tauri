@@ -29,7 +29,12 @@ import { app } from 'electron'
 import yaml from 'yaml'
 import type { McpServerConfig, McpServerStatus, McpTool } from '../../shared/types'
 import { atomicWrite } from '../utils/atomic-write'
-import { deepInterpolate, isSafeMcpUrl, validateCommandSafe, validateServerConfig } from './mcp-helpers'
+import {
+  deepInterpolate,
+  isSafeMcpUrl,
+  validateCommandSafe,
+  validateServerConfig,
+} from './mcp-helpers'
 import { settingsService } from './settings-service'
 
 /** MCP 工具调用结果(兼容 MCP 协议) */
