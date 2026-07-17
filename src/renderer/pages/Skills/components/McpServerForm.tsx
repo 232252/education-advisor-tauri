@@ -184,7 +184,7 @@ export function McpServerForm({ initial, onSubmit, onCancel }: McpServerFormProp
                   className="w-full px-2 py-1 border rounded font-mono dark:bg-gray-700 dark:border-gray-600"
                 />
               </FormField>
-              <FormField label={t('page.mcp.field.args')} hint="空格或换行分隔">
+              <FormField label={t('page.mcp.field.args')} hint={t('page.mcp.hint.args')}>
                 <textarea
                   value={draft.args}
                   onChange={(e) => update({ args: e.target.value })}
@@ -193,7 +193,7 @@ export function McpServerForm({ initial, onSubmit, onCancel }: McpServerFormProp
                   className="w-full px-2 py-1 border rounded font-mono text-sm dark:bg-gray-700 dark:border-gray-600"
                 />
               </FormField>
-              <FormField label={t('page.mcp.field.env')} hint="KEY=VALUE 每行一个">
+              <FormField label={t('page.mcp.field.env')} hint={t('page.mcp.hint.env')}>
                 <textarea
                   value={draft.env}
                   onChange={(e) => update({ env: e.target.value })}
@@ -215,7 +215,7 @@ export function McpServerForm({ initial, onSubmit, onCancel }: McpServerFormProp
                   className="w-full px-2 py-1 border rounded font-mono dark:bg-gray-700 dark:border-gray-600"
                 />
               </FormField>
-              <FormField label={t('page.mcp.field.headers')} hint="KEY: VALUE 每行一个">
+              <FormField label={t('page.mcp.field.headers')} hint={t('page.mcp.hint.headers')}>
                 <textarea
                   value={draft.headers}
                   onChange={(e) => update({ headers: e.target.value })}

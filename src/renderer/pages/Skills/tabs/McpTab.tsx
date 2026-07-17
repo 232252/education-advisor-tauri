@@ -243,7 +243,7 @@ export function McpTab() {
   }
 
   if (loading) {
-    return <div className="p-4 text-gray-500">Loading...</div>
+    return <div className="p-4 text-gray-500">{t('common.loading')}</div>
   }
 
   return (
@@ -351,7 +351,7 @@ export function McpTab() {
                           </span>
                         </div>
                         <div className="ml-3.5 text-xs text-gray-500 dark:text-gray-400">
-                          {s.transport} ·{' '}
+                          {t(`page.mcp.transport.${s.transport}`)} ·{' '}
                           {s.connected
                             ? `${s.toolCount} ${t('page.mcp.tools')}`
                             : t('page.mcp.status.disconnected')}

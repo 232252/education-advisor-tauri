@@ -80,7 +80,7 @@ export function McpServerCard({
         </div>
         <div>
           <dt className="inline font-medium">{t('page.mcp.field.transport')}:</dt>
-          <dd className="inline ml-2">{server.transport}</dd>
+          <dd className="inline ml-2">{t(`page.mcp.transport.${server.transport}`)}</dd>
         </div>
         <div>
           <dt className="inline font-medium">{t('page.mcp.tools')}:</dt>
@@ -115,7 +115,7 @@ export function McpServerCard({
                 </li>
               ))}
               {tools.length === 0 && !toolsLoading && (
-                <li className="text-gray-400 italic">(no tools)</li>
+                <li className="text-gray-400 italic">{t('page.mcp.tools.empty')}</li>
               )}
             </ul>
           )}
