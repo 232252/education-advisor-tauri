@@ -473,7 +473,15 @@ export const writeCsvTool: AgentTool<typeof writeCsvParams> = {
     }
 
     // CSV 转义：包含逗号、引号、换行的字段用双引号包裹
-    const escapeField = (field: string): string => {
+    const escapeField = (rawField: string): string => {
+      // BUG-2 修复: 移除 null byte(部分 CSV 解析器会截断)
+      const field = rawField.includes('\0') ? rawField.replace(/\0/g, '') : rawField
+      // BUG-1 修复: CSV 公式注入防护(CWE-1236)
+      // Excel/LibreOffice 会自动求值以 = @ + - \t \r 开头的单元格
+      // 前置单引号 ' 强制按文本处理(导出后 Excel 显示时隐藏前缀)
+      if (/^[=+\-@\t\r]/.test(field)) {
+        return `"'${field.replace(/"/g, '""')}"`
+      }
       if (
         field.includes(',') ||
         field.includes('"') ||
