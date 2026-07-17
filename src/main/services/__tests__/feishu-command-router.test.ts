@@ -210,4 +210,70 @@ describe('FeishuCommandRouter 自定义注册', () => {
     const reply = await router.dispatch('/ping', makeCtx())
     expect(reply).toBe('pong')
   })
+
+  it('register 同名命令后注册覆盖先注册（Map set 语义）', async () => {
+    const router = createDefaultRouter()
+    router.register('dup', '第一个', async () => 'first')
+    router.register('dup', '第二个', async () => 'second')
+    const reply = await router.dispatch('/dup', makeCtx())
+    expect(reply).toBe('second')
+  })
+
+  it('register 命令名自动转小写（大小写不敏感）', async () => {
+    const router = createDefaultRouter()
+    router.register('CaseTest', '大小写测试', async () => 'ok')
+    expect(await router.dispatch('/casetest', makeCtx())).toBe('ok')
+    expect(await router.dispatch('/CASETEST', makeCtx())).toBe('ok')
+  })
+})
+
+// =============================================================
+// getErrorMessage 边界（通过命令失败路径间接覆盖）
+// =============================================================
+describe('getErrorMessage 错误信息提取（间接）', () => {
+  it('优先取 result.data（字符串且有内容）', async () => {
+    const router = createDefaultRouter()
+    const ctx = makeCtx({
+      runEAA: async () => ({
+        success: false,
+        data: '详细的错误说明',
+        stderr: 'stderr信息',
+        exitCode: 1,
+      }),
+    })
+    const reply = await router.dispatch('/dashboard', ctx)
+    expect(reply).toContain('详细的错误说明')
+  })
+
+  it('result.data 为空字符串时回退到 stderr', async () => {
+    const router = createDefaultRouter()
+    const ctx = makeCtx({
+      runEAA: async () => ({ success: false, data: '', stderr: 'stderr兜底信息', exitCode: 1 }),
+    })
+    const reply = await router.dispatch('/dashboard', ctx)
+    expect(reply).toContain('stderr兜底信息')
+  })
+
+  it('result.data 和 stderr 都为空时用默认 fallback', async () => {
+    const router = createDefaultRouter()
+    const ctx = makeCtx({
+      runEAA: async () => ({ success: false, data: '', stderr: '', exitCode: 1 }),
+    })
+    const reply = await router.dispatch('/dashboard', ctx)
+    expect(reply).toContain('未知错误')
+  })
+
+  it('result.data 为非字符串类型时回退到 stderr', async () => {
+    const router = createDefaultRouter()
+    const ctx = makeCtx({
+      runEAA: async () => ({
+        success: false,
+        data: { nested: 'object' } as unknown,
+        stderr: 'stderr兜底',
+        exitCode: 1,
+      }),
+    })
+    const reply = await router.dispatch('/dashboard', ctx)
+    expect(reply).toContain('stderr兜底')
+  })
 })
