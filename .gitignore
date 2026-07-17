@@ -190,3 +190,5 @@ sidecar/test-round4
 sidecar/test-round5-error-handling.mjs
 test-round4-results
 test-round5-results
+test-round4-data-*/
+test-agent-tools-report.json
