@@ -1,4 +1,5 @@
 import type { McpServerConfig } from '@shared/types'
+import { useId } from 'react'
 import { useT } from '../../../i18n'
 import { MCP_PRESETS } from '../mcp-presets'
 
@@ -9,17 +10,21 @@ interface PresetTemplatesProps {
 
 export function PresetTemplates({ onSelect, onCancel }: PresetTemplatesProps) {
   const { t } = useT()
+  const titleId = useId()
 
   return (
     <div
       className="fixed inset-0 bg-black/40 flex items-center justify-center z-50"
       onClick={onCancel}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby={titleId}
     >
       <div
         onClick={(e) => e.stopPropagation()}
         className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md"
       >
-        <h2 className="text-lg font-medium mb-4 text-gray-900 dark:text-gray-100">
+        <h2 id={titleId} className="text-lg font-medium mb-4 text-gray-900 dark:text-gray-100">
           {t('page.mcp.preset.title')}
         </h2>
         <ul className="space-y-2">
