@@ -433,7 +433,14 @@ ${yaml.stringify({ servers })}
     if (agentMcpServers && agentMcpServers.length > 0) {
       for (const serverId of agentMcpServers) {
         const globalServer = this.config.find((s) => s.id === serverId)
-        if (globalServer) serversToConnect.push(globalServer)
+        if (globalServer) {
+          serversToConnect.push(globalServer)
+        } else {
+          // R8-5 修复: 引用不存在的 server 时记录警告(之前静默跳过,用户 typo 无信号)
+          console.warn(
+            `[McpService] Agent ${agentId} referenced missing MCP server "${serverId}", skipped`,
+          )
+        }
       }
     }
 
