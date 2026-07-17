@@ -8,7 +8,7 @@
 // =============================================================
 
 import type { McpServerConfig, McpServerStatus, McpTool } from '@shared/types'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { EmptyState } from '../../../components/EmptyState'
 import { useInterval } from '../../../hooks'
 import { useT } from '../../../i18n'
@@ -30,6 +30,7 @@ export function McpTab() {
   const [editingServer, setEditingServer] = useState<McpServerConfig | null>(null)
   const [showPresets, setShowPresets] = useState(false)
   const [presetDraft, setPresetDraft] = useState<McpServerConfig | null>(null)
+  const loadingRef = useRef(false)
 
   const checkMcpEnabled = useCallback(async () => {
     try {
@@ -62,10 +63,33 @@ export function McpTab() {
   }
 
   const loadServers = useCallback(async () => {
+    if (document.visibilityState === 'hidden') {
+      setLoading(false)
+      return
+    }
+    if (loadingRef.current) return
+    loadingRef.current = true
     try {
       const result = await getAPI().mcp.list()
       if (result.success) {
-        setServers(result.servers)
+        setServers((previous) => {
+          const unchanged =
+            previous.length === result.servers.length &&
+            previous.every((server, index) => {
+              const next = result.servers[index]
+              return (
+                server.id === next.id &&
+                server.name === next.name &&
+                server.connected === next.connected &&
+                server.toolCount === next.toolCount &&
+                server.lastError === next.lastError &&
+                server.transport === next.transport &&
+                server.source === next.source &&
+                server.enabled === next.enabled
+              )
+            })
+          return unchanged ? previous : result.servers
+        })
       } else if (result.error) {
         toast.error(result.error)
       }
@@ -73,6 +97,7 @@ export function McpTab() {
       console.error('[MCP] load failed:', err)
       toast.error(t('toast.mcp.loadFailed'))
     } finally {
+      loadingRef.current = false
       setLoading(false)
     }
   }, [t])
@@ -83,7 +108,7 @@ export function McpTab() {
   }, [checkMcpEnabled, loadServers])
 
   // 每 5s 轮询刷新连接状态(粗轮询,工具列表懒加载)
-  useInterval(loadServers, 5000)
+  useInterval(loadServers, mcpEnabled ? 5000 : null)
 
   const selected = servers.find((s) => s.id === selectedId) ?? null
 
@@ -243,11 +268,9 @@ export function McpTab() {
                 </span>
               </>
             ) : (
-              <>
-                <span className="text-amber-600 dark:text-amber-400 font-medium">
-                  ○ {t('page.mcp.banner.disabled')}
-                </span>
-              </>
+              <span className="text-amber-600 dark:text-amber-400 font-medium">
+                ○ {t('page.mcp.banner.disabled')}
+              </span>
             )}
           </span>
         </div>
