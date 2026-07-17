@@ -23,6 +23,7 @@ import {
 import type { ModelInfo, ProviderInfo, StreamEvent, TestConnectionResult } from '../../shared/types'
 import { logChat } from '../utils/logger'
 import { compactAgentMessages, compactChatMessagesSimple } from './compaction-helper'
+import { costScore, dedupeModels, extractPartialToolCall, isRetryableError, mapEvent, selectCheapestModel } from './pi-ai-helpers'
 import { keystoreService } from './keystore-service'
 import { KEYLESS_PROVIDERS, OLLAMA_OPENAI_BASE_URL, ollamaService } from './ollama-service'
 import { settingsService } from './settings-service'
@@ -447,14 +448,9 @@ class PiAIService {
     return true
   }
 
-  /** 按 id 去重模型列表（保留第一个） */
+  /** 按 id 去重模型列表（保留第一个）— 已提取到 pi-ai-helpers.ts */
   private dedupeModels(models: ModelInfo[]): ModelInfo[] {
-    const seen = new Set<string>()
-    return models.filter((m) => {
-      if (seen.has(m.id)) return false
-      seen.add(m.id)
-      return true
-    })
+    return dedupeModels(models)
   }
 
   // ===========================================================
@@ -793,16 +789,8 @@ class PiAIService {
       }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err)
-      const retryable =
-        message.includes('timeout') ||
-        message.includes('network') ||
-        message.includes('429') ||
-        message.includes('500') ||
-        message.includes('502') ||
-        message.includes('503') ||
-        message.includes('504') ||
-        message.includes('ECONNRESET') ||
-        message.includes('ECONNREFUSED')
+      // isRetryableError 已提取到 pi-ai-helpers.ts(原内联逻辑,大小写敏感)
+      const retryable = isRetryableError(message)
       // 把 retry 配置附在 error 事件,渲染端可基于此做手动重试
       yield {
         type: 'error',
@@ -992,94 +980,22 @@ class PiAIService {
     }
   }
 
-  /** 选择最便宜的模型用于连接测试 */
+  /** 选择最便宜的模型用于连接测试 — 已提取到 pi-ai-helpers.ts */
   private selectCheapestModel(models: Model<Api>[]): Model<Api> {
-    if (models.length === 0) {
-      throw new Error('selectCheapestModel: empty model list')
-    }
-    const score = (m: Model<Api>): number => {
-      const input = Number.isFinite(m.cost?.input) ? m.cost.input : Number.POSITIVE_INFINITY
-      const output = Number.isFinite(m.cost?.output) ? m.cost.output : Number.POSITIVE_INFINITY
-      return input + output
-    }
-    return models.reduce((cheapest, m) => (score(m) < score(cheapest) ? m : cheapest))
+    return selectCheapestModel(models)
   }
 
-  /** 将 pi-ai 的 AssistantMessageEvent 映射为前端的 StreamEvent */
+  /** 将 pi-ai 的 AssistantMessageEvent 映射为前端的 StreamEvent — 已提取到 pi-ai-helpers.ts */
   private mapEvent(event: AssistantMessageEvent): StreamEvent | null {
-    switch (event.type) {
-      case 'start':
-        // start 已在 chatStream 中手动 yield
-        return null
-
-      case 'text_start':
-        return { type: 'text_start' }
-
-      case 'text_delta':
-        return { type: 'text_delta', delta: event.delta }
-
-      case 'text_end':
-        return { type: 'text_end' }
-
-      case 'thinking_start':
-        return { type: 'thinking_start' }
-
-      case 'thinking_delta':
-        return { type: 'thinking_delta', delta: event.delta }
-
-      case 'thinking_end':
-        return { type: 'thinking_end' }
-
-      case 'toolcall_start': {
-        const tc = this.extractPartialToolCall(event.partial, event.contentIndex)
-        return tc ? { type: 'toolcall_start', id: tc.id, name: tc.name } : null
-      }
-
-      case 'toolcall_delta':
-        return { type: 'toolcall_delta', id: '', argsDelta: event.delta }
-
-      case 'toolcall_end':
-        return { type: 'toolcall_end', id: event.toolCall.id }
-
-      case 'done': {
-        const msg = event.message
-        const usage = msg.usage
-        return {
-          type: 'done',
-          usage: {
-            inputTokens: usage?.input ?? 0,
-            outputTokens: usage?.output ?? 0,
-            cacheReadTokens: usage?.cacheRead ?? 0,
-            cacheWriteTokens: usage?.cacheWrite ?? 0,
-          },
-          cost: usage?.cost?.total ?? 0,
-        }
-      }
-
-      case 'error': {
-        const msg = event.error
-        return {
-          type: 'error',
-          message: msg.errorMessage ?? 'Unknown error',
-          retryable: event.reason === 'aborted',
-        }
-      }
-
-      default:
-        return null
-    }
+    return mapEvent(event)
   }
 
-  /** 从 partial AssistantMessage 中提取 toolCall 信息 */
+  /** 从 partial AssistantMessage 中提取 toolCall 信息 — 已提取到 pi-ai-helpers.ts */
   private extractPartialToolCall(
     partial: AssistantMessage,
     contentIndex: number,
   ): { id: string; name: string } | null {
-    const block = partial.content[contentIndex]
-    if (block && block.type === 'toolCall') {
-      return { id: block.id, name: block.name }
-    }
-    return null
+    return extractPartialToolCall(partial, contentIndex)
   }
 
   // ===========================================================

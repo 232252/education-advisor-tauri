@@ -21,6 +21,7 @@ import {
   createDefaultRouter,
   type FeishuCommandRouter,
 } from './feishu-command-router'
+import { extractText as extractTextImpl, safeJsonParse } from './feishu-message-utils'
 
 export type BotStatus = 'idle' | 'connecting' | 'connected' | 'error'
 
@@ -57,32 +58,7 @@ interface FetchOpts {
   params?: Record<string, string>
 }
 
-/**
- * R6-7 修复: 递归删除 __proto__ / constructor / prototype 键,防止原型链污染。
- * 用于安全解析来自飞书 API / 消息内容的外部 JSON。
- */
-function sanitizeObject<T>(value: T): T {
-  if (Array.isArray(value)) {
-    for (let i = 0; i < value.length; i++) {
-      value[i] = sanitizeObject(value[i])
-    }
-  } else if (value && typeof value === 'object') {
-    const obj = value as Record<string, unknown>
-    for (const key of Object.keys(obj)) {
-      if (key === '__proto__' || key === 'constructor' || key === 'prototype') {
-        delete obj[key]
-      } else {
-        obj[key] = sanitizeObject(obj[key])
-      }
-    }
-  }
-  return value
-}
-
-/** R6-7 修复: 安全 JSON.parse,解析后递归清理原型链污染键 */
-function safeJsonParse<T>(text: string): T {
-  return sanitizeObject(JSON.parse(text) as T)
-}
+// sanitizeObject / safeJsonParse 已提取到 feishu-message-utils.ts(R6-7 安全修复)
 
 async function fetchRequest<T>(opts: FetchOpts): Promise<T> {
   let url = opts.url || ''
@@ -441,28 +417,12 @@ class FeishuBotService extends EventEmitter {
 
   /**
    * 从飞书消息 content 中提取纯文本,并去掉 @机器人 的占位符。
+   * 实现已提取到 feishu-message-utils.ts(便于单元测试)。
    * @param content   JSON 字符串,如 {"text":"@_user_1 你好"}
    * @param mentions  @信息数组,key 是占位符(如 @_user_1)
    */
   private extractText(content: string, mentions: Array<{ key: string; name: string }>): string {
-    let raw: string
-    try {
-      // R6-7 修复: 使用 safeJsonParse 防止消息内容中的原型链污染
-      const parsed = safeJsonParse<{ text?: string }>(content)
-      raw = parsed.text ?? ''
-    } catch {
-      // content 不是合法 JSON,直接用原始字符串
-      raw = content
-    }
-    if (!raw) return ''
-    // 去掉 @机器人 占位符(@_user_1 等),保留其余文本
-    let cleaned = raw
-    for (const m of mentions) {
-      if (m.key) {
-        cleaned = cleaned.split(m.key).join('')
-      }
-    }
-    return cleaned.trim()
+    return extractTextImpl(content, mentions)
   }
 
   /**

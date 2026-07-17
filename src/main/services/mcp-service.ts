@@ -25,9 +25,9 @@ import { spawn, type ChildProcess } from 'node:child_process'
 import fs from 'node:fs'
 import fsp from 'node:fs/promises'
 import path from 'node:path'
-import { app } from 'electron'
 import yaml from 'yaml'
 import type { McpServerConfig, McpServerStatus, McpTool, McpTransport } from '../../shared/types'
+import { deepInterpolate, interpolateEnv, validateServerConfig } from './mcp-helpers'
 import { settingsService } from './settings-service'
 
 /** MCP 工具调用结果(兼容 MCP 协议) */
@@ -66,46 +66,7 @@ const RECONNECT_DELAY_MS = 1000
 /** 返回内容最大大小(5MB,防止超大响应撑爆上下文) */
 const MAX_RESPONSE_SIZE = 5 * 1024 * 1024
 
-/**
- * 环境变量插值: ${VAR} → process.env[VAR]
- */
-function interpolateEnv(value: string): string {
-  return value.replace(/\$\{([^}]+)\}/g, (_, name) => process.env[name] ?? '')
-}
-
-/**
- * 深度插值:递归处理对象中的所有字符串值
- */
-function deepInterpolate<T>(obj: T): T {
-  if (typeof obj === 'string') return interpolateEnv(obj) as unknown as T
-  if (Array.isArray(obj)) return obj.map(deepInterpolate) as unknown as T
-  if (obj && typeof obj === 'object') {
-    const result: Record<string, unknown> = {}
-    for (const [key, value] of Object.entries(obj)) {
-      result[key] = deepInterpolate(value)
-    }
-    return result as unknown as T
-  }
-  return obj
-}
-
-/**
- * 校验 server 配置完整性
- */
-function validateServerConfig(server: unknown): server is McpServerConfig {
-  if (!server || typeof server !== 'object') return false
-  const s = server as Record<string, unknown>
-  if (typeof s.id !== 'string' || s.id.length === 0) return false
-  if (typeof s.name !== 'string') return false
-  if (typeof s.enabled !== 'boolean') return false
-  const transport = s.transport
-  if (transport !== 'stdio' && transport !== 'sse' && transport !== 'websocket') return false
-  // stdio 需要 command
-  if (transport === 'stdio' && typeof s.command !== 'string') return false
-  // sse/websocket 需要 url
-  if ((transport === 'sse' || transport === 'websocket') && typeof s.url !== 'string') return false
-  return true
-}
+// interpolateEnv / deepInterpolate / validateServerConfig 已提取到 mcp-helpers.ts
 
 class McpService {
   private clients: Map<string, MCPClient> = new Map()
