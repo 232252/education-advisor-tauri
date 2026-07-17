@@ -28,9 +28,14 @@ import path from 'node:path'
 import { app } from 'electron'
 import yaml from 'yaml'
 import type { McpServerConfig, McpServerStatus, McpTool } from '../../shared/types'
-import { deepInterpolate, validateCommandSafe, validateServerConfig } from './mcp-helpers'
-import { settingsService } from './settings-service'
 import { atomicWrite } from '../utils/atomic-write'
+import {
+  deepInterpolate,
+  isSafeMcpUrl,
+  validateCommandSafe,
+  validateServerConfig,
+} from './mcp-helpers'
+import { settingsService } from './settings-service'
 
 /** MCP 工具调用结果(兼容 MCP 协议) */
 export interface McpCallResult {
@@ -62,6 +67,8 @@ interface MCPClient {
 
 /** 连接超时(毫秒) */
 const CONNECT_TIMEOUT_MS = 30_000
+/** server id 格式(与 mcp-handlers.ts validateServerId 一致) */
+const SERVER_ID_RE = /^[a-zA-Z0-9_-]+$/
 /** 工具调用超时(毫秒) */
 const CALL_TIMEOUT_MS = 60_000
 /** 最大重连次数 */
@@ -71,21 +78,33 @@ const _RECONNECT_DELAY_MS = 1000
 /** 返回内容最大大小(5MB,防止超大响应撑爆上下文) */
 const MAX_RESPONSE_SIZE = 5 * 1024 * 1024
 
-// interpolateEnv / deepInterpolate / validateServerConfig 已提取到 mcp-helpers.ts
+// interpolateEnv / deepInterpolate / validateServerConfig / isSafeMcpUrl 已提取到 mcp-helpers.ts
+
+/**
+ * SSRF 防护断言(薄封装,逻辑在 mcp-helpers.isSafeMcpUrl 纯函数,便于单测)。
+ * R4-SSRF-1 修复:防止 sidecar 被诱导连接云元数据服务或扫描内网。
+ */
+function assertSafeMcpUrl(rawUrl: string | undefined, serverId: string): void {
+  if (!isSafeMcpUrl(rawUrl)) {
+    throw new Error(
+      `MCP server ${serverId} url refused (SSRF protection): ${rawUrl ?? '(missing)'}`,
+    )
+  }
+}
 
 class McpService {
   private clients: Map<string, MCPClient> = new Map()
   private config: McpServerConfig[] = []
   private configPath: string
   private initialized = false
+  /** 写操作串行队列(防止 add/update/remove 并发竞态) */
+  private writeQueue: Promise<unknown> = Promise.resolve()
 
   constructor() {
     const devConfigDir = path.join(__dirname, '..', '..', 'config')
     const prodConfigDir = path.join(process.resourcesPath || '', 'config')
     const configDir = fs.existsSync(devConfigDir) ? devConfigDir : prodConfigDir
     this.configPath = path.join(configDir, 'mcp.yaml')
-    // 用户级配置(可写),仿 agents.user.yaml
-    this.userConfigPath = path.join(app.getPath('userData'), 'mcp.user.yaml')
   }
 
   /**
@@ -116,7 +135,6 @@ class McpService {
     const globalServers = await this.loadConfigFile(this.configPath, 'global')
     // 每次加载时按当前 userData 解析,避免单例构造期缓存过期路径
     const userPath = path.join(app.getPath('userData'), 'mcp.user.yaml')
-    this.userConfigPath = userPath
     const userServers = await this.loadConfigFile(userPath, 'user')
 
     // 合并:用户级整条覆盖同 id 的全局项
@@ -187,14 +205,31 @@ class McpService {
    * 校验:id 唯一、配置合法、command 安全
    */
   async addServer(config: McpServerConfig): Promise<void> {
+    return this.serializeWrite(() => this.addServerInternal(config))
+  }
+
+  /** addServer 的串行化实现 */
+  private async addServerInternal(config: McpServerConfig): Promise<void> {
     if (!validateServerConfig(config)) {
       throw new Error('Invalid server config')
+    }
+    // R4-EDGE-MCP-ID 修复: id 格式校验,与 mcp-handlers.ts 的 validateServerId 一致
+    // 防止 add 接受非法 id 但 remove/update 拒绝,形成不可删除的脏配置
+    if (!SERVER_ID_RE.test(config.id)) {
+      throw new Error(
+        `Server id "${config.id}" contains invalid characters (only a-zA-Z0-9_- allowed)`,
+      )
     }
     if (this.config.some((s) => s.id === config.id)) {
       throw new Error(`Server ${config.id} already exists`)
     }
     if (config.transport === 'stdio' && !validateCommandSafe(config.command)) {
       throw new Error(`Server ${config.id} command failed safety check`)
+    }
+    // R5-ERR-2 修复: sse/websocket 的 URL 在 add 时也校验 SSRF(不只是 connect 时),
+    // 防止 file:// 等危险 URL 写入 mcp.user.yaml
+    if (config.transport !== 'stdio' && !isSafeMcpUrl(config.url)) {
+      throw new Error(`Server ${config.id} url failed SSRF check`)
     }
     // 读取现有 user 配置 + 追加
     const userServers = await this.readUserConfig()
@@ -207,15 +242,55 @@ class McpService {
   }
 
   /**
+   * 把写操作串行化执行(防止并发 add/update/remove 竞态)
+   * 每个操作等前一个完成后再开始
+   *
+   * 关键:
+   *   - run = writeQueue.then(fn, fn) — 即使前一个操作 reject,本操作也能基于
+   *     已 settle 的队列开始(reject/recover 都会触发 .then 的第2个 handler)
+   *   - writeQueue = run.then(_, _)  — 即使本操作 reject,后续操作依然能排队
+   *     (catch 会吞掉 reject,否则后续 addServer 会卡死)
+   */
+  private async serializeWrite<T>(fn: () => Promise<T>): Promise<T> {
+    const run = this.writeQueue.then(fn, fn)
+    // 关键: 即使 fn 失败也要让队列继续(reject 不应阻塞后续操作)
+    this.writeQueue = run.then(
+      () => undefined,
+      () => undefined,
+    )
+    return run
+  }
+
+  /**
    * 更新 server(用户级直接改;全局级复制覆盖到 user)
    */
   async updateServer(id: string, patch: Partial<McpServerConfig>): Promise<void> {
+    return this.serializeWrite(() => this.updateServerInternal(id, patch))
+  }
+
+  /** updateServer 的串行化实现 */
+  private async updateServerInternal(id: string, patch: Partial<McpServerConfig>): Promise<void> {
     const existing = this.config.find((s) => s.id === id)
     if (!existing) throw new Error(`Server ${id} not found`)
 
     // 若 command 被改,校验安全性
     if (patch.command !== undefined && !validateCommandSafe(patch.command)) {
       throw new Error(`Server ${id} command failed safety check`)
+    }
+
+    // R5-ERR-2 修复: patch 含 url → 校验 SSRF;
+    // patch 改为非 stdio transport → 校验 existing.url(新 transport 会用到它)
+    // 注意:patch 同时含 transport + url 时,patch.url 优先(校验 patch.url 即可)
+    if (patch.url !== undefined) {
+      if (!isSafeMcpUrl(patch.url)) {
+        throw new Error(`Server ${id} url failed SSRF check`)
+      }
+    } else if (
+      patch.transport !== undefined &&
+      patch.transport !== 'stdio' &&
+      !isSafeMcpUrl(existing.url)
+    ) {
+      throw new Error(`Server ${id} url failed SSRF check`)
     }
 
     // 若正在连接,先断开(新配置下次连接生效)
@@ -255,6 +330,11 @@ class McpService {
    * - 纯全局:拒绝
    */
   async removeServer(id: string): Promise<void> {
+    return this.serializeWrite(() => this.removeServerInternal(id))
+  }
+
+  /** removeServer 的串行化实现 */
+  private async removeServerInternal(id: string): Promise<void> {
     const existing = this.config.find((s) => s.id === id)
     if (!existing) throw new Error(`Server ${id} not found`)
 
@@ -353,7 +433,14 @@ ${yaml.stringify({ servers })}
     if (agentMcpServers && agentMcpServers.length > 0) {
       for (const serverId of agentMcpServers) {
         const globalServer = this.config.find((s) => s.id === serverId)
-        if (globalServer) serversToConnect.push(globalServer)
+        if (globalServer) {
+          serversToConnect.push(globalServer)
+        } else {
+          // R8-5 修复: 引用不存在的 server 时记录警告(之前静默跳过,用户 typo 无信号)
+          console.warn(
+            `[McpService] Agent ${agentId} referenced missing MCP server "${serverId}", skipped`,
+          )
+        }
       }
     }
 
@@ -484,6 +571,10 @@ ${yaml.stringify({ servers })}
    * 根据传输方式连接
    */
   private async connectTransport(client: MCPClient, server: McpServerConfig): Promise<void> {
+    // R4-SSRF-1 修复: sse/websocket 连接前校验 URL,拒绝内网/云元数据地址
+    if (server.transport === 'sse' || server.transport === 'websocket') {
+      assertSafeMcpUrl(server.url, server.id)
+    }
     const connectPromise = (() => {
       switch (server.transport) {
         case 'stdio':
@@ -556,11 +647,12 @@ ${yaml.stringify({ servers })}
         if (!client.buffer) client.buffer = ''
         client.buffer += chunk.toString('utf-8')
         // 按行解析 JSON-RPC
-        let newlineIdx: number
-        while ((newlineIdx = client.buffer.indexOf('\n')) >= 0) {
+        let newlineIdx = client.buffer.indexOf('\n')
+        while (newlineIdx >= 0) {
           const line = client.buffer.slice(0, newlineIdx).trim()
           client.buffer = client.buffer.slice(newlineIdx + 1)
           if (line) this.handleJsonRpcMessage(client, line)
+          newlineIdx = client.buffer.indexOf('\n')
         }
       })
 
@@ -626,70 +718,72 @@ ${yaml.stringify({ servers })}
    * WebSocket 传输:使用 ws 库
    */
   private connectWebSocket(client: MCPClient, server: McpServerConfig): Promise<void> {
-    return new Promise(async (resolve, reject) => {
-      if (!server.url) {
-        reject(new Error(`websocket server ${server.id} missing url`))
-        return
-      }
-      try {
-        const { default: WebSocket } = await import('ws')
-        const ws = new WebSocket(server.url, { headers: server.headers })
-        client.ws = ws
+    return new Promise((resolve, reject) => {
+      void (async () => {
+        if (!server.url) {
+          reject(new Error(`websocket server ${server.id} missing url`))
+          return
+        }
+        try {
+          const { default: WebSocket } = await import('ws')
+          const ws = new WebSocket(server.url, { headers: server.headers })
+          client.ws = ws
 
-        const timeout = setTimeout(() => {
-          reject(new Error(`WebSocket connect timeout after ${CONNECT_TIMEOUT_MS}ms`))
-          ws.close()
-        }, CONNECT_TIMEOUT_MS)
+          const timeout = setTimeout(() => {
+            reject(new Error(`WebSocket connect timeout after ${CONNECT_TIMEOUT_MS}ms`))
+            ws.close()
+          }, CONNECT_TIMEOUT_MS)
 
-        ws.on('open', () => {
-          clearTimeout(timeout)
-          // 发送 initialize 请求
-          this.sendJsonRpc(client, 'initialize', {
-            protocolVersion: '2024-11-05',
-            capabilities: {},
-            clientInfo: { name: 'education-advisor', version: '1.0.0' },
-          })
-            .then(() => {
-              this.sendNotification(client, 'notifications/initialized', {})
-              resolve()
+          ws.on('open', () => {
+            clearTimeout(timeout)
+            // 发送 initialize 请求
+            this.sendJsonRpc(client, 'initialize', {
+              protocolVersion: '2024-11-05',
+              capabilities: {},
+              clientInfo: { name: 'education-advisor', version: '1.0.0' },
             })
-            .catch(reject)
-        })
+              .then(() => {
+                this.sendNotification(client, 'notifications/initialized', {})
+                resolve()
+              })
+              .catch(reject)
+          })
 
-        ws.on('message', (...args: unknown[]) => {
-          const raw = args[0] as Buffer
-          const text = raw.toString('utf-8').trim()
-          if (text) this.handleJsonRpcMessage(client, text)
-        })
+          ws.on('message', (...args: unknown[]) => {
+            const raw = args[0] as Buffer
+            const text = raw.toString('utf-8').trim()
+            if (text) this.handleJsonRpcMessage(client, text)
+          })
 
-        ws.on('error', (...args: unknown[]) => {
-          const err = args[0] as Error
-          clearTimeout(timeout)
-          client.lastError = `ws error: ${err.message}`
-          if (!client.connected) reject(err)
-          else {
+          ws.on('error', (...args: unknown[]) => {
+            const err = args[0] as Error
+            clearTimeout(timeout)
+            client.lastError = `ws error: ${err.message}`
+            if (!client.connected) reject(err)
+            else {
+              client.connected = false
+              // 拒绝所有待响应请求
+              for (const [, entry] of client.pending) {
+                clearTimeout(entry.timer)
+                entry.reject(new Error(`WebSocket error: ${err.message}`))
+              }
+              client.pending.clear()
+            }
+          })
+
+          ws.on('close', () => {
+            console.warn(`[McpService] websocket server ${server.id} closed`)
             client.connected = false
-            // 拒绝所有待响应请求
             for (const [, entry] of client.pending) {
               clearTimeout(entry.timer)
-              entry.reject(new Error(`WebSocket error: ${err.message}`))
+              entry.reject(new Error('WebSocket closed'))
             }
             client.pending.clear()
-          }
-        })
-
-        ws.on('close', () => {
-          console.warn(`[McpService] websocket server ${server.id} closed`)
-          client.connected = false
-          for (const [, entry] of client.pending) {
-            clearTimeout(entry.timer)
-            entry.reject(new Error('WebSocket closed'))
-          }
-          client.pending.clear()
-        })
-      } catch (err) {
-        reject(err)
-      }
+          })
+        } catch (err) {
+          reject(err)
+        }
+      })()
     })
   }
 
@@ -747,7 +841,8 @@ ${yaml.stringify({ servers })}
     const m = msg as { id?: number; result?: unknown; error?: { message: string }; method?: string }
     // 响应(有 id)
     if (m.id !== undefined && client.pending.has(m.id)) {
-      const entry = client.pending.get(m.id)!
+      const entry = client.pending.get(m.id)
+      if (!entry) return
       client.pending.delete(m.id)
       clearTimeout(entry.timer)
       if (m.error) {
@@ -823,7 +918,10 @@ ${yaml.stringify({ servers })}
     toolName: string,
     args: Record<string, unknown>,
   ): Promise<McpCallResult> {
-    const response = await fetch(client.config.url!, {
+    if (!client.config.url) {
+      throw new Error(`sse server ${client.serverId} missing url`)
+    }
+    const response = await fetch(client.config.url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -861,15 +959,20 @@ ${yaml.stringify({ servers })}
     client.pending.clear()
 
     // stdio: kill 子进程
-    if (client.childProcess) {
+    // R4-MAP-LEAK-3 修复: 用局部变量捕获 childProcess,避免 setTimeout 触发时
+    // client.childProcess 已被置 undefined 导致可选链 no-op,SIGKILL fallback 永不执行
+    const cp = client.childProcess
+    if (cp) {
       try {
-        client.childProcess.kill('SIGTERM')
+        cp.kill('SIGTERM')
         // 给 1s 优雅退出,然后 SIGKILL
-        setTimeout(() => {
-          if (!client.childProcess?.killed) {
-            client.childProcess?.kill('SIGKILL')
+        const killTimer = setTimeout(() => {
+          if (!cp.killed) {
+            cp.kill('SIGKILL')
           }
         }, 1000)
+        // 子进程已退出则清理 timer,避免内存泄漏
+        cp.once('exit', () => clearTimeout(killTimer))
       } catch {
         // ignore
       }

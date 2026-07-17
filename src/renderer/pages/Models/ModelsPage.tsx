@@ -232,7 +232,8 @@ export function ModelsPage() {
     async (providerId: string) => {
       try {
         const settings = await getAPI().settings.get()
-        const blacklist = settings.models.providerBlacklist ?? []
+        // UI-2 修复: 可选链兜底,防止后端 settings 缺嵌套子对象时崩溃
+        const blacklist = settings?.models?.providerBlacklist ?? []
         if (!blacklist.includes(providerId)) {
           await getAPI().settings.set('models.providerBlacklist', [...blacklist, providerId])
           toast.success(`已隐藏 ${providerId}`)
@@ -250,7 +251,8 @@ export function ModelsPage() {
     async (providerId: string) => {
       try {
         const settings = await getAPI().settings.get()
-        const blacklist = settings.models.providerBlacklist ?? []
+        // UI-2 修复: 可选链兜底
+        const blacklist = settings?.models?.providerBlacklist ?? []
         const next = blacklist.filter((id) => id !== providerId)
         await getAPI().settings.set('models.providerBlacklist', next)
         toast.success(`已取消隐藏 ${providerId}`)
@@ -1061,10 +1063,12 @@ const DefaultModelConfig = memo(function DefaultModelConfig({
     const loadSettings = async () => {
       try {
         const settings = await getAPI().settings.get()
-        const prov = settings.models.defaultProvider || ''
+        // UI-2 修复: 用可选链兜底,防止后端 settings.get() 在迁移/升级后返回
+        // 缺少嵌套子对象(例如 models 整体缺失)导致白屏崩溃。
+        const prov = settings?.models?.defaultProvider || ''
         setDefaultProvider(prov)
-        setHighQualityModel(settings.models.highQualityModel || '')
-        setLowCostModel(settings.models.lowCostModel || '')
+        setHighQualityModel(settings?.models?.highQualityModel || '')
+        setLowCostModel(settings?.models?.lowCostModel || '')
         // loadProviders 已批量加载所有 configured provider 的模型，不再重复请求
       } catch (err) {
         console.error('[DefaultModelConfig] Failed to load settings:', err)

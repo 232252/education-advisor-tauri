@@ -37,6 +37,7 @@ import type {
   AgentListItem,
   AgentStatus,
 } from '../../shared/types'
+import { atomicWrite } from '../utils/atomic-write'
 import { compactAgentMessages } from './compaction-helper'
 import { cronService } from './cron-service'
 import { dbService } from './db-service'
@@ -48,7 +49,6 @@ import { getMcpToolsForAgent } from './mcp-tools'
 import { settingsService } from './settings-service'
 import { skillService } from './skill-service'
 import { allUtilityTools } from './utility-tools'
-import { atomicWrite } from '../utils/atomic-write'
 
 // =============================================================
 // Agent 运行时实例（每次执行创建一个）
@@ -261,6 +261,9 @@ ${yaml.stringify({ agents: list })}
           schedule: a.schedule?.cron ?? [],
           capabilities: override?.capabilities ?? a.capabilities ?? [],
           riskThresholds: a.risk_thresholds,
+          // R8-1 修复: 映射 yaml 的 mcp_servers → AgentConfig.mcpServers
+          // 之前此字段在加载时丢失,导致 agent 永远拿不到 MCP 工具
+          mcpServers: a.mcp_servers,
         }
         this.agents.set(config.id, config)
         this.agentStatus.set(config.id, 'idle')

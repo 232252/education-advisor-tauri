@@ -20,14 +20,38 @@ export function SkillsPage() {
     { key: 'plugins', label: t('page.skills.tab.plugins') },
   ]
 
+  const handleTabKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return
+    e.preventDefault()
+    const idx = tabs.findIndex((tb) => tb.key === tab)
+    if (idx < 0) return
+    const nextIdx =
+      e.key === 'ArrowRight' ? (idx + 1) % tabs.length : (idx - 1 + tabs.length) % tabs.length
+    const nextKey = tabs[nextIdx].key
+    setTab(nextKey)
+    // 把焦点也移到新选中的 tab 上,符合 roving tabindex 模式
+    const btn = document.getElementById(`skills-tab-${nextKey}`)
+    btn?.focus()
+  }
+
   return (
     <section className="h-full flex flex-col" aria-label={t('page.skills.title')}>
       {/* Tab 栏 */}
-      <div className="flex border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
+      <div
+        role="tablist"
+        aria-label={t('page.skills.title')}
+        onKeyDown={handleTabKeyDown}
+        className="flex border-b border-gray-200 dark:border-gray-700 flex-shrink-0"
+      >
         {tabs.map((tb) => (
           <button
             type="button"
+            role="tab"
             key={tb.key}
+            id={`skills-tab-${tb.key}`}
+            aria-selected={tab === tb.key}
+            aria-controls="skills-tabpanel"
+            tabIndex={tab === tb.key ? 0 : -1}
             onClick={() => setTab(tb.key)}
             className={`px-4 py-2 text-sm transition-colors
               ${
@@ -42,7 +66,12 @@ export function SkillsPage() {
       </div>
 
       {/* Tab 内容 */}
-      <div className="flex-1 overflow-hidden">
+      <div
+        role="tabpanel"
+        id="skills-tabpanel"
+        aria-labelledby={`skills-tab-${tab}`}
+        className="flex-1 overflow-hidden"
+      >
         {tab === 'skills' && <SkillsTab />}
         {tab === 'mcp' && <McpTab />}
         {tab === 'plugins' && <PluginsTab />}

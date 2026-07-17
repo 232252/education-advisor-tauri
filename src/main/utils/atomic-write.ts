@@ -13,7 +13,10 @@ async function renameWithRetry(src: string, dest: string, attempt = 0): Promise<
     await fsp.rename(src, dest)
   } catch (err) {
     const code = err instanceof Error ? (err as NodeJS.ErrnoException).code : undefined
-    if ((code === 'EPERM' || code === 'EACCES' || code === 'EBUSY') && attempt < RENAME_MAX_RETRIES) {
+    if (
+      (code === 'EPERM' || code === 'EACCES' || code === 'EBUSY') &&
+      attempt < RENAME_MAX_RETRIES
+    ) {
       await delay(RENAME_RETRY_DELAY_MS * (attempt + 1))
       return renameWithRetry(src, dest, attempt + 1)
     }

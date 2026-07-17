@@ -192,8 +192,8 @@ interface WindowAPI {
   }
   settings: {
     get: () => Promise<UnifiedSettings>
-    set: (path: string, value: unknown) => Promise<{ success: boolean }>
-    reset: () => Promise<{ success: boolean }>
+    set: (path: string, value: unknown) => Promise<{ success: boolean; error?: string }>
+    reset: () => Promise<{ success: boolean; error?: string }>
   }
   mcp: {
     list: () => Promise<{ success: boolean; servers: McpServerStatus[]; error?: string }>

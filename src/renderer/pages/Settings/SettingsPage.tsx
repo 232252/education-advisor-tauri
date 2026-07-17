@@ -7,10 +7,51 @@
 
 import type { FeishuBotStatusInfo, UnifiedSettings } from '@shared/types'
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
+import DEFAULT_SETTINGS_JSON from '../../../../config/default-settings.json'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { setLang, useT } from '../../i18n'
 import { getAPI } from '../../lib/ipc-client'
 import { toast } from '../../stores/toastStore'
+
+/**
+ * 深合并:以后端 settings 覆盖默认 settings 的对应层,确保所有嵌套字段存在。
+ * 防止 settings.feishu.bitableSync 这类访问因字段缺失而崩溃(UI-1 修复)。
+ * 浅层合并只 merge 一层不够,要递归到对象叶子。
+ *
+ * 边界处理:
+ *  - defaults/partial 为 null/undefined 时走空对象兜底,避免递归崩溃
+ *  - 仅在两边都是 plain object(非数组)时递归,数组按值覆盖
+ *  - partial 中 key 为 undefined 时保留 defaults 原值,只有有效值才覆盖
+ */
+function mergeSettings(
+  defaults: Partial<UnifiedSettings> | null | undefined,
+  partial: Partial<UnifiedSettings> | null | undefined,
+): UnifiedSettings {
+  const safeDefaults: Record<string, unknown> = (defaults ?? {}) as Record<string, unknown>
+  const safePartial: Record<string, unknown> = (partial ?? {}) as Record<string, unknown>
+  const result: Record<string, unknown> = { ...safeDefaults }
+  for (const key of Object.keys(safePartial)) {
+    const dVal = safeDefaults[key]
+    const pVal = safePartial[key]
+    if (pVal === undefined) continue
+    const dIsObj = dVal !== null && typeof dVal === 'object' && !Array.isArray(dVal)
+    const pIsObj = pVal !== null && typeof pVal === 'object' && !Array.isArray(pVal)
+    if (dIsObj && pIsObj) {
+      // 两边都是对象:递归合并,确保所有默认叶子字段都保留
+      result[key] = mergeSettings(
+        dVal as Partial<UnifiedSettings>,
+        pVal as Partial<UnifiedSettings>,
+      )
+    } else {
+      // 否则(primitive / array / null):用 partial 覆盖
+      result[key] = pVal
+    }
+  }
+  return result as unknown as UnifiedSettings
+}
+
+// 完整默认 settings(从 config/default-settings.json 导入,作为缺字段兜底)
+const DEFAULT_SETTINGS = DEFAULT_SETTINGS_JSON as unknown as UnifiedSettings
 
 // 字段提示信息（鼠标悬停显示）
 // 所有字段已实现,不再需要 status 状态标识
@@ -260,10 +301,14 @@ export function SettingsPage() {
     try {
       setLoading(true)
       const s = await getAPI().settings.get()
-      setSettings(s)
+      // UI-1 修复: 深合并默认值,防止嵌套字段(如 feishu.bitableSync / chat.compaction /
+      // general.theme 等)在后端迁移/升级后缺失,导致 settings.feishu.bitableSync.enabled 等
+      // 嵌套访问触发 "Cannot read properties of undefined" 而白屏崩溃。
+      const merged = mergeSettings(DEFAULT_SETTINGS, s as Partial<UnifiedSettings>)
+      setSettings(merged)
       // C-4 修复: 从 settings 加载 bitableAppToken 到本地 state
       // 之前该字段只在本地 state,从未持久化,重启后丢失
-      setBitableAppToken(s.feishu?.bitableAppToken ?? '')
+      setBitableAppToken(merged.feishu?.bitableAppToken ?? '')
     } catch (err) {
       console.error('[Settings] Failed to load:', err)
       toast.error(t('settings.load.failed'))

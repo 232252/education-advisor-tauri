@@ -1,5 +1,9 @@
 # AI Workstation 真实问题诊断报告(2026-06-29 重新扫描)
 
+> **状态说明**:本报告为 **2026-06-29 的历史诊断记录**。后续 R1-R10 测试轮次发现的修复与现状以最新文档为准:
+> - 测试规模与索引:[`TESTING.md`](./TESTING.md)
+> - 持续测试轮次与已知问题:[`PROBLEMS.md`](./PROBLEMS.md)
+>
 > 扫描日期: 2026-06-29
 > 扫描范围: 全项目 102 个 IPC 通道 × 11 个 Handler × 13 个 Service × 9 个页面
 > 扫描方法: 静态分析 + 测试套件全跑 + 代码 diff 对比
@@ -103,26 +107,27 @@ E2E 测试:        3 个
 
 ## 已知技术债(本轮未解决,需用户确认是否处理)
 
-### A. db-service.ts 的 4 个 noNonNullAssertion
-- 位置: `src/main/services/db-service.ts:528, 532, 536, 540`
-- 现状: 改用 `?.` 会破坏 transaction 行为
-- 建议: 保持现状,加注释说明
+> **2026-07-17 复核更新**:A、B、D 三项已在后续轮次修复,标记为 ✅ 已修复;C 项页面-Store 统计已按当前 11 个页面重新盘点(数据从 7/9 调整为 7/11)。
 
-### B. ipc-handlers.ts 的 eaa:search 仍无 token sanitize
-- 位置: `src/main/ipc/eaa-handlers.ts:166-173`
-- 现状: tokenizeQuery 拆分但不对每个 token 校验
-- 风险: 用户 UI 路径可输入含 `;` 等字符的搜索词(由用户主动输入,非攻击向量)
-- 建议: 加上 token sanitize,与 eaa-tools 保持一致
+### A. ~~db-service.ts 的 4 个 noNonNullAssertion~~ ✅ 已修复
+- 原位置: `src/main/services/db-service.ts:528, 532, 536, 540`
+- 现状: `grep -n "!" src/main/services/db-service.ts` 确认该区域已无 `!` 非空断言;事务回调已重构为对 `this.stmts.*` 做可空判断,不再依赖入口处的非空断言
+- 修复时间: R7 阶段 biome `lint:fix` 自动修复(commit 363504f7)
+
+### B. ~~ipc-handlers.ts 的 eaa:search 仍无 token sanitize~~ ✅ 已修复(501662d)
+- 原位置: `src/main/ipc/eaa-handlers.ts:166-173`
+- 现状: `eaa-handlers.ts:353-380` search 处理已加入双层过滤——`tokenizeQuery` 拆分后,逐 token 拒绝 `--` 前缀 + shell 元字符 `` ` $ ; | & < > { } \ ``,外层再做控制字符与零宽字符清洗
+- 修复时间: commit 501662d(R10 全面测试优化阶段)
 
 ### C. 部分页面无 store (Dashboard 已修,Students/StudentProfile/Privacy 等仍直接调 getAPI)
-- 现状: 7/9 页面无 store,直接调 getAPI
+- 现状(2026-07-17 盘点):项目现 **11 个主页面**(Dashboard / Models / Settings / Classes / Skills / Privacy / Scheduler / Chat / Agents / Students / Academics);其中 7 个仍直接调 `getAPI`(Dashboard / Models / Settings / Classes / Skills / Privacy / Scheduler = 7/11),4 个已迁移到 zustand store(Chat / Agents / Students / Academics)
 - 风险: 跨页面缓存数据不一致
 - 建议: P3,功能正常,只是代码组织
 
-### D. 渲染进程 dist/renderer 旧资源未自动清理
-- 现状: 多次构建后,旧 `index-*.js` 仍留在 `dist/renderer/assets/`
-- 原因: `vite.config.renderer.ts` 用了相对路径,outDir 不在 project root 内,vite 不会自动清理
-- 建议: 改用 `--emptyOutDir` 标志或手动 `npm run clean && npm run build`
+### D. ~~渲染进程 dist/renderer 旧资源未自动清理~~ ✅ 已修复
+- 原位置: `vite.config.renderer.ts` 缺 `emptyOutDir`
+- 现状: `vite.config.renderer.ts:13-15` 已显式开启 `emptyOutDir: true`,多次构建自动清理旧 `index-*.js`
+- 修复时间: 2026-06-29 本轮 Bug 14(见下方 §14)
 
 ---
 

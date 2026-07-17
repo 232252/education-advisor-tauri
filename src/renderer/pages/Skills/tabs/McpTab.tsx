@@ -8,7 +8,7 @@
 // =============================================================
 
 import type { McpServerConfig, McpServerStatus, McpTool } from '@shared/types'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { EmptyState } from '../../../components/EmptyState'
 import { useInterval } from '../../../hooks'
 import { useT } from '../../../i18n'
@@ -30,6 +30,7 @@ export function McpTab() {
   const [editingServer, setEditingServer] = useState<McpServerConfig | null>(null)
   const [showPresets, setShowPresets] = useState(false)
   const [presetDraft, setPresetDraft] = useState<McpServerConfig | null>(null)
+  const loadingRef = useRef(false)
 
   const checkMcpEnabled = useCallback(async () => {
     try {
@@ -45,7 +46,7 @@ export function McpTab() {
       const result = await getAPI().settings.set('mcp.enabled', enabled)
       if (result.success) {
         setMcpEnabled(enabled)
-        toast.success(enabled ? 'MCP 功能已启用' : 'MCP 功能已禁用')
+        toast.success(enabled ? t('toast.mcp.enabled') : t('toast.mcp.disabled'))
         if (enabled) {
           setLoading(true)
           setTimeout(() => loadServers(), 500)
@@ -54,7 +55,7 @@ export function McpTab() {
           setSelectedId(null)
         }
       } else {
-        toast.error(result.error || '操作失败')
+        toast.error(result.error || t('toast.mcp.toggleFailed'))
       }
     } catch (err) {
       toast.error((err as Error).message)
@@ -62,10 +63,33 @@ export function McpTab() {
   }
 
   const loadServers = useCallback(async () => {
+    if (document.visibilityState === 'hidden') {
+      setLoading(false)
+      return
+    }
+    if (loadingRef.current) return
+    loadingRef.current = true
     try {
       const result = await getAPI().mcp.list()
       if (result.success) {
-        setServers(result.servers)
+        setServers((previous) => {
+          const unchanged =
+            previous.length === result.servers.length &&
+            previous.every((server, index) => {
+              const next = result.servers[index]
+              return (
+                server.id === next.id &&
+                server.name === next.name &&
+                server.connected === next.connected &&
+                server.toolCount === next.toolCount &&
+                server.lastError === next.lastError &&
+                server.transport === next.transport &&
+                server.source === next.source &&
+                server.enabled === next.enabled
+              )
+            })
+          return unchanged ? previous : result.servers
+        })
       } else if (result.error) {
         toast.error(result.error)
       }
@@ -73,6 +97,7 @@ export function McpTab() {
       console.error('[MCP] load failed:', err)
       toast.error(t('toast.mcp.loadFailed'))
     } finally {
+      loadingRef.current = false
       setLoading(false)
     }
   }, [t])
@@ -83,7 +108,7 @@ export function McpTab() {
   }, [checkMcpEnabled, loadServers])
 
   // 每 5s 轮询刷新连接状态(粗轮询,工具列表懒加载)
-  useInterval(loadServers, 5000)
+  useInterval(loadServers, mcpEnabled ? 5000 : null)
 
   const selected = servers.find((s) => s.id === selectedId) ?? null
 
@@ -159,7 +184,8 @@ export function McpTab() {
         toast.success(t('toast.mcp.updated'))
         await loadServers()
       } else {
-        toast.error(result.error || t('toast.mcp.updated'))
+        // R5-I18N-1 修复: 失败 fallback 不再用 "已更新" 文案,改用 toggleFailed
+        toast.error(result.error || t('toast.mcp.toggleFailed'))
       }
     } catch (err) {
       toast.error((err as Error).message)
@@ -209,7 +235,7 @@ export function McpTab() {
         setPresetDraft(null)
         await loadServers()
       } else {
-        toast.error(result.error || 'Failed')
+        toast.error(result.error || t('toast.mcp.toggleFailed'))
       }
     } catch (err) {
       toast.error((err as Error).message)
@@ -217,7 +243,7 @@ export function McpTab() {
   }
 
   if (loading) {
-    return <div className="p-4 text-gray-500">Loading...</div>
+    return <div className="p-4 text-gray-500">{t('common.loading')}</div>
   }
 
   return (
@@ -234,18 +260,17 @@ export function McpTab() {
           <span className="text-sm">
             {mcpEnabled ? (
               <>
-                <span className="text-green-600 dark:text-green-400 font-medium">● MCP 已启用</span>
+                <span className="text-green-600 dark:text-green-400 font-medium">
+                  ● {t('page.mcp.banner.enabled')}
+                </span>
                 <span className="text-gray-600 dark:text-gray-400 ml-2">
-                  Model Context Protocol — 连接外部工具服务器扩展 Agent 能力
+                  Model Context Protocol — {t('page.mcp.empty.hint')}
                 </span>
               </>
             ) : (
-              <>
-                <span className="text-amber-600 dark:text-amber-400 font-medium">○ MCP 未启用</span>
-                <span className="text-gray-600 dark:text-gray-400 ml-2">
-                  启用后可添加 MCP 服务器，为 Agent 提供文件系统、网页搜索等外部工具
-                </span>
-              </>
+              <span className="text-amber-600 dark:text-amber-400 font-medium">
+                ○ {t('page.mcp.banner.disabled')}
+              </span>
             )}
           </span>
         </div>
@@ -258,7 +283,7 @@ export function McpTab() {
               : 'bg-blue-500 text-white hover:bg-blue-600'
           }`}
         >
-          {mcpEnabled ? '禁用' : '启用 MCP'}
+          {mcpEnabled ? t('page.mcp.disable') : t('page.mcp.enable')}
         </button>
       </div>
 
@@ -267,8 +292,8 @@ export function McpTab() {
         <div className="flex-1 flex items-center justify-center p-8">
           <EmptyState
             icon="🔌"
-            title="MCP 功能未启用"
-            description="点击上方「启用 MCP」按钮开启 Model Context Protocol，然后即可添加和管理 MCP 服务器。"
+            title={t('page.mcp.banner.disabled')}
+            description={t('page.mcp.empty.hint')}
           />
         </div>
       ) : (
@@ -326,7 +351,7 @@ export function McpTab() {
                           </span>
                         </div>
                         <div className="ml-3.5 text-xs text-gray-500 dark:text-gray-400">
-                          {s.transport} ·{' '}
+                          {t(`page.mcp.transport.${s.transport}`)} ·{' '}
                           {s.connected
                             ? `${s.toolCount} ${t('page.mcp.tools')}`
                             : t('page.mcp.status.disconnected')}

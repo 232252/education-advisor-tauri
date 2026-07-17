@@ -256,6 +256,45 @@ describe('file-tools', () => {
       expect((result.content[0] as { text: string }).text).toContain('✅ CSV 已写入')
       expect(await fsp.readFile(filePath, 'utf-8')).toContain('a')
     })
+
+    // BUG-1 回归测试: CSV 公式注入防护 (CWE-1236)
+    it('应对公式注入前缀 (= @ + -) 加单引号转义', async () => {
+      const filePath = path.join(tmpRoot, 'formula-injection.csv')
+      await writeCsvTool.execute('wc5', {
+        path: filePath,
+        headers: ['col'],
+        rows: [
+          ['=CMD("calc")'],
+          ['@SUM(1+1)'],
+          ['+1+1'],
+          ['-1+1'],
+          ['正常文本'],
+        ],
+      })
+      const raw = await fsp.readFile(filePath, 'utf-8')
+      // 危险前缀都应被 ' 转义,Excel 不会求值
+      expect(raw).toContain("'=CMD")
+      expect(raw).toContain("'@SUM")
+      expect(raw).toContain("'+1+1")
+      expect(raw).toContain("'-1+1")
+      // 正常文本不应被加 ' 前缀(公式注入防护只针对危险前缀字符)
+      expect(raw).toContain('正常文本')
+      expect(raw).not.toContain("'正常文本")
+    })
+
+    // BUG-2 回归测试: null byte 应被移除
+    it('应移除字段中的 null byte', async () => {
+      const filePath = path.join(tmpRoot, 'null-byte.csv')
+      await writeCsvTool.execute('wc6', {
+        path: filePath,
+        headers: ['name'],
+        rows: [['before\0\0after'], ['clean']],
+      })
+      const raw = await fsp.readFile(filePath, 'utf-8')
+      expect(raw).not.toContain('\0')
+      expect(raw).toContain('beforeafter')
+      expect(raw).toContain('clean')
+    })
   })
 
   describe('listDirTool', () => {

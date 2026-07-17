@@ -58,14 +58,22 @@ export function validateServerConfig(server: unknown): server is McpServerConfig
   if (!server || typeof server !== 'object') return false
   const s = server as Record<string, unknown>
   if (typeof s.id !== 'string' || s.id.length === 0) return false
+  // R5-ERR-4 修复: id 长度上限,与 mcp-handlers.ts 的 validateServerId 一致
+  if (s.id.length > 128) return false
   if (typeof s.name !== 'string') return false
   if (typeof s.enabled !== 'boolean') return false
   const transport = s.transport
   if (transport !== 'stdio' && transport !== 'sse' && transport !== 'websocket') return false
   // stdio 需要 command
   if (transport === 'stdio' && typeof s.command !== 'string') return false
-  // sse/websocket 需要 url
-  if ((transport === 'sse' || transport === 'websocket') && typeof s.url !== 'string') return false
+  // sse/websocket 需要 url 且非空(拒空字符串/纯空白)
+  // R5-ERR-3 修复: typeof 'string' 接受空串,要求 trim 后非空
+  if (
+    (transport === 'sse' || transport === 'websocket') &&
+    (typeof s.url !== 'string' || s.url.trim().length === 0)
+  ) {
+    return false
+  }
   return true
 }
 
@@ -88,5 +96,54 @@ export function validateCommandSafe(command: unknown): boolean {
   if (SHELL_METACHAR_RE.test(trimmed)) return false
   // 拒绝命令替换 $(...) 和 ${...}(但允许环境变量引用在 args/env 中,这里只管 command 本身)
   if (/\$\(|\$\{/.test(trimmed)) return false
+  return true
+}
+
+/**
+ * SSRF 防护:校验 MCP sse/websocket 的 URL 是否指向内网/敏感地址。
+ * 返回 true = 安全(可连),false = 危险(应拒绝)。
+ *
+ * 拒绝:私有 IP 段(10/172.16-31/192.168)、loopback(127,但 localhost 域名放行)、
+ *      link-local(169.254,云元数据)、IPv6 unique-local(fc/fd)、0.0.0.0、多播/保留段(224+)。
+ * 允许:公网域名、localhost 字符串、公网 IP。
+ *
+ * R4-SSRF-1 修复:防止 sidecar 被诱导连接云元数据服务或扫描内网。
+ */
+export function isSafeMcpUrl(rawUrl: string | undefined): boolean {
+  if (!rawUrl) return false
+  let parsed: URL
+  try {
+    parsed = new URL(rawUrl)
+  } catch {
+    return false
+  }
+  // 只允许 http/https/ws/wss 协议
+  if (!['http:', 'https:', 'ws:', 'wss:'].includes(parsed.protocol)) return false
+  const host = parsed.hostname.toLowerCase()
+  // IPv6 在 URL 里带方括号(如 [::1]),new URL().hostname 保留 bracket,这里去掉便于判断
+  const hostNoBracket = host.startsWith('[') && host.endsWith(']') ? host.slice(1, -1) : host
+  // 显式允许 localhost(本地开发 MCP server 常用)
+  if (host === 'localhost') return true
+  // IPv4 解析
+  const ipv4Match = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/)
+  if (ipv4Match) {
+    const [a, b] = [Number(ipv4Match[1]), Number(ipv4Match[2])]
+    if (
+      a === 10 || // 10.0.0.0/8 私有
+      (a === 172 && b >= 16 && b <= 31) || // 172.16.0.0/12 私有
+      (a === 192 && b === 168) || // 192.168.0.0/16 私有
+      a === 127 || // 127.0.0.0/8 loopback(IP 形式,localhost 域名已放行)
+      (a === 169 && b === 254) || // 169.254.0.0/16 link-local(含 AWS/Azure 元数据)
+      a === 0 || // 0.0.0.0/8
+      a >= 224 // 224+ 多播/保留
+    ) {
+      return false
+    }
+    return true
+  }
+  // IPv6 loopback / unique-local
+  if (hostNoBracket === '::1') return false
+  if (/^f[cd][0-9a-f]{2}(?::|$)/.test(hostNoBracket)) return false // fc00::/7 unique-local
+  // 公网域名放行
   return true
 }

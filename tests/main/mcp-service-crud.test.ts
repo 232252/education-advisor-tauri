@@ -123,6 +123,59 @@ describe('McpService addServer', () => {
       }),
     ).rejects.toThrow(/command/)
   })
+
+  // R5-ERR-2 修复: addServer 时校验 URL SSRF(不只是 connect 时)
+  it('add sse 内网地址被拒 (R5-ERR-2)', async () => {
+    await mcpService.init()
+    await expect(
+      mcpService.addServer({
+        id: 'evil-meta',
+        name: '元数据',
+        enabled: true,
+        transport: 'sse',
+        url: 'http://169.254.169.254/latest/meta-data/',
+      }),
+    ).rejects.toThrow(/SSRF|url failed/)
+  })
+
+  it('add file:// 协议被拒 (R5-ERR-2)', async () => {
+    await mcpService.init()
+    await expect(
+      mcpService.addServer({
+        id: 'evil-file',
+        name: '文件',
+        enabled: true,
+        transport: 'sse',
+        url: 'file:///etc/passwd',
+      }),
+    ).rejects.toThrow(/SSRF|url failed/)
+  })
+
+  it('add websocket 内网 IP 被拒 (R5-ERR-2)', async () => {
+    await mcpService.init()
+    await expect(
+      mcpService.addServer({
+        id: 'evil-ws',
+        name: 'WS内网',
+        enabled: true,
+        transport: 'websocket',
+        url: 'ws://10.0.0.5/ws',
+      }),
+    ).rejects.toThrow(/SSRF|url failed/)
+  })
+
+  it('add sse 公网 URL 通过 (R5-ERR-2 正向)', async () => {
+    await mcpService.init()
+    await mcpService.addServer({
+      id: 'public-sse',
+      name: '公网SSE',
+      enabled: true,
+      transport: 'sse',
+      url: 'https://example.com/sse',
+    })
+    const servers = mcpService.listServers()
+    expect(servers.some((s) => s.id === 'public-sse')).toBe(true)
+  })
 })
 
 describe('McpService updateServer', () => {
@@ -157,6 +210,36 @@ describe('McpService updateServer', () => {
     expect(found).toBeDefined()
     expect(found?.enabled).toBe(false)
   })
+
+  // R5-ERR-2 修复: updateServer 时也校验 URL SSRF
+  it('update 改为危险 url 被拒 (R5-ERR-2)', async () => {
+    await mcpService.init()
+    await mcpService.addServer({
+      id: 'upd-safe',
+      name: '安全SSE',
+      enabled: true,
+      transport: 'sse',
+      url: 'https://example.com/sse',
+    })
+    await expect(
+      mcpService.updateServer('upd-safe', { url: 'file:///etc/passwd' }),
+    ).rejects.toThrow(/SSRF|url failed/)
+  })
+
+  it('update 仅改 name 不触发 URL 校验 (R5-ERR-2 保守路径)', async () => {
+    await mcpService.init()
+    await mcpService.addServer({
+      id: 'upd-name',
+      name: '原名',
+      enabled: true,
+      transport: 'stdio',
+      command: 'npx',
+    })
+    // stdio + 仅改 name → 不应触发任何 URL 校验(保守路径)
+    await mcpService.updateServer('upd-name', { name: '新名' })
+    const servers = mcpService.listServers()
+    expect(servers.find((s) => s.id === 'upd-name')?.name).toBe('新名')
+  })
 })
 
 describe('McpService removeServer', () => {
@@ -177,5 +260,113 @@ describe('McpService removeServer', () => {
   it('删除不存在的 id 抛错', async () => {
     await mcpService.init()
     await expect(mcpService.removeServer('nonexistent-id')).rejects.toThrow(/not found/)
+  })
+})
+
+describe('McpService 并发安全 (M7 修复)', () => {
+  it('并发 add 同一 id 应只成功1次', async () => {
+    await mcpService.init()
+    const results = await Promise.all(
+      Array.from({ length: 5 }, () =>
+        mcpService
+          .addServer({
+            id: 'race-target',
+            name: '竞态目标',
+            enabled: true,
+            transport: 'stdio',
+            command: 'npx',
+          })
+          .then(
+            () => 'success' as const,
+            (e) => `error: ${(e as Error).message}` as const,
+          ),
+      ),
+    )
+    const successCount = results.filter((r) => r === 'success').length
+    expect(successCount).toBe(1)
+    // 内存里只有1条
+    const servers = mcpService.listServers()
+    const matches = servers.filter((s) => s.id === 'race-target')
+    expect(matches).toHaveLength(1)
+  })
+
+  it('并发 add 不同 id 应全部成功', async () => {
+    await mcpService.init()
+    const ids = ['a', 'b', 'c', 'd', 'e']
+    const results = await Promise.all(
+      ids.map((id) =>
+        mcpService
+          .addServer({
+            id,
+            name: `server-${id}`,
+            enabled: true,
+            transport: 'stdio',
+            command: 'npx',
+          })
+          .then(
+            () => 'success' as const,
+            () => 'error' as const,
+          ),
+      ),
+    )
+    expect(results.every((r) => r === 'success')).toBe(true)
+    const servers = mcpService.listServers()
+    for (const id of ids) {
+      expect(servers.some((s) => s.id === id)).toBe(true)
+    }
+  })
+})
+
+describe('McpService id 格式校验 (R4-EDGE-MCP-ID 修复)', () => {
+  it('拒绝含空格的 id', async () => {
+    await mcpService.init()
+    await expect(
+      mcpService.addServer({
+        id: 'bad id',
+        name: '坏id',
+        enabled: true,
+        transport: 'stdio',
+        command: 'npx',
+      }),
+    ).rejects.toThrow(/invalid characters/)
+  })
+
+  it('拒绝含特殊字符的 id (!@#)', async () => {
+    await mcpService.init()
+    await expect(
+      mcpService.addServer({
+        id: 'bad!@#',
+        name: '特殊字符',
+        enabled: true,
+        transport: 'stdio',
+        command: 'npx',
+      }),
+    ).rejects.toThrow(/invalid characters/)
+  })
+
+  it('拒绝含路径分隔符的 id (路径遍历尝试)', async () => {
+    await mcpService.init()
+    await expect(
+      mcpService.addServer({
+        id: '../etc',
+        name: '遍历',
+        enabled: true,
+        transport: 'stdio',
+        command: 'npx',
+      }),
+    ).rejects.toThrow(/invalid characters/)
+  })
+
+  it('接受合法 id (字母数字下划线连字符)', async () => {
+    await mcpService.init()
+    await mcpService.addServer({
+      id: 'my-server_1',
+      name: '合法',
+      enabled: true,
+      transport: 'stdio',
+      command: 'npx',
+    })
+    const servers = mcpService.listServers()
+    expect(servers.some((s) => s.id === 'my-server_1')).toBe(true)
   })
 })

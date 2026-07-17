@@ -19,8 +19,6 @@ export default defineConfig({
         manualChunks(id: string) {
           // ECharts 单独打包 — 仅 Dashboard/StudentProfile 使用
           if (id.includes('echarts') || id.includes('zrender')) return 'vendor-echarts'
-          // Markdown 渲染库 — 仅 Chat 页面使用
-          if (id.includes('react-markdown') || id.includes('remark-') || id.includes('rehype-') || id.includes('unified') || id.includes('hast-') || id.includes('mdast-')) return 'vendor-markdown'
           // React 核心
           if (id.includes('react-dom') || id.includes('react/') || id.includes('scheduler')) return 'vendor-react'
         },

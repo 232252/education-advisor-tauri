@@ -23,6 +23,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import {
   deepInterpolate,
   interpolateEnv,
+  isSafeMcpUrl,
   validateCommandSafe,
   validateServerConfig,
 } from '../../src/main/services/mcp-helpers'
@@ -199,6 +200,53 @@ describe('mcp-helpers: validateServerConfig', () => {
  ])('%s → 期望返回 %s', (_name, input, expected) => {
   expect(validateServerConfig(input)).toBe(expected)
  })
+
+ // R5-ERR-4 修复: id 长度上限 128
+ it('拒绝超长 id (>128)', () => {
+  expect(
+   validateServerConfig({
+    id: 'a'.repeat(129),
+    name: 'x',
+    enabled: true,
+    transport: 'stdio',
+    command: 'npx',
+   }),
+  ).toBe(false)
+  expect(
+   validateServerConfig({
+    id: 'a'.repeat(128),
+    name: 'x',
+    enabled: true,
+    transport: 'stdio',
+    command: 'npx',
+   }),
+  ).toBe(true)
+ })
+
+ // R5-ERR-3 修复: sse/websocket 拒绝空 url (含纯空白)
+ it('拒绝 sse 空 url', () => {
+  expect(
+   validateServerConfig({ id: 'x', name: 'x', enabled: true, transport: 'sse', url: '' }),
+  ).toBe(false)
+  expect(
+   validateServerConfig({ id: 'x', name: 'x', enabled: true, transport: 'sse', url: '   ' }),
+  ).toBe(false)
+ })
+
+ it('拒绝 websocket 空 url', () => {
+  expect(
+   validateServerConfig({ id: 'x', name: 'x', enabled: true, transport: 'websocket', url: '' }),
+  ).toBe(false)
+  expect(
+   validateServerConfig({
+    id: 'x',
+    name: 'x',
+    enabled: true,
+    transport: 'websocket',
+    url: '\t\n ',
+   }),
+  ).toBe(false)
+ })
 })
 
 // =============================================================
@@ -246,4 +294,53 @@ describe('validateCommandSafe', () => {
   expect(validateCommandSafe('a'.repeat(513))).toBe(false)
   expect(validateCommandSafe('a'.repeat(512))).toBe(true)
  })
+})
+describe('isSafeMcpUrl (SSRF 防护)', () => {
+  // 导入被测函数(在文件顶部已有 import 语句,这里复用)
+  // 注意:需要在顶部 import 里加 isSafeMcpUrl,这里假设已加
+  it('拒绝 undefined/空', () => {
+    expect(isSafeMcpUrl(undefined)).toBe(false)
+    expect(isSafeMcpUrl('')).toBe(false)
+  })
+
+  it('拒绝非法 URL 格式', () => {
+    expect(isSafeMcpUrl('not-a-url')).toBe(false)
+    expect(isSafeMcpUrl('://missing-protocol')).toBe(false)
+  })
+
+  it('拒绝非 http(s)/ws(s) 协议', () => {
+    expect(isSafeMcpUrl('file:///etc/passwd')).toBe(false)
+    expect(isSafeMcpUrl('ftp://example.com')).toBe(false)
+    expect(isSafeMcpUrl('javascript:alert(1)')).toBe(false)
+  })
+
+  it('拒绝 IPv4 私有段', () => {
+    expect(isSafeMcpUrl('http://10.0.0.1/sse')).toBe(false)
+    expect(isSafeMcpUrl('http://172.16.0.1/sse')).toBe(false)
+    expect(isSafeMcpUrl('http://172.31.255.255/sse')).toBe(false)
+    expect(isSafeMcpUrl('http://192.168.1.1/sse')).toBe(false)
+    expect(isSafeMcpUrl('http://127.0.0.1/sse')).toBe(false)
+    expect(isSafeMcpUrl('http://0.0.0.0/sse')).toBe(false)
+    expect(isSafeMcpUrl('http://224.0.0.1/sse')).toBe(false)
+  })
+
+  it('拒绝云元数据 link-local 地址 (R4-SSRF-1 核心)', () => {
+    expect(isSafeMcpUrl('http://169.254.169.254/latest/meta-data/')).toBe(false)
+  })
+
+  it('拒绝 IPv6 loopback 和 unique-local', () => {
+    expect(isSafeMcpUrl('http://[::1]/sse')).toBe(false)
+    expect(isSafeMcpUrl('http://[fc00::1]/sse')).toBe(false)
+    expect(isSafeMcpUrl('http://[fd12:3456::1]/sse')).toBe(false)
+  })
+
+  it('允许 localhost 域名 (开发用)', () => {
+    expect(isSafeMcpUrl('http://localhost:3000/sse')).toBe(true)
+  })
+
+  it('允许公网域名和公网 IP', () => {
+    expect(isSafeMcpUrl('https://example.com/sse')).toBe(true)
+    expect(isSafeMcpUrl('https://8.8.8.8/sse')).toBe(true)
+    expect(isSafeMcpUrl('wss://mcp.example.com/ws')).toBe(true)
+  })
 })

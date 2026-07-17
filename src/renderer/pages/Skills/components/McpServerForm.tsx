@@ -1,11 +1,11 @@
 import type { McpServerConfig, McpTransport } from '@shared/types'
-import { useMemo, useState } from 'react'
+import { cloneElement, useId, useMemo, useState } from 'react'
 import { useT } from '../../../i18n'
 import { validateMcpConfig } from '../mcp-validate'
 
 interface McpServerFormProps {
   initial: Partial<McpServerConfig> | null
-  onSubmit: (config: McpServerConfig) => void
+  onSubmit: (config: McpServerConfig) => Promise<void> | void
   onCancel: () => void
 }
 
@@ -35,7 +35,7 @@ function toDraft(initial: Partial<McpServerConfig> | null): DraftState {
     enabled: initial?.enabled ?? true,
     transport: (initial?.transport as McpTransport) ?? 'stdio',
     command: initial?.command ?? '',
-    args: Array.isArray(initial?.args) ? initial!.args!.join('\n') : '',
+    args: Array.isArray(initial?.args) ? initial?.args?.join('\n') : '',
     env: initial?.env ? stringifyKv(initial.env, '=') : '',
     url: initial?.url ?? '',
     headers: initial?.headers ? stringifyKv(initial.headers, ': ') : '',
@@ -47,6 +47,8 @@ export function McpServerForm({ initial, onSubmit, onCancel }: McpServerFormProp
   const [draft, setDraft] = useState<DraftState>(() => toDraft(initial))
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [submitted, setSubmitted] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const titleId = useId()
 
   // validateMcpConfig 入参为 Partial<McpServerConfig>;draft 字段已是合法子集
   const draftAsConfig = useMemo<Partial<McpServerConfig>>(
@@ -79,8 +81,9 @@ export function McpServerForm({ initial, onSubmit, onCancel }: McpServerFormProp
     }
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (submitting) return
     setSubmitted(true)
     const errs = validateMcpConfig(draftAsConfig)
     setErrors(errs)
@@ -104,20 +107,28 @@ export function McpServerForm({ initial, onSubmit, onCancel }: McpServerFormProp
             headers: parseKv(draft.headers),
           }),
     }
-    onSubmit(config)
+    setSubmitting(true)
+    try {
+      await onSubmit(config)
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
     <div
       className="fixed inset-0 bg-black/40 flex items-center justify-center z-50"
       onClick={onCancel}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby={titleId}
     >
       <form
         onSubmit={handleSubmit}
         onClick={(e) => e.stopPropagation()}
         className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-lg max-h-[90vh] overflow-auto"
       >
-        <h2 className="text-lg font-medium mb-4 text-gray-900 dark:text-gray-100">
+        <h2 id={titleId} className="text-lg font-medium mb-4 text-gray-900 dark:text-gray-100">
           {initial ? t('page.mcp.edit') : t('page.mcp.add')}
         </h2>
 
@@ -173,7 +184,7 @@ export function McpServerForm({ initial, onSubmit, onCancel }: McpServerFormProp
                   className="w-full px-2 py-1 border rounded font-mono dark:bg-gray-700 dark:border-gray-600"
                 />
               </FormField>
-              <FormField label={t('page.mcp.field.args')} hint="空格或换行分隔">
+              <FormField label={t('page.mcp.field.args')} hint={t('page.mcp.hint.args')}>
                 <textarea
                   value={draft.args}
                   onChange={(e) => update({ args: e.target.value })}
@@ -182,10 +193,11 @@ export function McpServerForm({ initial, onSubmit, onCancel }: McpServerFormProp
                   className="w-full px-2 py-1 border rounded font-mono text-sm dark:bg-gray-700 dark:border-gray-600"
                 />
               </FormField>
-              <FormField label={t('page.mcp.field.env')} hint="KEY=VALUE 每行一个">
+              <FormField label={t('page.mcp.field.env')} hint={t('page.mcp.hint.env')}>
                 <textarea
                   value={draft.env}
                   onChange={(e) => update({ env: e.target.value })}
+                  // biome-ignore lint/suspicious/noTemplateCurlyInString: 占位符由后端 deepInterpolate 处理
                   placeholder={'USER_DOCS=${env.USERPROFILE}/Documents'}
                   rows={2}
                   className="w-full px-2 py-1 border rounded font-mono text-sm dark:bg-gray-700 dark:border-gray-600"
@@ -203,7 +215,7 @@ export function McpServerForm({ initial, onSubmit, onCancel }: McpServerFormProp
                   className="w-full px-2 py-1 border rounded font-mono dark:bg-gray-700 dark:border-gray-600"
                 />
               </FormField>
-              <FormField label={t('page.mcp.field.headers')} hint="KEY: VALUE 每行一个">
+              <FormField label={t('page.mcp.field.headers')} hint={t('page.mcp.hint.headers')}>
                 <textarea
                   value={draft.headers}
                   onChange={(e) => update({ headers: e.target.value })}
@@ -229,13 +241,15 @@ export function McpServerForm({ initial, onSubmit, onCancel }: McpServerFormProp
           <button
             type="button"
             onClick={onCancel}
-            className="px-4 py-1.5 text-sm rounded border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700"
+            disabled={submitting}
+            className="px-4 py-1.5 text-sm rounded border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {t('common.cancel')}
           </button>
           <button
             type="submit"
-            className="px-4 py-1.5 text-sm rounded bg-blue-500 text-white hover:bg-blue-600"
+            disabled={submitting}
+            className="px-4 py-1.5 text-sm rounded bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {t('common.confirm')}
           </button>
@@ -258,22 +272,47 @@ function FormField({
   hint?: string
   children: React.ReactNode
 }) {
+  const fieldId = useId()
+  const errorId = `${fieldId}-err`
+  const hintId = `${fieldId}-hint`
+  // children 约定是单个 input/select/textarea;用 cloneElement 注入 id 和 aria-* 关联
+  const child = cloneElement(children as React.ReactElement, {
+    id: fieldId,
+    'aria-invalid': error ? true : undefined,
+    'aria-describedby':
+      [hint ? hintId : null, error ? errorId : null].filter(Boolean).join(' ') || undefined,
+  })
   return (
     <div>
-      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+      <label
+        htmlFor={fieldId}
+        className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+      >
         {label}
-        {required && <span className="text-red-500 ml-0.5">*</span>}
+        {required && (
+          <span className="text-red-500 ml-0.5" aria-hidden="true">
+            *
+          </span>
+        )}
       </label>
-      {children}
-      {hint && <p className="mt-0.5 text-xs text-gray-400">{hint}</p>}
-      {error && <p className="mt-0.5 text-xs text-red-500">{error}</p>}
+      {child}
+      {hint && (
+        <p id={hintId} className="mt-0.5 text-xs text-gray-400">
+          {hint}
+        </p>
+      )}
+      {error && (
+        <p id={errorId} className="mt-0.5 text-xs text-red-500" role="alert">
+          {error}
+        </p>
+      )}
     </div>
   )
 }
 
 /** 把多行字符串解析为 args 数组(每行一个 arg,或空格分隔) */
 function parseArgs(input?: string): string[] {
-  if (!input || !input.trim()) return []
+  if (!input?.trim()) return []
   return input
     .split(/\n/)
     .map((l) => l.trim())
@@ -283,7 +322,7 @@ function parseArgs(input?: string): string[] {
 
 /** 把 KEY=VALUE 或 KEY: VALUE 多行解析为对象 */
 function parseKv(input?: string): Record<string, string> | undefined {
-  if (!input || !input.trim()) return undefined
+  if (!input?.trim()) return undefined
   const result: Record<string, string> = {}
   for (const line of input.split(/\n/)) {
     const trimmed = line.trim()
