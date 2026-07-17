@@ -136,13 +136,20 @@ export function ChatPage() {
   // 右键菜单事件处理: 会话删除
   useEffect(() => {
     const handler = (e: Event) => {
-      const ce = e as CustomEvent<{ action: string; target: HTMLElement }>
-      const action = ce.detail?.action
-      const target = ce.detail?.target
-      if (!action || !target) return
-      const sid = target.getAttribute('data-ctx-session-id')
-      if (!sid) return
-      if (action === 'delete') setPendingDeleteSessionId(sid)
+      try {
+        const ce = e as CustomEvent<{ action: string; target: HTMLElement | { dataset?: Record<string, string> } }>
+        const action = ce.detail?.action
+        const target = ce.detail?.target
+        if (!action || !target) return
+        // 健壮性: target 可能是 DOM 元素或普通对象(防御畸形事件导致整页崩溃)
+        const sid = typeof target.getAttribute === 'function'
+          ? target.getAttribute('data-ctx-session-id')
+          : target.dataset?.ctxSessionId
+        if (!sid) return
+        if (action === 'delete') setPendingDeleteSessionId(sid)
+      } catch {
+        // 静默忽略畸形事件,避免错误边界捕获导致整页崩溃
+      }
     }
     document.addEventListener('ctx-menu-action', handler)
     return () => document.removeEventListener('ctx-menu-action', handler)

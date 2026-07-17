@@ -512,7 +512,8 @@ export function AcademicsPage() {
 
         {/* Tab 内容 */}
         <div className="p-6">
-          {!selectedStudent && activeTab !== 'exams' ? (
+          {/* compare tab 是全班对比功能,不依赖 selectedStudent;exams tab 也独立 */}
+          {!selectedStudent && activeTab !== 'exams' && activeTab !== 'compare' ? (
             <EmptyState
               icon="👈"
               title="请先选择学生"

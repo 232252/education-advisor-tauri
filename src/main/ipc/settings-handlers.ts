@@ -29,6 +29,22 @@ const ENUM_VALIDATORS: Record<string, readonly string[]> = {
   'chat.thinkingLevel': ['off', 'minimal', 'low', 'medium', 'high', 'xhigh'],
 }
 
+/**
+ * P4-5 修复: 字段类型校验表
+ * 对 settings.json 中的布尔/字符串字段,校验 value 类型与 schema 匹配。
+ * 防止 XSS'd renderer 传入错误类型 (如 autoStart='true' 字符串) 污染内存配置。
+ * 枚举字段已在 ENUM_VALIDATORS 中隐式要求 string 类型,此处不重复。
+ */
+const TYPE_VALIDATORS: Record<string, 'string' | 'boolean' | 'number'> = {
+  'general.autoStart': 'boolean',
+  'general.minimizeToTray': 'boolean',
+  'chat.conversationLogging': 'boolean',
+  'feishu.appId': 'string',
+}
+
+/** P4-6 修复: feishu.appSecret 长度上限 (10KB,合理的 API key 长度) */
+const MAX_FEISHU_SECRET_LEN = 10_000
+
 export function registerSettingsHandlers(win: BrowserWindow) {
   // 启动时同步 autoStart 设置到系统
   const currentSettings = settingsService.getSettings()
@@ -91,11 +107,22 @@ export function registerSettingsHandlers(win: BrowserWindow) {
       if (typeof path !== 'string' || path.length === 0) {
         return { success: false, error: 'path must be a non-empty string' }
       }
+      // P4-6 修复: path 含 null byte 拒绝
+      if (path.includes('\0')) {
+        return { success: false, error: '[IPC] invalid path: contains null byte' }
+      }
       // 飞书 appSecret:存入 keystore 加密存储，不写入 settings.json
       if (path === 'feishu.appSecret' && typeof value === 'string' && value.length > 0) {
         // 如果是 keystore 占位符，说明用户没修改，跳过
         if (value === '__keystore__') {
           return { success: true }
+        }
+        // P4-6 修复: 长度上限 + null byte 校验
+        if (value.length > MAX_FEISHU_SECRET_LEN) {
+          return { success: false, error: `[IPC] feishu.appSecret too long (${value.length} > ${MAX_FEISHU_SECRET_LEN})` }
+        }
+        if (value.includes('\0')) {
+          return { success: false, error: '[IPC] feishu.appSecret contains null byte' }
         }
         keystoreService.setSecret('feishu-app-secret', value)
         log('info', 'settings', 'feishu.appSecret saved to keystore (encrypted)')
@@ -105,16 +132,44 @@ export function registerSettingsHandlers(win: BrowserWindow) {
       }
 
       // Bug R28-1 修复: 枚举字段校验,拒绝非法值
+      // P4-5 修复: 枚举字段必须是 string 类型,非 string 直接拒绝 (不再跳过校验)
       const allowedValues = ENUM_VALIDATORS[path]
-      if (allowedValues && typeof value === 'string' && !allowedValues.includes(value)) {
+      if (allowedValues) {
+        if (typeof value !== 'string') {
+          log(
+            'warn',
+            'settings',
+            `Rejected non-string value for enum ${path}: type=${typeof value}`,
+          )
+          return {
+            success: false,
+            error: `[IPC] Invalid value type for ${path}: expected string, got ${typeof value}`,
+          }
+        }
+        if (!allowedValues.includes(value)) {
+          log(
+            'warn',
+            'settings',
+            `Rejected invalid enum value for ${path}: ${value} (allowed: ${allowedValues.join(', ')})`,
+          )
+          return {
+            success: false,
+            error: `Invalid value "${value}" for ${path}. Allowed: ${allowedValues.join(', ')}`,
+          }
+        }
+      }
+
+      // P4-5 修复: 非枚举字段的类型校验
+      const expectedType = TYPE_VALIDATORS[path]
+      if (expectedType && typeof value !== expectedType) {
         log(
           'warn',
           'settings',
-          `Rejected invalid enum value for ${path}: ${value} (allowed: ${allowedValues.join(', ')})`,
+          `Rejected type mismatch for ${path}: expected ${expectedType}, got ${typeof value}`,
         )
         return {
           success: false,
-          error: `Invalid value "${value}" for ${path}. Allowed: ${allowedValues.join(', ')}`,
+          error: `[IPC] Invalid value type for ${path}: expected ${expectedType}, got ${typeof value}`,
         }
       }
 

@@ -21,6 +21,14 @@ function sanitizeName(name: string): string {
   if (cleaned.length === 0) {
     throw new Error('name is empty after cleaning')
   }
+  // P4 修复: 拒绝路径遍历序列 .. (防止 profile 文件路径逃逸)
+  if (cleaned.includes('..')) {
+    throw new Error('name contains path traversal sequence (..)')
+  }
+  // 拒绝路径分隔符 (防止跨目录访问)
+  if (/[/\\]/.test(cleaned)) {
+    throw new Error('name contains path separators')
+  }
   // 拒绝控制字符 (包括 NUL、换行符 \n \r、制表符等,防止参数注入和数据损坏)
   // biome-ignore lint/suspicious/noControlCharactersInRegex: intentional control-char guard against injection
   if (/[\x00-\x1F\x7F]/.test(cleaned)) {

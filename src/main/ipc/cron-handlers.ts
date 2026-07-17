@@ -76,6 +76,163 @@ function validateCronExpression(expr: string): void {
   }
 }
 
+// =============================================================
+// P5 修复: Cron 任务参数校验 helper
+// 防止 XSS'd renderer 传入非法类型/null byte/超长字符串污染 cron-tasks.json
+// =============================================================
+
+const MAX_CRON_NAME_LEN = 128
+const MAX_CRON_PROMPT_LEN = 10_000
+
+/** 校验 task.name: 非空字符串 + 长度上限 + null byte + 控制字符 */
+function validateCronName(name: unknown): string {
+  if (typeof name !== 'string') {
+    throw new Error(`task.name must be a string, got ${name === null ? 'null' : typeof name}`)
+  }
+  if (name.length === 0) {
+    throw new Error('task.name must be a non-empty string')
+  }
+  if (name.length > MAX_CRON_NAME_LEN) {
+    throw new Error(`task.name too long (${name.length} > ${MAX_CRON_NAME_LEN})`)
+  }
+  if (name.includes('\0')) {
+    throw new Error('task.name contains null byte')
+  }
+  // 拒绝控制字符 (换行/制表符等,防止 cron-tasks.json 行结构被破坏)
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: intentional control-char guard
+  if (/[\x00-\x1F\x7F]/.test(name)) {
+    throw new Error('task.name contains control characters')
+  }
+  return name
+}
+
+/** 校验 task.expression: 非空字符串 + null byte (语法校验由 validateCronExpression 完成) */
+function validateCronExpressionInput(expr: unknown): string {
+  if (typeof expr !== 'string') {
+    throw new Error(`task.expression must be a string, got ${expr === null ? 'null' : typeof expr}`)
+  }
+  if (expr.length === 0) {
+    throw new Error('task.expression must be a non-empty string')
+  }
+  if (expr.includes('\0')) {
+    throw new Error('task.expression contains null byte')
+  }
+  return expr
+}
+
+/** 校验 task.prompt: 字符串 + 长度上限 + null byte (可选字段) */
+function validateCronPrompt(prompt: unknown): string | undefined {
+  if (prompt === undefined || prompt === null) return undefined
+  if (typeof prompt !== 'string') {
+    throw new Error(`task.prompt must be a string, got ${typeof prompt}`)
+  }
+  if (prompt.length > MAX_CRON_PROMPT_LEN) {
+    throw new Error(`task.prompt too long (${prompt.length} > ${MAX_CRON_PROMPT_LEN})`)
+  }
+  if (prompt.includes('\0')) {
+    throw new Error('task.prompt contains null byte')
+  }
+  return prompt
+}
+
+/** modelTier 白名单 (与 agent-handlers 保持一致) */
+const VALID_CRON_MODEL_TIERS = ['high_quality', 'low_cost'] as const
+
+/** 校验 task.modelTier: 枚举白名单 (可选字段) */
+function validateCronModelTier(tier: unknown): 'high_quality' | 'low_cost' | undefined {
+  if (tier === undefined || tier === null) return undefined
+  if (typeof tier !== 'string') {
+    throw new Error(`task.modelTier must be a string, got ${typeof tier}`)
+  }
+  if (!VALID_CRON_MODEL_TIERS.includes(tier as (typeof VALID_CRON_MODEL_TIERS)[number])) {
+    throw new Error(`task.modelTier "${tier}" invalid (allowed: ${VALID_CRON_MODEL_TIERS.join(', ')})`)
+  }
+  return tier as 'high_quality' | 'low_cost'
+}
+
+/** 校验 task.agentId: 非空字符串 + null byte + 控制字符 */
+function validateCronAgentId(agentId: unknown): string {
+  if (typeof agentId !== 'string') {
+    throw new Error(`task.agentId must be a string, got ${agentId === null ? 'null' : typeof agentId}`)
+  }
+  if (agentId.length === 0) {
+    throw new Error('task.agentId must be a non-empty string')
+  }
+  if (agentId.length > 128) {
+    throw new Error(`task.agentId too long (${agentId.length} > 128)`)
+  }
+  if (agentId.includes('\0')) {
+    throw new Error('task.agentId contains null byte')
+  }
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: intentional control-char guard
+  if (/[\x00-\x1F\x7F]/.test(agentId)) {
+    throw new Error('task.agentId contains control characters')
+  }
+  return agentId
+}
+
+/**
+ * 校验完整 task 对象 (用于 add)
+ * 返回经过校验的 Omit<CronTask, 'id'>
+ */
+function validateCronTaskInput(task: unknown): {
+  name: string
+  expression: string
+  enabled?: boolean
+  agentId: string
+  prompt?: string
+  modelTier?: 'high_quality' | 'low_cost'
+} {
+  if (!task || typeof task !== 'object') {
+    throw new Error('task must be a non-null object')
+  }
+  const t = task as Record<string, unknown>
+  const name = validateCronName(t.name)
+  const expression = validateCronExpressionInput(t.expression)
+  // 语法校验
+  validateCronExpression(expression)
+  // agentId 必填 (cronService.addTask 需要)
+  const agentId = validateCronAgentId(t.agentId)
+  // enabled 可选,但必须是 boolean
+  let enabled: boolean | undefined
+  if (t.enabled !== undefined && t.enabled !== null) {
+    if (typeof t.enabled !== 'boolean') {
+      throw new Error(`task.enabled must be a boolean, got ${typeof t.enabled}`)
+    }
+    enabled = t.enabled
+  }
+  const prompt = validateCronPrompt(t.prompt)
+  const modelTier = validateCronModelTier(t.modelTier)
+  return { name, expression, agentId, enabled, prompt, modelTier }
+}
+
+/**
+ * 校验 patch 对象 (用于 update, 所有字段可选)
+ * 排除 id 字段,返回安全 patch
+ */
+function validateCronPatchInput(patch: unknown): Record<string, unknown> {
+  if (!patch || typeof patch !== 'object') {
+    throw new Error('patch must be a non-null object')
+  }
+  const p = patch as Record<string, unknown>
+  // 排除 id 字段,防止 id 被篡改
+  const { id: _ignored, ...safePatch } = p
+  if (safePatch.name !== undefined) safePatch.name = validateCronName(safePatch.name)
+  if (safePatch.expression !== undefined) {
+    safePatch.expression = validateCronExpressionInput(safePatch.expression)
+    validateCronExpression(safePatch.expression as string)
+  }
+  if (safePatch.agentId !== undefined) safePatch.agentId = validateCronAgentId(safePatch.agentId)
+  if (safePatch.prompt !== undefined) safePatch.prompt = validateCronPrompt(safePatch.prompt)
+  if (safePatch.modelTier !== undefined) safePatch.modelTier = validateCronModelTier(safePatch.modelTier)
+  if (safePatch.enabled !== undefined && safePatch.enabled !== null) {
+    if (typeof safePatch.enabled !== 'boolean') {
+      throw new Error(`patch.enabled must be a boolean, got ${typeof safePatch.enabled}`)
+    }
+  }
+  return safePatch
+}
+
 export function registerCronHandlers(win: BrowserWindow) {
   // 设置窗口引用，用于推送状态更新
   cronService.setMainWindow(win)
@@ -92,22 +249,11 @@ export function registerCronHandlers(win: BrowserWindow) {
   // P1-36 修复:用 Omit<CronTask, 'id'> 替代 as any,
   // 拒绝畸形数据(空对象/缺失 name/expression 等)
   // H-3 修复:增加 cron 表达式语法校验,防止无效表达式进入调度器
+  // P5 修复: 全字段校验 (name/expression/agentId/prompt/modelTier/enabled 类型+长度+null byte+控制字符)
   ipcMain.handle(IPC.IPC_CRON_ADD, async (_e, task: unknown) => {
-    if (!task || typeof task !== 'object') {
-      throw new Error('task must be a non-null object')
-    }
-    const t = task as Record<string, unknown>
-    if (typeof t.name !== 'string' || t.name.length === 0) {
-      throw new Error('task.name must be a non-empty string')
-    }
-    if (typeof t.expression !== 'string' || t.expression.length === 0) {
-      throw new Error('task.expression must be a non-empty string')
-    }
-    // H-3 修复:校验 cron 表达式语法,拒绝如 "*/foo * * * *" 等畸形表达式
-    // 修复: 严格校验 5 段格式 + 字段范围,与前端 validateCron 保持一致
-    validateCronExpression(t.expression)
     try {
-      const id = cronService.addTask(task as Omit<CronTask, 'id'>)
+      const safeTask = validateCronTaskInput(task)
+      const id = cronService.addTask(safeTask as Omit<CronTask, 'id'>)
       return { success: true, id }
     } catch (err) {
       return { success: false, error: err instanceof Error ? err.message : String(err) }
@@ -117,18 +263,12 @@ export function registerCronHandlers(win: BrowserWindow) {
   // P1-37 修复:用 Partial<CronTask> 替代 as any,
   // 过滤 patch 中 id 等不可变字段
   // H-3 修复:update 中若包含 expression,也需校验
+  // P5 修复: 全字段校验 (与 add 一致,所有字段可选)
   ipcMain.handle(IPC.IPC_CRON_UPDATE, async (_e, id: string, patch: unknown) => {
-    if (!patch || typeof patch !== 'object') {
-      throw new Error('patch must be a non-null object')
+    if (typeof id !== 'string' || id.length === 0) {
+      throw new Error('id must be a non-empty string')
     }
-    // 排除 id 字段,防止 id 被篡改
-    const { id: _ignored, ...safePatch } = patch as Record<string, unknown>
-    if (
-      typeof safePatch.expression === 'string' &&
-      safePatch.expression.length > 0
-    ) {
-      validateCronExpression(safePatch.expression)
-    }
+    const safePatch = validateCronPatchInput(patch)
     return cronService.updateTask(id, safePatch as Partial<CronTask>)
   })
 

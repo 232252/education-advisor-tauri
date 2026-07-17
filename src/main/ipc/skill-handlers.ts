@@ -52,6 +52,10 @@ export function registerSkillHandlers(_win: BrowserWindow) {
       if (content.length > 1024 * 1024) {
         throw new Error('content too large (max 1MB)')
       }
+      // P4 修复: 拒绝 null byte,防止注入到 .md 文件下游解析
+      if (content.includes('\0')) {
+        throw new Error('content contains null byte')
+      }
       return await skillService.saveSkill(safeName, content)
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)

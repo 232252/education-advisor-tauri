@@ -198,6 +198,32 @@ export function registerAIHandlers(win: BrowserWindow) {
         maxTokens?: number
       },
     ) => {
+      // R6-8 修复: 输入验证(同步执行,在 IIFE 前)
+      // P3-1 修复: 验证前移至 IIFE 外,使 IPC 返回值能反映验证失败
+      //   之前验证在 IIFE 内异步执行,IPC 立即返回 success:true,
+      //   调用方不订阅 stream 时无法感知验证失败
+      try {
+        validateString(params.providerId, 'params.providerId', 256)
+        validateString(params.modelId, 'params.modelId', 256)
+        if (!Array.isArray(params.messages)) {
+          throw new Error('[IPC] invalid params.messages: expected array')
+        }
+        // P1-42 修复:thinking 通过 ModelThinkingLevel 类型安全转换
+        // 6 个枚举值: 'off' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh'
+        // 运行时枚举校验: 防止 XSS 注入非法值透传到 Provider API
+        const ALLOWED_THINKING = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh'] as const
+        const thinking = params.thinking as ModelThinkingLevel | undefined
+        if (thinking !== undefined && !ALLOWED_THINKING.includes(thinking)) {
+          throw new Error(
+            `[IPC] invalid thinking: ${thinking} (allowed: ${ALLOWED_THINKING.join(', ')})`,
+          )
+        }
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        console.error('[IPC] ai:chat validation failed:', msg)
+        return { success: false, error: msg, sessionId: null }
+      }
+
       // 异步执行流式对话，逐事件推送到渲染进程
       // P1-41 修复:跟踪会话状态,主动捕获 IIFE 异常,确保错误始终送到前端
       activeChatCount++
@@ -208,31 +234,17 @@ export function registerAIHandlers(win: BrowserWindow) {
         }
       }
 
+      // thinking 已在上面验证,这里直接使用
+      const validatedThinking = params.thinking as ModelThinkingLevel | undefined
+
       ;(async () => {
         try {
-          // R6-8 修复: 输入验证
-          validateString(params.providerId, 'params.providerId', 256)
-          validateString(params.modelId, 'params.modelId', 256)
-          if (!Array.isArray(params.messages)) {
-            throw new Error('[IPC] invalid params.messages: expected array')
-          }
-          // P1-42 修复:thinking 通过 ModelThinkingLevel 类型安全转换
-          // 6 个枚举值: 'off' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh'
-          // 运行时枚举校验: 防止 XSS 注入非法值透传到 Provider API
-          const ALLOWED_THINKING = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh'] as const
-          const thinking = params.thinking as ModelThinkingLevel | undefined
-          if (thinking !== undefined && !ALLOWED_THINKING.includes(thinking)) {
-            throw new Error(
-              `[IPC] invalid thinking: ${thinking} (allowed: ${ALLOWED_THINKING.join(', ')})`,
-            )
-          }
-
           const stream = piAIService.chatStream({
             providerId: params.providerId,
             modelId: params.modelId,
             messages: params.messages,
             systemPrompt: params.systemPrompt,
-            thinking,
+            thinking: validatedThinking,
             maxTokens: params.maxTokens,
           })
 
@@ -297,6 +309,16 @@ export function registerAIHandlers(win: BrowserWindow) {
         // content 允许空字符串: createSession 占位消息 / agent 无文本输出
         validateStringAllowEmpty(msg.content, 'msg.content', 10_000_000) // 10MB for large context
         validateOptionalString(msg.sessionId, 'msg.sessionId', 256)
+        // 数值字段类型校验: 防止字符串/对象污染统计
+        if (msg.tokenInput !== undefined && typeof msg.tokenInput !== 'number') {
+          return { success: false, error: `[IPC] invalid msg.tokenInput: expected number, got ${typeof msg.tokenInput}`, id: -1 }
+        }
+        if (msg.tokenOutput !== undefined && typeof msg.tokenOutput !== 'number') {
+          return { success: false, error: `[IPC] invalid msg.tokenOutput: expected number, got ${typeof msg.tokenOutput}`, id: -1 }
+        }
+        if (msg.cost !== undefined && typeof msg.cost !== 'number') {
+          return { success: false, error: `[IPC] invalid msg.cost: expected number, got ${typeof msg.cost}`, id: -1 }
+        }
         const enrichedMsg = { ...msg, timestamp: msg.timestamp ?? Date.now() }
         const id = dbService.saveChatMessage(enrichedMsg)
         return { success: id >= 0, id }
@@ -355,6 +377,23 @@ export function registerAIHandlers(win: BrowserWindow) {
   })
 
   // ----- 自定义模型管理 (写操作后失效 provider 缓存,因 modelCount 会变) -----
+  // P3-3 修复: 数值/布尔字段类型校验 helper,防止 XSS'd renderer 传入字符串/对象
+  // 污染 settings.json (piAIService.addCustomModel 直接存储,不做类型转换)
+  function validateOptionalNumber(value: unknown, field: string): number | undefined {
+    if (value === undefined || value === null) return undefined
+    if (typeof value !== 'number' || !Number.isFinite(value)) {
+      throw new Error(`[IPC] invalid ${field}: expected finite number, got ${typeof value}=${String(value).slice(0, 32)}`)
+    }
+    return value
+  }
+  function validateOptionalBoolean(value: unknown, field: string): boolean | undefined {
+    if (value === undefined || value === null) return undefined
+    if (typeof value !== 'boolean') {
+      throw new Error(`[IPC] invalid ${field}: expected boolean, got ${typeof value}=${String(value).slice(0, 32)}`)
+    }
+    return value
+  }
+
   ipcMain.handle(
     IPC.IPC_AI_ADD_CUSTOM_MODEL,
     async (
@@ -376,6 +415,10 @@ export function registerAIHandlers(win: BrowserWindow) {
         validateString(params.providerId, 'params.providerId', 256)
         validateString(params.modelId, 'params.modelId', 256)
         validateOptionalString(params.name, 'params.name', 256)
+        // P3-3 修复: 数值/布尔字段类型校验
+        validateOptionalNumber(params.contextWindow, 'params.contextWindow')
+        validateOptionalNumber(params.maxOutputTokens, 'params.maxOutputTokens')
+        validateOptionalBoolean(params.supportsReasoning, 'params.supportsReasoning')
         const result = piAIService.addCustomModel(params.providerId, {
           id: params.modelId,
           name: params.name,
@@ -435,6 +478,12 @@ export function registerAIHandlers(win: BrowserWindow) {
         validateOptionalString(params.name, 'params.name', 256)
         validateOptionalString(params.api, 'params.api', 64)
         validateOptionalString(params.baseUrl, 'params.baseUrl', 2048)
+        // P3-3 修复: 数值/布尔字段类型校验
+        validateOptionalNumber(params.contextWindow, 'params.contextWindow')
+        validateOptionalNumber(params.maxOutputTokens, 'params.maxOutputTokens')
+        validateOptionalNumber(params.costPerInputToken, 'params.costPerInputToken')
+        validateOptionalNumber(params.costPerOutputToken, 'params.costPerOutputToken')
+        validateOptionalBoolean(params.supportsReasoning, 'params.supportsReasoning')
         const updated = piAIService.updateCustomModel(params.providerId, params.modelId, {
           name: params.name,
           contextWindow: params.contextWindow,

@@ -66,6 +66,15 @@ function sanitizeName(name: string, field: string): string {
   if (/[\x00-\x1F\x7F]/.test(cleaned)) {
     throw new Error(`${field} contains control characters`)
   }
+  // P5 修复: 拒绝路径分隔符和路径遍历序列 (与 profile-handlers 保持一致)
+  // studentName 虽然作为 CLI 参数传递而非文件路径,但 entity_id 不应含 / \
+  // 且 ../ 可能被下游服务拼接成文件路径 (如 logs/<name>.json)
+  if (/[/\\]/.test(cleaned)) {
+    throw new Error(`${field} contains path separators`)
+  }
+  if (cleaned.includes('..')) {
+    throw new Error(`${field} contains path traversal sequence (..)`)
+  }
   if (/[`$;|&<>{}\\]/.test(cleaned)) {
     throw new Error(`${field} contains illegal characters`)
   }
