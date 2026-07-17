@@ -40,6 +40,22 @@ function uniqStudent(): string {
   return `测试学生${seq}`
 }
 
+/**
+ * 创建一个真实的考试并返回其 id。
+ * 用于 setGrade 测试：新校验要求 examId 必须存在于 listExams()。
+ * 默认 subjects 为 ['math']；若测试需要多科目，可传 subjects 数组。
+ */
+async function seedExam(subjects: string[] = ['math']): Promise<string> {
+  const exam = await academicService.createExam({
+    name: '测试考试',
+    type: 'midterm',
+    date: '2026-07-17',
+    semester: '2026-spring',
+    subjects,
+  })
+  return exam.id
+}
+
 beforeAll(async () => {
   await fsp.mkdir(tmpDir, { recursive: true })
 })
@@ -87,9 +103,10 @@ describe('academicService.setConfig', () => {
 describe('safeName（路径遍历防御，间接通过文件名验证）', () => {
   it('含 / 的学生名被替换为 _，写入正确文件', async () => {
     const name = '../../../etc/passwd'
+    const examId = await seedExam()
     const grade = await academicService.setGrade({
       studentName: name,
-      examId: 'e1',
+      examId,
       subjectId: 'math',
       score: 90,
     })
@@ -102,9 +119,10 @@ describe('safeName（路径遍历防御，间接通过文件名验证）', () =>
 
   it('含空格的学生名被替换为 _', async () => {
     const name = '张 三'
+    const examId = await seedExam()
     await academicService.setGrade({
       studentName: name,
-      examId: 'e1',
+      examId,
       subjectId: 'math',
       score: 80,
     })
@@ -114,9 +132,10 @@ describe('safeName（路径遍历防御，间接通过文件名验证）', () =>
 
   it('中文/字母/数字/_- 的学生名保持不变', async () => {
     const name = '张三_A1-2'
+    const examId = await seedExam()
     await academicService.setGrade({
       studentName: name,
-      examId: 'e1',
+      examId,
       subjectId: 'math',
       score: 70,
     })
@@ -164,9 +183,10 @@ describe('academicService.listExams', () => {
 describe('academicService.setGrade / getGrades', () => {
   it('新增成绩（upsert 新条目）', async () => {
     const name = uniqStudent()
+    const examId = await seedExam()
     const grade = await academicService.setGrade({
       studentName: name,
-      examId: 'exam-1',
+      examId,
       subjectId: 'math',
       score: 95,
     })
@@ -176,8 +196,9 @@ describe('academicService.setGrade / getGrades', () => {
 
   it('更新已有成绩（同 examId + subjectId 覆盖）', async () => {
     const name = uniqStudent()
-    await academicService.setGrade({ studentName: name, examId: 'e1', subjectId: 'math', score: 60 })
-    await academicService.setGrade({ studentName: name, examId: 'e1', subjectId: 'math', score: 90 })
+    const examId = await seedExam()
+    await academicService.setGrade({ studentName: name, examId, subjectId: 'math', score: 60 })
+    await academicService.setGrade({ studentName: name, examId, subjectId: 'math', score: 90 })
     const got = await academicService.getGrades(name)
     expect(got).toHaveLength(1)
     expect(got[0].score).toBe(90)
@@ -185,8 +206,9 @@ describe('academicService.setGrade / getGrades', () => {
 
   it('不同 subjectId 视为不同条目', async () => {
     const name = uniqStudent()
-    await academicService.setGrade({ studentName: name, examId: 'e1', subjectId: 'math', score: 80 })
-    await academicService.setGrade({ studentName: name, examId: 'e1', subjectId: 'english', score: 85 })
+    const examId = await seedExam(['math', 'english'])
+    await academicService.setGrade({ studentName: name, examId, subjectId: 'math', score: 80 })
+    await academicService.setGrade({ studentName: name, examId, subjectId: 'english', score: 85 })
     const got = await academicService.getGrades(name)
     expect(got).toHaveLength(2)
   })
@@ -248,7 +270,7 @@ describe('academicService.deleteExam（级联删除）', () => {
   })
 
   it('学生成绩文件变空时文件被删除', async () => {
-    const examId = 'exam-empty-file'
+    const examId = await seedExam()
     const a = uniqStudent()
     await academicService.setGrade({ studentName: a, examId, subjectId: 'math', score: 80 })
 
@@ -287,5 +309,100 @@ describe('academicService.getClassGrades', () => {
   it('无成绩的学生返回空数组', async () => {
     const result = await academicService.getClassGrades([uniqStudent()], 'no-exam')
     expect(Object.keys(result)).toHaveLength(1)
+  })
+})
+
+// =============================================================
+// R9-1/2/3/4 修复: setGrade 输入校验测试
+// 覆盖：examId 不存在 / subjectId 不属于考试 / score 非数字 / score 越界 / null 合法 / 空字符串拒绝
+// =============================================================
+
+describe('academicService.setGrade 输入校验 (R9-1/2/3/4)', () => {
+  it('拒绝不存在的 examId', async () => {
+    await expect(
+      academicService.setGrade({
+        studentName: '校验学生',
+        examId: 'NONEXISTENT',
+        subjectId: 'math',
+        score: 80,
+        fullMark: 100,
+      }),
+    ).rejects.toThrow(/考试不存在/)
+  })
+
+  it('拒绝不属于考试的 subjectId', async () => {
+    const examId = await seedExam(['math'])
+    await expect(
+      academicService.setGrade({
+        studentName: '校验学生',
+        examId,
+        subjectId: 'physics',
+        score: 80,
+        fullMark: 100,
+      }),
+    ).rejects.toThrow(/不属于考试/)
+  })
+
+  it('拒绝非数字 score', async () => {
+    const examId = await seedExam(['math'])
+    await expect(
+      academicService.setGrade({
+        studentName: '校验学生',
+        examId,
+        subjectId: 'math',
+        score: 'abc' as unknown as number,
+        fullMark: 100,
+      }),
+    ).rejects.toThrow(/score 必须是有限数字/)
+  })
+
+  it('拒绝越界 score (负数)', async () => {
+    const examId = await seedExam(['math'])
+    await expect(
+      academicService.setGrade({
+        studentName: '校验学生',
+        examId,
+        subjectId: 'math',
+        score: -10,
+        fullMark: 100,
+      }),
+    ).rejects.toThrow(/超出范围/)
+  })
+
+  it('拒绝越界 score (>fullMark)', async () => {
+    const examId = await seedExam(['math'])
+    await expect(
+      academicService.setGrade({
+        studentName: '校验学生',
+        examId,
+        subjectId: 'math',
+        score: 150,
+        fullMark: 100,
+      }),
+    ).rejects.toThrow(/超出范围/)
+  })
+
+  it('接受 null score (缺考)', async () => {
+    const examId = await seedExam(['math'])
+    const grade = await academicService.setGrade({
+      studentName: '校验学生',
+      examId,
+      subjectId: 'math',
+      score: null,
+      fullMark: 100,
+    })
+    expect(grade.score).toBeNull()
+  })
+
+  it('拒绝空 examId', async () => {
+    await expect(
+      academicService.setGrade({
+        studentName: 'x',
+        examId: '',
+        subjectId: 'math',
+        score: 80,
+        fullMark: 100,
+      }),
+    ).rejects.toThrow(/examId/)
   })
 })
