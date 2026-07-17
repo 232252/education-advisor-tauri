@@ -2,7 +2,7 @@
   "general": {
     "dataDir": "",
     "defaultOperator": "班主任",
-    "theme": "dark",
+    "theme": "light",
     "language": "zh-CN",
     "autoUpdate": true,
     "telemetry": false,
@@ -10,6 +10,9 @@
     "autoStart": false,
     "minimizeToTray": true,
     "closeBehavior": "ask"
+  },
+  "mcp": {
+    "enabled": false
   },
   "models": {
     "defaultProvider": "",

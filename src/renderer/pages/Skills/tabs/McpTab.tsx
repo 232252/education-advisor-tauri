@@ -22,6 +22,7 @@ export function McpTab() {
   const { t } = useT()
   const [servers, setServers] = useState<McpServerStatus[]>([])
   const [loading, setLoading] = useState(true)
+  const [mcpEnabled, setMcpEnabled] = useState(false)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [toolsCache, setToolsCache] = useState<Record<string, McpTool[]>>({})
   const [toolsLoadingId, setToolsLoadingId] = useState<string | null>(null)
@@ -29,6 +30,36 @@ export function McpTab() {
   const [editingServer, setEditingServer] = useState<McpServerConfig | null>(null)
   const [showPresets, setShowPresets] = useState(false)
   const [presetDraft, setPresetDraft] = useState<McpServerConfig | null>(null)
+
+  const checkMcpEnabled = useCallback(async () => {
+    try {
+      const settings = await getAPI().settings.get()
+      setMcpEnabled(settings?.mcp?.enabled === true)
+    } catch {
+      setMcpEnabled(false)
+    }
+  }, [])
+
+  const handleToggleMcp = async (enabled: boolean) => {
+    try {
+      const result = await getAPI().settings.set('mcp.enabled', enabled)
+      if (result.success) {
+        setMcpEnabled(enabled)
+        toast.success(enabled ? 'MCP 功能已启用' : 'MCP 功能已禁用')
+        if (enabled) {
+          setLoading(true)
+          setTimeout(() => loadServers(), 500)
+        } else {
+          setServers([])
+          setSelectedId(null)
+        }
+      } else {
+        toast.error(result.error || '操作失败')
+      }
+    } catch (err) {
+      toast.error((err as Error).message)
+    }
+  }
 
   const loadServers = useCallback(async () => {
     try {
@@ -47,8 +78,9 @@ export function McpTab() {
   }, [t])
 
   useEffect(() => {
+    checkMcpEnabled()
     loadServers()
-  }, [loadServers])
+  }, [checkMcpEnabled, loadServers])
 
   // 每 5s 轮询刷新连接状态(粗轮询,工具列表懒加载)
   useInterval(loadServers, 5000)
@@ -168,7 +200,7 @@ export function McpTab() {
     try {
       const isEdit = editingServer !== null
       const result = isEdit
-        ? await getAPI().mcp.update(editingServer!.id, config)
+        ? await getAPI().mcp.update(editingServer?.id, config)
         : await getAPI().mcp.add(config)
       if (result.success) {
         toast.success(isEdit ? t('toast.mcp.updated') : t('toast.mcp.added'))
@@ -189,95 +221,148 @@ export function McpTab() {
   }
 
   return (
-    <section className="h-full flex">
-      {/* 左侧服务器列表 */}
-      <div className="w-72 flex-shrink-0 border-r border-gray-200 dark:border-gray-700 flex flex-col bg-gray-50/30 dark:bg-gray-800/30">
-        <div className="p-3 border-b border-gray-200 dark:border-gray-700 space-y-2">
-          <button
-            type="button"
-            onClick={() => {
-              setEditingServer(null)
-              setPresetDraft(null)
-              setShowForm(true)
-            }}
-            className="w-full px-3 py-1.5 text-sm rounded bg-blue-500 text-white hover:bg-blue-600"
-          >
-            + {t('page.mcp.add')}
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowPresets(true)}
-            className="w-full px-3 py-1.5 text-sm rounded border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700"
-          >
-            ⚡ {t('page.mcp.addFromTemplate')}
-          </button>
+    <section className="h-full flex flex-col">
+      {/* MCP 功能开关横幅 */}
+      <div
+        className={`px-4 py-2.5 flex items-center justify-between border-b ${
+          mcpEnabled
+            ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'
+            : 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800'
+        }`}
+      >
+        <div className="flex items-center gap-2">
+          <span className="text-sm">
+            {mcpEnabled ? (
+              <>
+                <span className="text-green-600 dark:text-green-400 font-medium">● MCP 已启用</span>
+                <span className="text-gray-600 dark:text-gray-400 ml-2">
+                  Model Context Protocol — 连接外部工具服务器扩展 Agent 能力
+                </span>
+              </>
+            ) : (
+              <>
+                <span className="text-amber-600 dark:text-amber-400 font-medium">○ MCP 未启用</span>
+                <span className="text-gray-600 dark:text-gray-400 ml-2">
+                  启用后可添加 MCP 服务器，为 Agent 提供文件系统、网页搜索等外部工具
+                </span>
+              </>
+            )}
+          </span>
         </div>
-        <div className="flex-1 overflow-auto">
-          {servers.length === 0 ? (
-            <div className="p-4">
+        <button
+          type="button"
+          onClick={() => handleToggleMcp(!mcpEnabled)}
+          className={`px-3 py-1 text-sm rounded font-medium transition-colors ${
+            mcpEnabled
+              ? 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+              : 'bg-blue-500 text-white hover:bg-blue-600'
+          }`}
+        >
+          {mcpEnabled ? '禁用' : '启用 MCP'}
+        </button>
+      </div>
+
+      {/* MCP 未启用时显示提示 */}
+      {!mcpEnabled ? (
+        <div className="flex-1 flex items-center justify-center p-8">
+          <EmptyState
+            icon="🔌"
+            title="MCP 功能未启用"
+            description="点击上方「启用 MCP」按钮开启 Model Context Protocol，然后即可添加和管理 MCP 服务器。"
+          />
+        </div>
+      ) : (
+        <div className="flex-1 flex min-h-0">
+          {/* 左侧服务器列表 */}
+          <div className="w-72 flex-shrink-0 border-r border-gray-200 dark:border-gray-700 flex flex-col bg-gray-50/30 dark:bg-gray-800/30">
+            <div className="p-3 border-b border-gray-200 dark:border-gray-700 space-y-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setEditingServer(null)
+                  setPresetDraft(null)
+                  setShowForm(true)
+                }}
+                className="w-full px-3 py-1.5 text-sm rounded bg-blue-500 text-white hover:bg-blue-600"
+              >
+                + {t('page.mcp.add')}
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowPresets(true)}
+                className="w-full px-3 py-1.5 text-sm rounded border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700"
+              >
+                ⚡ {t('page.mcp.addFromTemplate')}
+              </button>
+            </div>
+            <div className="flex-1 overflow-auto">
+              {servers.length === 0 ? (
+                <div className="p-4">
+                  <EmptyState
+                    icon="🔌"
+                    title={t('page.mcp.empty.title')}
+                    description={t('page.mcp.empty.hint')}
+                  />
+                </div>
+              ) : (
+                <ul>
+                  {servers.map((s) => (
+                    <li key={s.id}>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedId(s.id)}
+                        className={`w-full text-left px-3 py-2 text-sm border-b border-gray-100 dark:border-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700/50 ${
+                          selectedId === s.id ? 'bg-blue-50 dark:bg-blue-900/20' : ''
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`inline-block w-1.5 h-1.5 rounded-full ${
+                              s.connected ? 'bg-green-500' : 'bg-gray-400'
+                            }`}
+                          />
+                          <span className="truncate font-medium text-gray-900 dark:text-gray-100">
+                            {s.name}
+                          </span>
+                        </div>
+                        <div className="ml-3.5 text-xs text-gray-500 dark:text-gray-400">
+                          {s.transport} ·{' '}
+                          {s.connected
+                            ? `${s.toolCount} ${t('page.mcp.tools')}`
+                            : t('page.mcp.status.disconnected')}
+                        </div>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+
+          {/* 右侧详情 */}
+          <div className="flex-1 overflow-auto p-4">
+            {selected ? (
+              <McpServerCard
+                server={selected}
+                tools={toolsCache[selected.id] ?? []}
+                toolsLoading={toolsLoadingId === selected.id}
+                onTest={() => handleTest(selected.id)}
+                onConnect={() => handleConnect(selected.id)}
+                onDisconnect={() => handleDisconnect(selected.id)}
+                onEdit={() => handleEdit(selected.id)}
+                onDelete={() => handleDelete(selected.id)}
+                onToggleEnabled={(enabled) => handleToggleEnabled(selected.id, enabled)}
+              />
+            ) : (
               <EmptyState
                 icon="🔌"
                 title={t('page.mcp.empty.title')}
                 description={t('page.mcp.empty.hint')}
               />
-            </div>
-          ) : (
-            <ul>
-              {servers.map((s) => (
-                <li key={s.id}>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedId(s.id)}
-                    className={`w-full text-left px-3 py-2 text-sm border-b border-gray-100 dark:border-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700/50 ${
-                      selectedId === s.id ? 'bg-blue-50 dark:bg-blue-900/20' : ''
-                    }`}
-                  >
-                    <div className="flex items-center gap-2">
-                      <span
-                        className={`inline-block w-1.5 h-1.5 rounded-full ${
-                          s.connected ? 'bg-green-500' : 'bg-gray-400'
-                        }`}
-                      />
-                      <span className="truncate font-medium text-gray-900 dark:text-gray-100">
-                        {s.name}
-                      </span>
-                    </div>
-                    <div className="ml-3.5 text-xs text-gray-500 dark:text-gray-400">
-                      {s.transport} ·{' '}
-                      {s.connected
-                        ? `${s.toolCount} ${t('page.mcp.tools')}`
-                        : t('page.mcp.status.disconnected')}
-                    </div>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
+            )}
+          </div>
         </div>
-      </div>
-
-      {/* 右侧详情 */}
-      <div className="flex-1 overflow-auto p-4">
-        {selected ? (
-          <McpServerCard
-            server={selected}
-            tools={toolsCache[selected.id] ?? []}
-            toolsLoading={toolsLoadingId === selected.id}
-            onTest={() => handleTest(selected.id)}
-            onConnect={() => handleConnect(selected.id)}
-            onDisconnect={() => handleDisconnect(selected.id)}
-            onEdit={() => handleEdit(selected.id)}
-            onDelete={() => handleDelete(selected.id)}
-            onToggleEnabled={(enabled) => handleToggleEnabled(selected.id, enabled)}
-          />
-        ) : (
-          <EmptyState
-            icon="🔌"
-            title={t('page.mcp.empty.title')}
-            description={t('page.mcp.empty.hint')}
-          />
-        )}
-      </div>
+      )}
 
       {/* 新增/编辑表单弹窗 */}
       {showForm && (

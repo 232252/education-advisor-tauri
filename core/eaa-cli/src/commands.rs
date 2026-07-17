@@ -788,7 +788,8 @@ pub fn cmd_export(format: &str, output_path: Option<&str>) -> Result<(), AppErro
             let mut csv = String::from("姓名,分数,变动,风险\n");
             for (eid, score) in &sorted {
                 let name = ctx.id_to_name.get(eid.as_str()).map(|s| s.as_str()).unwrap_or("?");
-                csv.push_str(&format!("{},{:.1},{:+.1},{}\n", name, score, **score - BASE_SCORE, risk_level(**score)));
+                let safe_name = csv_escape(name);
+                csv.push_str(&format!("{},{:.1},{:+.1},{}\n", safe_name, score, **score - BASE_SCORE, risk_level(**score)));
             }
             if out_file == "-" { println!("{}", csv); }
             else { std::fs::write(out_file, &csv)?; println!("✓ CSV已导出: {}", out_file); }
@@ -954,8 +955,9 @@ fn generate_dashboard_html(ctx: &LightContext, sorted: &Vec<(&String, &f64)>) ->
     let mut rows = String::new();
     for (i,(eid,score)) in sorted.iter().enumerate() {
         let name = ctx.id_to_name.get(eid.as_str()).map(|s| s.as_str()).unwrap_or("?");
+        let safe_name = html_escape(name);
         let cls = match risk_level(**score) { "极高"=>"risk-extreme", "高"=>"risk-high", "中"=>"risk-mid", _=>"risk-low" };
-        rows.push_str(&format!("<tr><td>{}</td><td>{}</td><td>{:.1}</td><td class=\"{}\">{}</td></tr>\n", i+1, name, score, cls, risk_level(**score)));
+        rows.push_str(&format!("<tr><td>{}</td><td>{}</td><td>{:.1}</td><td class=\"{}\">{}</td></tr>\n", i+1, safe_name, score, cls, risk_level(**score)));
     }
 
     let rl = risk_dist.get("低").unwrap_or(&0);
@@ -995,6 +997,24 @@ fn generate_dashboard_html(ctx: &LightContext, sorted: &Vec<(&String, &f64)>) ->
     rl, rm, rh, rx
     );
     Ok(html)
+}
+
+/// HTML 转义：防止 XSS（学生姓名等用户输入拼入 HTML 时）
+fn html_escape(s: &str) -> String {
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+        .replace('\'', "&#x27;")
+}
+
+/// CSV 公式注入防护：对以 =/+/-/@ 开头的字段前缀加单引号
+fn csv_escape(s: &str) -> String {
+    if s.starts_with('=') || s.starts_with('+') || s.starts_with('-') || s.starts_with('@') {
+        format!("'{}", s)
+    } else {
+        s.to_string()
+    }
 }
 
 // === Enhanced doctor ===

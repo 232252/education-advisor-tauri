@@ -56,7 +56,7 @@ describe('settingsService', () => {
 
   it('getSettings 应返回默认值（无文件时）', () => {
     const s = settingsService.getSettings()
-    expect(s.general.theme).toBe('dark')
+    expect(s.general.theme).toBe('light')
     expect(s.general.language).toBe('zh-CN')
     expect(s.models.transport).toBe('auto')
     expect(s.chat.compaction.enabled).toBe(true)
@@ -64,9 +64,9 @@ describe('settingsService', () => {
 
   it('getSettings 返回深拷贝（修改不影响内部）', () => {
     const s1 = settingsService.getSettings()
-    s1.general.theme = 'light'
+    s1.general.theme = 'dark'
     const s2 = settingsService.getSettings()
-    expect(s2.general.theme).toBe('dark')
+    expect(s2.general.theme).toBe('light')
   })
 
   it('update dotPath 应生效', () => {
@@ -185,7 +185,7 @@ describe('settingsService', () => {
     // 由于 settingsService 是单例,直接验证 getSettings 还能拿到原始值
     settingsService.reset()
     const s = settingsService.getSettings()
-    expect(s.general.theme).toBe('dark')
+    expect(s.general.theme).toBe('light')
     expect(s.chat.maxTokens).toBe(32768)
     expect(s.models.defaultProvider).toBe('')
   })

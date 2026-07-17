@@ -2,7 +2,6 @@
 // 系统 IPC 处理器
 // =============================================================
 
-import fs from 'node:fs'
 import fsp from 'node:fs/promises'
 import path from 'node:path'
 import { app, type BrowserWindow, dialog, ipcMain, Notification, shell } from 'electron'

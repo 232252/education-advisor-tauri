@@ -48,7 +48,8 @@ export function SkillsTab() {
 
   // P2 优化: 预计算右键菜单 JSON,避免列表每行每次渲染都 JSON.stringify
   const userMenuJson = useMemo(
-    () => JSON.stringify([{ label: t('common.delete'), action: 'delete', variant: 'danger' as const }]),
+    () =>
+      JSON.stringify([{ label: t('common.delete'), action: 'delete', variant: 'danger' as const }]),
     [t],
   )
 
@@ -218,14 +219,8 @@ export function SkillsTab() {
   }
 
   return (
-    <section
-      className="h-full flex"
-      aria-label="技能列表"
-      onKeyDown={handleKeyDown}
-    >
-      <h1 style={SR_ONLY_STYLE}>
-        {t('page.skills.title')}
-      </h1>
+    <section className="h-full flex" aria-label="技能列表" onKeyDown={handleKeyDown}>
+      <h1 style={SR_ONLY_STYLE}>{t('page.skills.title')}</h1>
       {/* 左侧技能列表 */}
       <div className="w-72 flex-shrink-0 border-r border-gray-200 dark:border-gray-700 flex flex-col bg-gray-50/30 dark:bg-gray-800/30">
         <div className="p-3 border-b border-gray-200 dark:border-gray-700 space-y-2">

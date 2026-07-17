@@ -575,13 +575,7 @@ interface CompareTabProps {
   themeProps: ThemeProps
 }
 
-function CompareTab({
-  students,
-  classList,
-  subjects,
-  exams,
-  themeProps,
-}: CompareTabProps) {
+function CompareTab({ students, classList, subjects, exams, themeProps }: CompareTabProps) {
   const { axisColor, gridColor } = themeProps
   const [classFilter, setClassFilter] = useState<string>('__ALL__')
   const [examAId, setExamAId] = useState<string>('')
@@ -2070,7 +2064,6 @@ function GradeEntryTab({
               onChange={(e) => setQuickName(e.target.value)}
               placeholder="如: 第一次月考"
               className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
-              autoFocus
             />
           </div>
           <div>

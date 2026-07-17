@@ -21,15 +21,16 @@
 //   详见 mcp-tools.ts
 // =============================================================
 
-import { app } from 'electron'
-import { spawn, type ChildProcess } from 'node:child_process'
+import { type ChildProcess, spawn } from 'node:child_process'
 import fs from 'node:fs'
 import fsp from 'node:fs/promises'
 import path from 'node:path'
+import { app } from 'electron'
 import yaml from 'yaml'
-import type { McpServerConfig, McpServerStatus, McpTool, McpTransport } from '../../shared/types'
+import type { McpServerConfig, McpServerStatus, McpTool } from '../../shared/types'
 import { deepInterpolate, validateCommandSafe, validateServerConfig } from './mcp-helpers'
 import { settingsService } from './settings-service'
+import { atomicWrite } from '../utils/atomic-write'
 
 /** MCP 工具调用结果(兼容 MCP 协议) */
 export interface McpCallResult {
@@ -51,7 +52,10 @@ interface MCPClient {
   // 请求计数器(JSON-RPC id)
   requestId: number
   // 待响应请求 Map
-  pending: Map<number, { resolve: (v: unknown) => void; reject: (e: Error) => void; timer: NodeJS.Timeout }>
+  pending: Map<
+    number,
+    { resolve: (v: unknown) => void; reject: (e: Error) => void; timer: NodeJS.Timeout }
+  >
   // 接收缓冲区(stdio 按行解析)
   buffer?: string
 }
@@ -61,9 +65,9 @@ const CONNECT_TIMEOUT_MS = 30_000
 /** 工具调用超时(毫秒) */
 const CALL_TIMEOUT_MS = 60_000
 /** 最大重连次数 */
-const MAX_RECONNECT = 3
+const _MAX_RECONNECT = 3
 /** 重连间隔(毫秒) */
-const RECONNECT_DELAY_MS = 1000
+const _RECONNECT_DELAY_MS = 1000
 /** 返回内容最大大小(5MB,防止超大响应撑爆上下文) */
 const MAX_RESPONSE_SIZE = 5 * 1024 * 1024
 
@@ -73,7 +77,6 @@ class McpService {
   private clients: Map<string, MCPClient> = new Map()
   private config: McpServerConfig[] = []
   private configPath: string
-  private userConfigPath: string
   private initialized = false
 
   constructor() {
@@ -325,10 +328,7 @@ ${yaml.stringify({ servers })}
       throw new Error('mcp.user.yaml exceeds 1MB limit')
     }
     const userPath = path.join(app.getPath('userData'), 'mcp.user.yaml')
-    const tmpPath = `${userPath}.tmp.${process.pid}.${Date.now()}`
-    await fsp.mkdir(path.dirname(userPath), { recursive: true })
-    await fsp.writeFile(tmpPath, payload, 'utf-8')
-    await fsp.rename(tmpPath, userPath)
+    await atomicWrite(userPath, payload, 'utf-8')
   }
 
   /**
@@ -374,7 +374,10 @@ ${yaml.stringify({ servers })}
         const client = await this.ensureConnected(server)
         allTools.push(...client.tools)
       } catch (err) {
-        console.warn(`[McpService] Failed to connect server ${server.id} for agent ${agentId}:`, err)
+        console.warn(
+          `[McpService] Failed to connect server ${server.id} for agent ${agentId}:`,
+          err,
+        )
         // 不阻塞其他 server,继续收集
       }
     }
@@ -384,9 +387,13 @@ ${yaml.stringify({ servers })}
   /**
    * 调用 MCP 工具
    */
-  async callTool(serverId: string, toolName: string, args: Record<string, unknown>): Promise<McpCallResult> {
+  async callTool(
+    serverId: string,
+    toolName: string,
+    args: Record<string, unknown>,
+  ): Promise<McpCallResult> {
     const client = this.clients.get(serverId)
-    if (!client || !client.connected) {
+    if (!client?.connected) {
       throw new Error(`MCP server ${serverId} not connected`)
     }
     return this.callToolInternal(client, toolName, args)
@@ -418,14 +425,16 @@ ${yaml.stringify({ servers })}
    */
   async listTools(serverId: string): Promise<McpTool[]> {
     const client = this.clients.get(serverId)
-    if (!client || !client.connected) return []
+    if (!client?.connected) return []
     return client.tools
   }
 
   /**
    * 测试 server 连通性(连接 + listTools + 不调用任何工具)
    */
-  async testServer(serverId: string): Promise<{ success: boolean; toolCount: number; error?: string }> {
+  async testServer(
+    serverId: string,
+  ): Promise<{ success: boolean; toolCount: number; error?: string }> {
     try {
       const serverConfig = this.config.find((s) => s.id === serverId)
       if (!serverConfig) {
@@ -443,7 +452,7 @@ ${yaml.stringify({ servers })}
    */
   private async ensureConnected(server: McpServerConfig): Promise<MCPClient> {
     const existing = this.clients.get(server.id)
-    if (existing && existing.connected) return existing
+    if (existing?.connected) return existing
     if (existing) await this.disconnectClient(existing)
 
     const client: MCPClient = {
@@ -492,7 +501,10 @@ ${yaml.stringify({ servers })}
     await Promise.race([
       connectPromise,
       new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error(`Connect timeout after ${CONNECT_TIMEOUT_MS}ms`)), CONNECT_TIMEOUT_MS)
+        setTimeout(
+          () => reject(new Error(`Connect timeout after ${CONNECT_TIMEOUT_MS}ms`)),
+          CONNECT_TIMEOUT_MS,
+        )
       }),
     ])
 
@@ -528,7 +540,9 @@ ${yaml.stringify({ servers })}
           reject(new Error(`stdio server exited before connect (code=${code}, signal=${signal})`))
           return
         }
-        console.warn(`[McpService] stdio server ${server.id} exited (code=${code}, signal=${signal})`)
+        console.warn(
+          `[McpService] stdio server ${server.id} exited (code=${code}, signal=${signal})`,
+        )
         client.connected = false
         // 拒绝所有待响应请求
         for (const [, entry] of client.pending) {
@@ -599,7 +613,9 @@ ${yaml.stringify({ servers })}
     })
 
     if (!response.ok) {
-      throw new Error(`SSE server ${server.id} responded ${response.status}: ${response.statusText}`)
+      throw new Error(
+        `SSE server ${server.id} responded ${response.status}: ${response.statusText}`,
+      )
     }
 
     // 存储连接信息(SSE 使用 fetch 发送每个请求)
@@ -693,7 +709,7 @@ ${yaml.stringify({ servers })}
       client.pending.set(id, { resolve, reject, timer })
 
       if (client.childProcess?.stdin?.writable) {
-        client.childProcess.stdin.write(message + '\n')
+        client.childProcess.stdin.write(`${message}\n`)
       } else if (client.ws?.readyState === 1 /* OPEN */) {
         client.ws.send(message)
       } else {
@@ -710,7 +726,7 @@ ${yaml.stringify({ servers })}
   private sendNotification(client: MCPClient, method: string, params: unknown): void {
     const message = JSON.stringify({ jsonrpc: '2.0', method, params })
     if (client.childProcess?.stdin?.writable) {
-      client.childProcess.stdin.write(message + '\n')
+      client.childProcess.stdin.write(`${message}\n`)
     } else if (client.ws?.readyState === 1) {
       client.ws.send(message)
     }
@@ -786,7 +802,12 @@ ${yaml.stringify({ servers })}
     const resultStr = JSON.stringify(result)
     if (resultStr.length > MAX_RESPONSE_SIZE) {
       return {
-        content: [{ type: 'text', text: `响应过大 (${(resultStr.length / 1024 / 1024).toFixed(1)} MB),超过 ${MAX_RESPONSE_SIZE / 1024 / 1024} MB 上限` }],
+        content: [
+          {
+            type: 'text',
+            text: `响应过大 (${(resultStr.length / 1024 / 1024).toFixed(1)} MB),超过 ${MAX_RESPONSE_SIZE / 1024 / 1024} MB 上限`,
+          },
+        ],
         isError: true,
       }
     }

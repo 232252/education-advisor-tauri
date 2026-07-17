@@ -202,7 +202,7 @@ export function SchedulerPage() {
     }
     document.addEventListener('ctx-menu-action', handler)
     return () => document.removeEventListener('ctx-menu-action', handler)
-  }, [tasks])
+  }, [tasks, handleToggle, handleRunNow, handleRemove])
 
   return (
     <div className="h-full flex flex-col">

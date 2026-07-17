@@ -10,6 +10,7 @@ import { app, type BrowserWindow, ipcMain } from 'electron'
 import * as IPC from '../../shared/ipc-channels'
 import { feishuBotService } from '../services/feishu-bot-service'
 import { keystoreService } from '../services/keystore-service'
+import { mcpService } from '../services/mcp-service'
 import { settingsService } from '../services/settings-service'
 import { updateTray } from '../services/tray-service'
 import { log, setLogLevel } from '../utils/logger'
@@ -39,6 +40,7 @@ const TYPE_VALIDATORS: Record<string, 'string' | 'boolean' | 'number'> = {
   'general.autoStart': 'boolean',
   'general.minimizeToTray': 'boolean',
   'chat.conversationLogging': 'boolean',
+  'mcp.enabled': 'boolean',
   'feishu.appId': 'string',
 }
 
@@ -119,7 +121,10 @@ export function registerSettingsHandlers(win: BrowserWindow) {
         }
         // P4-6 修复: 长度上限 + null byte 校验
         if (value.length > MAX_FEISHU_SECRET_LEN) {
-          return { success: false, error: `[IPC] feishu.appSecret too long (${value.length} > ${MAX_FEISHU_SECRET_LEN})` }
+          return {
+            success: false,
+            error: `[IPC] feishu.appSecret too long (${value.length} > ${MAX_FEISHU_SECRET_LEN})`,
+          }
         }
         if (value.includes('\0')) {
           return { success: false, error: '[IPC] feishu.appSecret contains null byte' }
@@ -201,6 +206,14 @@ export function registerSettingsHandlers(win: BrowserWindow) {
         log('info', 'settings', `chat.conversationLogging changed to ${value}`)
       }
 
+      // MCP 功能开关变化:重新加载 MCP 配置
+      if (path === 'mcp.enabled' && typeof value === 'boolean') {
+        log('info', 'settings', `mcp.enabled changed to ${value}, reloading MCP config`)
+        await mcpService.reloadConfig().catch((err) => {
+          log('warn', 'settings', `MCP reloadConfig failed: ${err}`)
+        })
+      }
+
       return { success: true }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
@@ -225,6 +238,10 @@ export function registerSettingsHandlers(win: BrowserWindow) {
       updateTray(newSettings.general.minimizeToTray)
       // T5: 重置后恢复 logLevel
       setLogLevel(newSettings.general.logLevel)
+      // 重置后重新加载 MCP 配置(默认 mcp.enabled=false)
+      await mcpService.reloadConfig().catch((err) => {
+        log('warn', 'settings', `MCP reloadConfig after reset failed: ${err}`)
+      })
       log('info', 'settings', `settings reset; logLevel=${newSettings.general.logLevel}`)
       return { success: true }
     } catch (err) {

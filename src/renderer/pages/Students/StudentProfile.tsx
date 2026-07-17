@@ -105,7 +105,7 @@ export function StudentProfile({ student, onClose, onRefresh }: StudentProfilePr
   useEffect(() => {
     currentNameRef.current = student.name
   }, [student.name])
-  const loadProfileData = useCallback(async (name: string) => {
+  const _loadProfileData = useCallback(async (name: string) => {
     try {
       const result = await getAPI().profile.get(name)
       if (currentNameRef.current !== name) return
@@ -1252,10 +1252,8 @@ function AcademicsTab({ studentName, isDark }: { studentName: string; isDark: bo
     if (gradesA.length === 0 && gradesB.length === 0) return null
     // 只有当学生在事件数组中有匹配事件时才计算操行分变化;
     // 否则为 null(UI 不显示操行分),避免"无事件但显示 0"的误导
-    const hasConductEvents = conductEvents && conductEvents.some((e) => e.name === studentName)
-    const conductDelta = hasConductEvents
-      ? aggregateConductDelta(conductEvents, studentName)
-      : null
+    const hasConductEvents = conductEvents?.some((e) => e.name === studentName)
+    const conductDelta = hasConductEvents ? aggregateConductDelta(conductEvents, studentName) : null
     return compareStudentGrades(gradesA, gradesB, ACADEMIC_SUBJECT_MAP, conductDelta)
   }, [compareExamAId, compareExamBId, gradesByExam, conductEvents, studentName])
 

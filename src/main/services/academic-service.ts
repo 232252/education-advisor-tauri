@@ -11,6 +11,7 @@ import path from 'node:path'
 import { app } from 'electron'
 import type { AcademicConfig, ExamDef, GradeRecord, SubjectDef } from '../../shared/types'
 import { log } from '../utils/logger'
+import { atomicWrite } from '../utils/atomic-write'
 
 const DEFAULT_SUBJECTS: SubjectDef[] = [
   { id: 'chinese', name: '语文', category: 'core', fullMark: 150, isCore: true },
@@ -71,13 +72,6 @@ class AcademicService {
     return path.join(this.gradesDir, `${this.safeName(studentName)}.json`)
   }
 
-  /** 原子写入(tmp + rename) */
-  private async atomicWrite(filePath: string, json: string): Promise<void> {
-    const tmpPath = `${filePath}.tmp`
-    await fsp.writeFile(tmpPath, json, 'utf-8')
-    await fsp.rename(tmpPath, filePath)
-  }
-
   // ===== Config =====
 
   /** 读取学业配置(文件不存在时返回默认配置) */
@@ -94,7 +88,7 @@ class AcademicService {
   async setConfig(config: AcademicConfig): Promise<void> {
     await this.ensureDir()
     const json = JSON.stringify(config, null, 2)
-    await this.atomicWrite(this.configPath, json)
+    await atomicWrite(this.configPath, json)
     log('info', 'academic', `config updated (${config.subjects?.length ?? 0} subjects)`)
   }
 
@@ -122,7 +116,7 @@ class AcademicService {
     const createdAt = new Date().toISOString()
     const record: ExamDef = { ...exam, id, createdAt }
     exams.push(record)
-    await this.atomicWrite(this.examsPath, JSON.stringify(exams, null, 2))
+    await atomicWrite(this.examsPath, JSON.stringify(exams, null, 2))
     log('info', 'academic', `exam created: ${id} (${record.name})`)
     return record
   }
@@ -133,7 +127,7 @@ class AcademicService {
     // 1. 从 exams.json 移除考试
     const exams = await this.listExams()
     const next = exams.filter((e) => e.id !== examId)
-    await this.atomicWrite(this.examsPath, JSON.stringify(next, null, 2))
+    await atomicWrite(this.examsPath, JSON.stringify(next, null, 2))
 
     // 2. 级联删除所有学生文件中该考试的成绩
     let removedGrades = 0
@@ -152,7 +146,7 @@ class AcademicService {
               // 文件变空,删除文件
               await fsp.unlink(filePath)
             } else {
-              await this.atomicWrite(filePath, JSON.stringify(filtered, null, 2))
+              await atomicWrite(filePath, JSON.stringify(filtered, null, 2))
             }
           }
         } catch {
@@ -181,7 +175,7 @@ class AcademicService {
   /** 写入学生全部成绩记录(内部) */
   private async writeGrades(studentName: string, grades: GradeRecord[]): Promise<void> {
     await this.ensureDir()
-    await this.atomicWrite(this.gradePath(studentName), JSON.stringify(grades, null, 2))
+    await atomicWrite(this.gradePath(studentName), JSON.stringify(grades, null, 2))
   }
 
   /** 设置单条成绩(upsert by examId + subjectId) */

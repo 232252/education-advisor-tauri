@@ -40,12 +40,24 @@ const INPUT_TAGS = new Set(['INPUT', 'TEXTAREA'])
 
 function isEditable(el: Element | null): boolean {
   if (!el) return false
-  if (el.hasAttribute('contenteditable') && el.getAttribute('contenteditable') !== 'false') return true
+  if (el.hasAttribute('contenteditable') && el.getAttribute('contenteditable') !== 'false')
+    return true
   const tag = el.tagName
   if (INPUT_TAGS.has(tag)) {
     // 排除 checkbox/radio/button/range 等非文本输入
     const type = (el as HTMLInputElement).type
-    return !['checkbox', 'radio', 'button', 'submit', 'reset', 'file', 'hidden', 'image', 'range', 'color'].includes(type)
+    return ![
+      'checkbox',
+      'radio',
+      'button',
+      'submit',
+      'reset',
+      'file',
+      'hidden',
+      'image',
+      'range',
+      'color',
+    ].includes(type)
   }
   return false
 }
@@ -205,7 +217,9 @@ export function ContextMenu() {
       const { target } = currentMenu
 
       // 编辑操作
-      if (['copy', 'cut', 'paste', 'selectAll', 'copy_disabled', 'cut_disabled'].includes(item.action)) {
+      if (
+        ['copy', 'cut', 'paste', 'selectAll', 'copy_disabled', 'cut_disabled'].includes(item.action)
+      ) {
         const realAction = item.action.replace('_disabled', '')
         if (!item.action.endsWith('_disabled')) {
           await executeEditAction(realAction, target)

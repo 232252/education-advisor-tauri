@@ -33,7 +33,12 @@ import { useT } from '../../i18n'
 import { getAPI } from '../../lib/ipc-client'
 import { cn } from '../../lib/ui-utils'
 import { toast } from '../../stores/toastStore'
-import { computeClassComparison, computePeriodSummary, computeReasonDistribution, computeScoreIntervals } from './dashboard-stats'
+import {
+  computeClassComparison,
+  computePeriodSummary,
+  computeReasonDistribution,
+  computeScoreIntervals,
+} from './dashboard-stats'
 
 // MEDIUM 修复: 类型守卫,区分 EAATagListData 和 EAATagDetailData,避免不安全的 as 断言
 function isTagListData(d: EAATagListData | EAATagDetailData): d is EAATagListData {
@@ -264,7 +269,7 @@ export function DashboardPage() {
   }, [loadData])
 
   // class_id → 班级名称 映射
-  const classIdToName = useMemo(() => {
+  const _classIdToName = useMemo(() => {
     const m: Record<string, string> = {}
     for (const c of classList) m[c.class_id] = c.name
     return m
@@ -345,10 +350,7 @@ export function DashboardPage() {
   }, [allStudents])
 
   // 按班级过滤后的事件原因分布（逻辑提取到 dashboard-stats.ts）
-  const classReasonDist = useMemo(
-    () => computeReasonDistribution(filteredEvents),
-    [filteredEvents],
-  )
+  const classReasonDist = useMemo(() => computeReasonDistribution(filteredEvents), [filteredEvents])
 
   // 按班级过滤后的周期摘要 (事件计数 + top_gainers/losers，逻辑提取到 dashboard-stats.ts)
   const classPeriodSummary = useMemo(
@@ -422,13 +424,33 @@ export function DashboardPage() {
             itemStyle: {
               borderRadius: [6, 6, 0, 0],
               color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-                { offset: 0, color: label.includes('极高') ? '#ef4444' : label.includes('低') ? '#f97316' : label.includes('中') ? '#eab308' : '#22c55e' },
-                { offset: 1, color: label.includes('极高') ? '#dc2626' : label.includes('低') ? '#ea580c' : label.includes('中') ? '#ca8a04' : '#16a34a' },
+                {
+                  offset: 0,
+                  color: label.includes('极高')
+                    ? '#ef4444'
+                    : label.includes('低')
+                      ? '#f97316'
+                      : label.includes('中')
+                        ? '#eab308'
+                        : '#22c55e',
+                },
+                {
+                  offset: 1,
+                  color: label.includes('极高')
+                    ? '#dc2626'
+                    : label.includes('低')
+                      ? '#ea580c'
+                      : label.includes('中')
+                        ? '#ca8a04'
+                        : '#16a34a',
+                },
               ]),
             },
           })),
           barWidth: '50%',
-          emphasis: { itemStyle: { shadowBlur: 10, shadowOffsetX: 0, shadowColor: 'rgba(0,0,0,0.2)' } },
+          emphasis: {
+            itemStyle: { shadowBlur: 10, shadowOffsetX: 0, shadowColor: 'rgba(0,0,0,0.2)' },
+          },
         },
       ],
     }),
@@ -468,7 +490,7 @@ export function DashboardPage() {
         },
       ],
     }),
-    [classStats.riskDistribution, isDark, legendColor, labelColor],
+    [classStats.riskDistribution, isDark, legendColor, labelColor, riskColorOf],
   )
 
   if (loading) {
@@ -718,11 +740,7 @@ export function DashboardPage() {
             <span className="w-2 h-2 rounded-full bg-blue-500"></span>
             {t('page.dashboard.chart.scoreDist')}
           </h3>
-          <ReactEChartsCore
-            echarts={echarts}
-            style={{ height: 260 }}
-            option={scoreChartOption}
-          />
+          <ReactEChartsCore echarts={echarts} style={{ height: 260 }} option={scoreChartOption} />
         </div>
 
         {/* 风险等级饼图 */}
@@ -732,11 +750,7 @@ export function DashboardPage() {
             {t('page.dashboard.chart.riskDist')}
           </h3>
           {classStats.riskDistribution ? (
-            <ReactEChartsCore
-              echarts={echarts}
-              style={{ height: 260 }}
-              option={riskChartOption}
-            />
+            <ReactEChartsCore echarts={echarts} style={{ height: 260 }} option={riskChartOption} />
           ) : (
             <div className="flex items-center justify-center h-[260px] text-gray-400 dark:text-gray-500 text-sm">
               暂无数据

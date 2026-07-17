@@ -98,6 +98,10 @@ class CronService {
 
   /** 删除任务 */
   removeTask(id: string) {
+    const task = this.tasks.get(id)
+    if (!task) {
+      return { success: false, error: 'Task not found' }
+    }
     this.unschedule(id)
     this.tasks.delete(id)
     this.nextRunAt.delete(id)
@@ -271,9 +275,11 @@ class CronService {
       // 日志文件过大时截断（只保留最近 1000 条），防止无限增长
       if (stats.size > 5 * 1024 * 1024 && entries.length > 0) {
         try {
-          const truncated = entries.map((e) => JSON.stringify(e)).join('\n') + '\n'
+          const truncated = `${entries.map((e) => JSON.stringify(e)).join('\n')}\n`
           await fsp.writeFile(this.logFilePath, truncated, 'utf-8')
-          console.log(`[CronService] Log file truncated from ${Math.round(stats.size / 1024)}KB to ${Math.round(truncated.length / 1024)}KB`)
+          console.log(
+            `[CronService] Log file truncated from ${Math.round(stats.size / 1024)}KB to ${Math.round(truncated.length / 1024)}KB`,
+          )
         } catch {
           // 截断失败不影响启动
         }

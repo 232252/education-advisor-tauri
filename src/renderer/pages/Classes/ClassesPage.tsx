@@ -13,8 +13,8 @@ import { useAutoDismiss } from '../../hooks/useAutoDismiss'
 import { useT } from '../../i18n'
 import { getAPI } from '../../lib/ipc-client'
 import { toast } from '../../stores/toastStore'
-import { computeAutoClassId } from './class-id'
 import { ClassProfile } from './ClassProfile'
+import { computeAutoClassId } from './class-id'
 
 /** 学生数统计：class_id → 人数 */
 type ClassCountMap = Record<string, number>
@@ -287,27 +287,6 @@ export function ClassesPage() {
     })
   }
 
-  // 右键菜单事件处理
-  useEffect(() => {
-    const handler = (e: Event) => {
-      const ce = e as CustomEvent<{ action: string; target: HTMLElement }>
-      const action = ce.detail?.action
-      const target = ce.detail?.target
-      if (!action || !target) return
-      const classId = target.getAttribute('data-ctx-class-id')
-      if (!classId) return
-      const cls = classes.find((c) => c.id === classId)
-      if (!cls) return
-      if (action === 'view') setSelectedClass(cls)
-      else if (action === 'edit') openEdit(cls)
-      else if (action === 'archive') handleArchive(cls)
-      else if (action === 'restore') handleRestore(cls)
-      else if (action === 'delete') handleDelete(cls)
-    }
-    document.addEventListener('ctx-menu-action', handler)
-    return () => document.removeEventListener('ctx-menu-action', handler)
-  }, [classes])
-
   const handleDelete = (c: ClassEntity) => {
     // 班级有一一对应约束: 有学生的班级不能直接删除, 避免产生未分班学生
     const studentCount = counts[c.class_id] ?? 0
@@ -344,6 +323,27 @@ export function ClassesPage() {
       },
     })
   }
+
+  // 右键菜单事件处理
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const ce = e as CustomEvent<{ action: string; target: HTMLElement }>
+      const action = ce.detail?.action
+      const target = ce.detail?.target
+      if (!action || !target) return
+      const classId = target.getAttribute('data-ctx-class-id')
+      if (!classId) return
+      const cls = classes.find((c) => c.id === classId)
+      if (!cls) return
+      if (action === 'view') setSelectedClass(cls)
+      else if (action === 'edit') openEdit(cls)
+      else if (action === 'archive') handleArchive(cls)
+      else if (action === 'restore') handleRestore(cls)
+      else if (action === 'delete') handleDelete(cls)
+    }
+    document.addEventListener('ctx-menu-action', handler)
+    return () => document.removeEventListener('ctx-menu-action', handler)
+  }, [classes, openEdit, handleDelete, handleRestore, handleArchive])
 
   return (
     <div className="h-full flex flex-col overflow-hidden">

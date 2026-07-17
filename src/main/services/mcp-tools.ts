@@ -16,8 +16,8 @@
 // =============================================================
 
 import type { AgentTool, AgentToolResult } from '@earendil-works/pi-agent-core'
-import { Type } from 'typebox'
 import type { TSchema } from 'typebox'
+import { Type } from 'typebox'
 import type { McpServerConfig, McpTool } from '../../shared/types'
 import { sanitizeArg } from './eaa-tools'
 import { validateFilePath } from './file-tools'
@@ -142,7 +142,9 @@ export function sanitizeMcpArgs(
         try {
           validateFilePath(value)
         } catch (err) {
-          throw new Error(`MCP 工具 ${toolName} 参数 ${key} 路径校验失败: ${(err as Error).message}`)
+          throw new Error(
+            `MCP 工具 ${toolName} 参数 ${key} 路径校验失败: ${(err as Error).message}`,
+          )
         }
       }
       // 所有字符串参数(含路径)走 sanitizeArg
@@ -201,8 +203,7 @@ export function mcpToolToAgentTool(serverId: string, mcpTool: McpTool): AnyAgent
   const safeToolName = sanitizeToolName(mcpTool.name)
   const toolName = `mcp_${safeServerId}_${safeToolName}`
   const label = `MCP [${serverId}] ${mcpTool.name}`
-  const description =
-    mcpTool.description || `MCP server ${serverId} 提供的工具 ${mcpTool.name}`
+  const description = mcpTool.description || `MCP server ${serverId} 提供的工具 ${mcpTool.name}`
   const parameters = jsonSchemaToTypebox(mcpTool.inputSchema as JsonSchema)
 
   return {
@@ -335,10 +336,7 @@ export async function getMcpToolsForAgent(
     }
     return agentTools
   } catch (err) {
-    console.warn(
-      `[mcp-tools] Failed to load MCP tools for agent ${agentId}:`,
-      err,
-    )
+    console.warn(`[mcp-tools] Failed to load MCP tools for agent ${agentId}:`, err)
     return []
   }
 }

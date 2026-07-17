@@ -9,6 +9,7 @@ import path from 'node:path'
 import type { AgentTool, AgentToolResult } from '@earendil-works/pi-agent-core'
 import { Type } from 'typebox'
 import * as XLSX from 'xlsx'
+import { atomicWrite } from '../utils/atomic-write'
 
 // 辅助函数
 function textResult(text: string): AgentToolResult<unknown> {
@@ -358,7 +359,7 @@ export const writeFileTool: AgentTool<typeof writeFileParams> = {
     }
 
     try {
-      await fsp.writeFile(resolvedPath, params.content, 'utf-8')
+      await atomicWrite(resolvedPath, params.content, 'utf-8')
     } catch (err) {
       throw new Error(`写入文件失败: ${resolvedPath} - ${(err as Error).message}`)
     }
@@ -499,7 +500,7 @@ export const writeCsvTool: AgentTool<typeof writeCsvParams> = {
     const content = bom + lines.join('\r\n')
 
     try {
-      await fsp.writeFile(resolvedPath, content, 'utf-8')
+      await atomicWrite(resolvedPath, content, 'utf-8')
     } catch (err) {
       throw new Error(`写入 CSV 文件失败: ${resolvedPath} - ${(err as Error).message}`)
     }

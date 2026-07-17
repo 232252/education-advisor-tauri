@@ -490,7 +490,5 @@ function buildAPI() {
 export function installTauriBridge() {
   const api = buildAPI()
   ;(window as unknown as { api: unknown }).api = api
-  // eslint-disable-next-line no-console
-  console.log('[tauri-bridge] window.api installed (Tauri mode)')
   return api
 }

@@ -3,7 +3,7 @@
 // =============================================================
 
 import type { ModelInfo, ProviderInfo } from '@shared/types'
-import { useCallback, useEffect, memo, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import { getAPI } from '../lib/ipc-client'
 import { toast } from '../stores/toastStore'
 
@@ -14,7 +14,11 @@ interface ModelSelectorProps {
 }
 
 // P2 优化: memo 包裹,避免 ChatPage 流式输出时每 token 重渲染
-export const ModelSelector = memo(function ModelSelector({ selectedProvider, selectedModel, onSelect }: ModelSelectorProps) {
+export const ModelSelector = memo(function ModelSelector({
+  selectedProvider,
+  selectedModel,
+  onSelect,
+}: ModelSelectorProps) {
   const [open, setOpen] = useState(false)
   const [providers, setProviders] = useState<ProviderInfo[]>([])
   const [models, setModels] = useState<Record<string, ModelInfo[]>>({})
@@ -77,14 +81,10 @@ export const ModelSelector = memo(function ModelSelector({ selectedProvider, sel
         // 排除被用户隐藏的 provider
         // 这样即使没配置 API Key，用户也能看到可用的 provider 列表
         const allWithModels = data.filter((p: ProviderInfo) => p.modelCount > 0 && !p.hidden)
-        const configured = allWithModels.filter((p: ProviderInfo) => p.hasApiKey)
+        // configured: 已配置 API Key 的 provider,用于默认选中优先级
+        const configured = data.filter((p: ProviderInfo) => p.hasApiKey && !p.hidden)
         setProviders(allWithModels)
 
-        console.log(
-          `[ModelSelector] Total providers: ${data.length}, with models: ${allWithModels.length}, configured: ${configured.length}`,
-        )
-
-        // 如果已有选中项（chatStore 非空），加载其模型即可，不覆盖
         if (selectedProviderRef.current && selectedModelRef.current) {
           await loadModelsFor(selectedProviderRef.current)
           return

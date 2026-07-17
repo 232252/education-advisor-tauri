@@ -23,9 +23,9 @@ import {
 import type { ModelInfo, ProviderInfo, StreamEvent, TestConnectionResult } from '../../shared/types'
 import { logChat } from '../utils/logger'
 import { compactAgentMessages, compactChatMessagesSimple } from './compaction-helper'
-import { dedupeModels, extractPartialToolCall, isRetryableError, mapEvent, selectCheapestModel } from './pi-ai-helpers'
 import { keystoreService } from './keystore-service'
 import { KEYLESS_PROVIDERS, OLLAMA_OPENAI_BASE_URL, ollamaService } from './ollama-service'
+import { dedupeModels, isRetryableError, mapEvent, selectCheapestModel } from './pi-ai-helpers'
 import { settingsService } from './settings-service'
 
 // OAuth 支持的 provider 列表
@@ -988,14 +988,6 @@ class PiAIService {
   /** 将 pi-ai 的 AssistantMessageEvent 映射为前端的 StreamEvent — 已提取到 pi-ai-helpers.ts */
   private mapEvent(event: AssistantMessageEvent): StreamEvent | null {
     return mapEvent(event)
-  }
-
-  /** 从 partial AssistantMessage 中提取 toolCall 信息 — 已提取到 pi-ai-helpers.ts */
-  private extractPartialToolCall(
-    partial: AssistantMessage,
-    contentIndex: number,
-  ): { id: string; name: string } | null {
-    return extractPartialToolCall(partial, contentIndex)
   }
 
   // ===========================================================

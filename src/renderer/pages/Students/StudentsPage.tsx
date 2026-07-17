@@ -14,8 +14,13 @@ import { useT } from '../../i18n'
 import { getAPI, getErrorMessage } from '../../lib/ipc-client'
 import { riskColor } from '../../lib/ui-utils'
 import { toast } from '../../stores/toastStore'
-import { countArchivedHidden, filterStudents, isAllSelected, sortStudentsByRisk } from './student-filters'
 import { StudentProfile } from './StudentProfile'
+import {
+  countArchivedHidden,
+  filterStudents,
+  isAllSelected,
+  sortStudentsByRisk,
+} from './student-filters'
 
 // Electron 文件对话框返回类型
 interface OpenDialogResult {
@@ -336,7 +341,7 @@ export function StudentsPage() {
     }
     document.addEventListener('ctx-menu-action', handler)
     return () => document.removeEventListener('ctx-menu-action', handler)
-  }, [students])
+  }, [students, handleDeleteStudent])
 
   // 切换单个学生选中状态
   const toggleSelect = (name: string) => {
@@ -760,7 +765,7 @@ export function StudentsPage() {
                 <button
                   type="button"
                   onClick={handleAddStudent}
-                  disabled={!newStudentClassId}
+                  disabled={!newStudentClassId || !newStudentName.trim()}
                   className="bg-green-600 hover:bg-green-700 disabled:bg-gray-300 dark:disabled:bg-gray-600 disabled:cursor-not-allowed px-3 py-1.5 rounded-lg text-sm transition-colors"
                 >
                   {t('common.confirm')}

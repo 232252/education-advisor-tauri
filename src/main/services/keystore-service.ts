@@ -11,6 +11,7 @@ import fs from 'node:fs'
 import fsp from 'node:fs/promises'
 import path from 'node:path'
 import { app, safeStorage } from 'electron'
+import { atomicWrite } from '../utils/atomic-write'
 
 class KeystoreService {
   private keyStorePath: string
@@ -111,11 +112,7 @@ class KeystoreService {
         const obj = Object.fromEntries(this.cache)
         const json = JSON.stringify(obj)
         const encrypted = safeStorage.encryptString(json)
-        // 原子写入:先写临时文件再 rename,避免崩溃导致 keystore.enc 损坏
-        // tmp 文件名加随机后缀,即使并发也不会互相覆盖(双重防御)
-        const tmpPath = `${this.keyStorePath}.tmp.${process.pid}.${Date.now()}`
-        await fsp.writeFile(tmpPath, encrypted)
-        await fsp.rename(tmpPath, this.keyStorePath)
+        await atomicWrite(this.keyStorePath, encrypted)
       } while (this._needsResave)
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)

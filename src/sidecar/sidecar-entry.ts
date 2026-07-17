@@ -188,15 +188,18 @@ async function bootstrap(): Promise<void> {
   const channels = listChannels()
   sendLog(`[sidecar] bootstrap complete. ${channels.length} handlers registered.`)
 
-  // 通知 Rust 已就绪
-  writeLine({ type: 'event', channel: '__sidecar__:ready', data: { channels } })
-
   // 性能优化: 缓存预预热
-  // 在 sidecar 就绪后异步触发 EAA 读命令,填充 staticCache/rankingCache/studentsCache/scoreCache。
+  // 在 sidecar 就绪前同步完成 EAA 读命令,填充 staticCache/rankingCache/studentsCache/scoreCache。
   // 这样用户的第一次请求 (Dashboard/Students/Classes 同时挂载时) 可直接命中缓存,
   // 避免并发 spawn 4 个 EAA 子进程 (~40-200ms/次)。
-  // 预预热是 fire-and-forget,不阻塞请求循环,失败也不影响功能 (缓存未命中时会正常 spawn)。
-  void preWarmCaches()
+  // 改为同步await: 防止预热与刚启动时的并发写请求产生竞态导致缓存污染。
+  // 预热失败静默忽略 (缓存未命中时会正常路径重新 spawn)。
+  await preWarmCaches().catch((err) => {
+    sendLog(`[sidecar] cache pre-warm failed (non-fatal): ${err}`)
+  })
+
+  // 通知 Rust 已就绪
+  writeLine({ type: 'event', channel: '__sidecar__:ready', data: { channels } })
 
   // 进入请求循环
   startRequestLoop()

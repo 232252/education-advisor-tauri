@@ -16,7 +16,7 @@ const CRON_FIELD_RANGES = [
   { min: 0, max: 23 }, // hour
   { min: 1, max: 31 }, // day-of-month
   { min: 1, max: 12 }, // month
-  { min: 0, max: 7 },  // day-of-week (0和7都是周日)
+  { min: 0, max: 7 }, // day-of-week (0和7都是周日)
 ] as const
 
 // node-cron 不支持宏表达式 (@daily/@hourly 等),
@@ -26,10 +26,14 @@ function strictValidateCron(expr: string): { ok: boolean; error?: string } {
   if (!expr || typeof expr !== 'string') return { ok: false, error: '表达式不能为空' }
   const macroKey = expr.trim().toLowerCase()
   if (macroKey.startsWith('@')) {
-    return { ok: false, error: `宏表达式不支持 (node-cron 不支持 @daily/@hourly 等), 请使用 5 段表达式如 "0 9 * * *"` }
+    return {
+      ok: false,
+      error: `宏表达式不支持 (node-cron 不支持 @daily/@hourly 等), 请使用 5 段表达式如 "0 9 * * *"`,
+    }
   }
   const parts = expr.trim().split(/\s+/)
-  if (parts.length !== 5) return { ok: false, error: `需要 5 段 (分 时 日 月 周), 当前 ${parts.length} 段` }
+  if (parts.length !== 5)
+    return { ok: false, error: `需要 5 段 (分 时 日 月 周), 当前 ${parts.length} 段` }
   for (let i = 0; i < 5; i++) {
     const field = parts[i]
     const range = CRON_FIELD_RANGES[i]
@@ -38,7 +42,8 @@ function strictValidateCron(expr: string): { ok: boolean; error?: string } {
       if (sub === '') return { ok: false, error: `第 ${i + 1} 段有空子字段` }
       if (sub.startsWith('*/')) {
         const step = Number.parseInt(sub.slice(2), 10)
-        if (Number.isNaN(step) || step < 1) return { ok: false, error: `第 ${i + 1} 段步长 "${sub}" 无效` }
+        if (Number.isNaN(step) || step < 1)
+          return { ok: false, error: `第 ${i + 1} 段步长 "${sub}" 无效` }
         continue
       }
       const rangeMatch = sub.match(/^(\d+)-(\d+)(?:\/(\d+))?$/)
@@ -48,8 +53,10 @@ function strictValidateCron(expr: string): { ok: boolean; error?: string } {
         const end = Number.parseInt(endStr, 10)
         const effectiveMaxStart = i === 4 && start === 7 ? 7 : range.max
         const effectiveMaxEnd = i === 4 && end === 7 ? 7 : range.max
-        if (start < range.min || start > effectiveMaxStart) return { ok: false, error: `第 ${i + 1} 段 ${start} 超出范围 ${range.min}-${range.max}` }
-        if (end < range.min || end > effectiveMaxEnd) return { ok: false, error: `第 ${i + 1} 段 ${end} 超出范围 ${range.min}-${range.max}` }
+        if (start < range.min || start > effectiveMaxStart)
+          return { ok: false, error: `第 ${i + 1} 段 ${start} 超出范围 ${range.min}-${range.max}` }
+        if (end < range.min || end > effectiveMaxEnd)
+          return { ok: false, error: `第 ${i + 1} 段 ${end} 超出范围 ${range.min}-${range.max}` }
         if (stepStr) {
           const step = Number.parseInt(stepStr, 10)
           if (step < 1) return { ok: false, error: `第 ${i + 1} 段步长 ${step} 无效` }
@@ -59,7 +66,8 @@ function strictValidateCron(expr: string): { ok: boolean; error?: string } {
       const num = Number.parseInt(sub, 10)
       if (Number.isNaN(num)) return { ok: false, error: `第 ${i + 1} 段 "${sub}" 不是有效数字` }
       const effectiveMax = i === 4 && num === 7 ? 7 : range.max
-      if (num < range.min || num > effectiveMax) return { ok: false, error: `第 ${i + 1} 段 ${num} 超出范围 ${range.min}-${range.max}` }
+      if (num < range.min || num > effectiveMax)
+        return { ok: false, error: `第 ${i + 1} 段 ${num} 超出范围 ${range.min}-${range.max}` }
     }
   }
   return { ok: true }
@@ -145,7 +153,9 @@ function validateCronModelTier(tier: unknown): 'high_quality' | 'low_cost' | und
     throw new Error(`task.modelTier must be a string, got ${typeof tier}`)
   }
   if (!VALID_CRON_MODEL_TIERS.includes(tier as (typeof VALID_CRON_MODEL_TIERS)[number])) {
-    throw new Error(`task.modelTier "${tier}" invalid (allowed: ${VALID_CRON_MODEL_TIERS.join(', ')})`)
+    throw new Error(
+      `task.modelTier "${tier}" invalid (allowed: ${VALID_CRON_MODEL_TIERS.join(', ')})`,
+    )
   }
   return tier as 'high_quality' | 'low_cost'
 }
@@ -153,7 +163,9 @@ function validateCronModelTier(tier: unknown): 'high_quality' | 'low_cost' | und
 /** 校验 task.agentId: 非空字符串 + null byte + 控制字符 */
 function validateCronAgentId(agentId: unknown): string {
   if (typeof agentId !== 'string') {
-    throw new Error(`task.agentId must be a string, got ${agentId === null ? 'null' : typeof agentId}`)
+    throw new Error(
+      `task.agentId must be a string, got ${agentId === null ? 'null' : typeof agentId}`,
+    )
   }
   if (agentId.length === 0) {
     throw new Error('task.agentId must be a non-empty string')
@@ -224,7 +236,8 @@ function validateCronPatchInput(patch: unknown): Record<string, unknown> {
   }
   if (safePatch.agentId !== undefined) safePatch.agentId = validateCronAgentId(safePatch.agentId)
   if (safePatch.prompt !== undefined) safePatch.prompt = validateCronPrompt(safePatch.prompt)
-  if (safePatch.modelTier !== undefined) safePatch.modelTier = validateCronModelTier(safePatch.modelTier)
+  if (safePatch.modelTier !== undefined)
+    safePatch.modelTier = validateCronModelTier(safePatch.modelTier)
   if (safePatch.enabled !== undefined && safePatch.enabled !== null) {
     if (typeof safePatch.enabled !== 'boolean') {
       throw new Error(`patch.enabled must be a boolean, got ${typeof safePatch.enabled}`)

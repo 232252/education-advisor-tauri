@@ -43,11 +43,12 @@ import { dbService } from './db-service'
 import { getToolsByCapability } from './eaa-tools'
 import { allFileTools } from './file-tools'
 import { keystoreService } from './keystore-service'
-import { getMcpToolsForAgent } from './mcp-tools'
 import { mcpService } from './mcp-service'
+import { getMcpToolsForAgent } from './mcp-tools'
 import { settingsService } from './settings-service'
 import { skillService } from './skill-service'
 import { allUtilityTools } from './utility-tools'
+import { atomicWrite } from '../utils/atomic-write'
 
 // =============================================================
 // Agent 运行时实例（每次执行创建一个）
@@ -225,11 +226,8 @@ class AgentService {
 # 删除此文件可重置所有覆盖
 ${yaml.stringify({ agents: list })}
 `
-    const tmpPath = `${this.userOverridesPath}.tmp.${process.pid}.${Date.now()}`
     try {
-      await fsp.mkdir(path.dirname(this.userOverridesPath), { recursive: true })
-      await fsp.writeFile(tmpPath, payload, 'utf-8')
-      await fsp.rename(tmpPath, this.userOverridesPath)
+      await atomicWrite(this.userOverridesPath, payload, 'utf-8')
     } catch (err) {
       console.error('[AgentService] Failed to persist user overrides:', err)
     }
@@ -830,7 +828,7 @@ ${yaml.stringify({ agents: list })}
     this.runningAgents.set(id, { agent, abortController, agentId: id, startedAt })
 
     // 收集输出 + 诊断计数
-    let outputChunks: string[] = []
+    const outputChunks: string[] = []
     let outputLen = 0
     let inputTokens = 0
     let outputTokens = 0

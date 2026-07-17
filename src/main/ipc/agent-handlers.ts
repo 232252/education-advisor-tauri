@@ -14,7 +14,11 @@ import { agentService } from '../services/agent-service'
 // =============================================================
 
 /** 校验可选字符串字段:类型 + 长度上限 + null byte */
-function validateOptionalAgentString(value: unknown, field: string, maxLen: number): string | undefined {
+function validateOptionalAgentString(
+  value: unknown,
+  field: string,
+  maxLen: number,
+): string | undefined {
   if (value === undefined || value === null) return undefined
   if (typeof value !== 'string') {
     throw new Error(`[IPC] invalid ${field}: expected string, got ${typeof value}`)
@@ -82,17 +86,23 @@ function validateHistory(history: unknown): Array<{ role: string; content: strin
   for (let i = 0; i < history.length; i++) {
     const msg = history[i]
     if (msg === null || typeof msg !== 'object') {
-      throw new Error(`[IPC] invalid history[${i}]: expected object, got ${msg === null ? 'null' : typeof msg}`)
+      throw new Error(
+        `[IPC] invalid history[${i}]: expected object, got ${msg === null ? 'null' : typeof msg}`,
+      )
     }
     const m = msg as { role?: unknown; content?: unknown }
     if (typeof m.role !== 'string' || m.role.length === 0) {
       throw new Error(`[IPC] invalid history[${i}].role: expected non-empty string`)
     }
     if (typeof m.content !== 'string') {
-      throw new Error(`[IPC] invalid history[${i}].content: expected string, got ${typeof m.content}`)
+      throw new Error(
+        `[IPC] invalid history[${i}].content: expected string, got ${typeof m.content}`,
+      )
     }
     if (m.content.length > MAX_HISTORY_MSG_LEN) {
-      throw new Error(`[IPC] invalid history[${i}].content: too long (${m.content.length} > ${MAX_HISTORY_MSG_LEN})`)
+      throw new Error(
+        `[IPC] invalid history[${i}].content: too long (${m.content.length} > ${MAX_HISTORY_MSG_LEN})`,
+      )
     }
     if (m.content.includes('\0')) {
       throw new Error(`[IPC] invalid history[${i}].content: contains null byte`)
@@ -157,9 +167,12 @@ export function registerAgentHandlers(win: BrowserWindow) {
       }
       // P4-1 修复: 校验 patch 字段类型 + 长度 + null byte
       const p = patch as Record<string, unknown>
-      const safePatch: Partial<Pick<AgentConfig, 'name' | 'description' | 'modelTier' | 'capabilities'>> = {}
+      const safePatch: Partial<
+        Pick<AgentConfig, 'name' | 'description' | 'modelTier' | 'capabilities'>
+      > = {}
       if (p.name !== undefined) safePatch.name = validateOptionalAgentString(p.name, 'name', 256)
-      if (p.description !== undefined) safePatch.description = validateOptionalAgentString(p.description, 'description', 2000)
+      if (p.description !== undefined)
+        safePatch.description = validateOptionalAgentString(p.description, 'description', 2000)
       if (p.modelTier !== undefined) safePatch.modelTier = validateModelTier(p.modelTier)
       if (p.capabilities !== undefined) safePatch.capabilities = p.capabilities as string[]
       return agentService.updateAgent(id, safePatch)
@@ -258,7 +271,10 @@ export function registerAgentHandlers(win: BrowserWindow) {
         // 1MB 上限: 防止超大 prompt 导致内存/OOM(LLM 上下文窗口通常 << 1MB)
         const MAX_PROMPT_LEN = 1_000_000
         if (prompt.length > MAX_PROMPT_LEN) {
-          return { success: false, message: `[IPC] invalid prompt: too long (${prompt.length} > ${MAX_PROMPT_LEN})` }
+          return {
+            success: false,
+            message: `[IPC] invalid prompt: too long (${prompt.length} > ${MAX_PROMPT_LEN})`,
+          }
         }
         // P4-2 修复: history 参数校验 (在 IIFE 前同步执行,IPC 直接返回错误)
         let safeHistory: Array<{ role: string; content: string }> | undefined

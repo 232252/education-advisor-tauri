@@ -33,7 +33,7 @@ function lookupReasonCodeDelta(reasonCode: string): number | undefined {
       }
       cachedReasonCodes = JSON.parse(fs.readFileSync(codesPath, 'utf-8'))
     }
-    const entry = cachedReasonCodes![reasonCode]
+    const entry = cachedReasonCodes?.[reasonCode]
     if (entry && typeof entry.delta === 'number') return entry.delta
     return undefined
   } catch {
@@ -355,11 +355,23 @@ export function registerEAAHandlers(_win: BrowserWindow) {
     if (typeof query !== 'string') {
       throw new Error('query must be a string')
     }
-    // 防止 spawn ENAMETOOLONG: 总参数长度限制 (32KB,保守估计,Windows 命令行长限制 ~32K)
     const MAX_QUERY_LEN = 8192
     const safeQuery = query.length > MAX_QUERY_LEN ? query.slice(0, MAX_QUERY_LEN) : query
-    // 用 tokenizer 替代 split(' ')，支持双引号包裹的复合词
-    const args = tokenizeQuery(safeQuery)
+    if (/[\x00-\x1F\x7F]/.test(safeQuery)) {
+      throw new Error('query contains control characters')
+    }
+    const cleaned = safeQuery.replace(/[\u200B-\u200F\u2028-\u202F\u2060-\u206F\uFEFF\uFFF9-\uFFFB]/g, '').trim()
+    if (cleaned.length === 0) {
+      return { events: [], students: [] }
+    }
+    const args = tokenizeQuery(cleaned).filter((t) => {
+      if (t.startsWith('--')) return false
+      if (/[`$;|&<>{}\\]/.test(t)) return false
+      return t.length > 0
+    })
+    if (args.length === 0) {
+      return { events: [], students: [] }
+    }
     if (limit !== undefined && limit > 0) {
       args.push('--limit', String(Math.min(1000, Math.floor(limit))))
     }
@@ -422,6 +434,22 @@ export function registerEAAHandlers(_win: BrowserWindow) {
       const allowedFormats = new Set(await eaaBridge.getSupportedExportFormats())
       if (!allowedFormats.has(format)) {
         throw new Error(`format must be one of: ${[...allowedFormats].join(', ')}`)
+      }
+      if (outputFile) {
+        if (typeof outputFile !== 'string' || outputFile.length === 0) {
+          throw new Error('outputFile must be a non-empty string')
+        }
+        if (/\x00/.test(outputFile)) {
+          throw new Error('outputFile contains null bytes')
+        }
+        if (outputFile.includes('..')) {
+          throw new Error('outputFile contains path traversal characters')
+        }
+        const allowedExts = ['.csv', '.jsonl', '.html', '.json', '.txt']
+        const ext = path.extname(outputFile).toLowerCase()
+        if (ext && !allowedExts.includes(ext)) {
+          throw new Error(`outputFile extension not allowed: ${ext}`)
+        }
       }
       const args = ['--format', format]
       if (outputFile) args.push('--output-file', outputFile)
@@ -532,14 +560,14 @@ export function registerEAAHandlers(_win: BrowserWindow) {
       if (filePath.includes('\0')) {
         throw new Error('filePath contains null bytes')
       }
-      // 路径遍历防护: 拒绝含 .. 的路径
       if (filePath.includes('..')) {
         throw new Error('filePath cannot contain path traversal (..)')
       }
-      // 扩展名白名单: 仅允许导入数据文件
-      const ext = filePath.toLowerCase().split('.').pop()
-      if (ext && !['csv', 'json', 'txt'].includes(ext)) {
-        throw new Error(`filePath has unsupported extension: .${ext} (allowed: .csv, .json, .txt)`)
+      // Rust 端只支持 JSON 格式导入（serde_json::from_str），白名单与 Rust 实现对齐
+      const allowedExts = ['.json', '.jsonl']
+      const ext = path.extname(filePath).toLowerCase()
+      if (!allowedExts.includes(ext)) {
+        throw new Error(`file extension not supported: ${ext}, allowed: ${allowedExts.join(', ')}`)
       }
       const result = await eaaBridge.execute({ command: 'import', args: [filePath] })
       invalidateStudentsCache()

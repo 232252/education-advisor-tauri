@@ -297,20 +297,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
    */
   fetchModelInfo: async (provider, model) => {
     if (!provider || !model) {
-      console.log(`[chatStore] fetchModelInfo skipped: provider=${provider} model=${model}`)
       return
     }
     try {
       const models = await getAPI().ai.listModels(provider)
-      console.log(
-        `[chatStore] fetchModelInfo: provider=${provider} model=${model} returned ${models.length} models:`,
-        models.map((m) => `${m.id}@${m.contextWindow}`),
-      )
       const found = models.find((m) => m.id === model)
       if (found) {
-        console.log(
-          `[chatStore] model matched: ${model} contextWindow=${found.contextWindow} maxOutput=${found.maxOutputTokens}`,
-        )
         set({
           currentModelContext: found.contextWindow || 0,
           currentModelMaxOutput: found.maxOutputTokens || 0,

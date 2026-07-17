@@ -137,14 +137,18 @@ export function ChatPage() {
   useEffect(() => {
     const handler = (e: Event) => {
       try {
-        const ce = e as CustomEvent<{ action: string; target: HTMLElement | { dataset?: Record<string, string> } }>
+        const ce = e as CustomEvent<{
+          action: string
+          target: HTMLElement | { dataset?: Record<string, string> }
+        }>
         const action = ce.detail?.action
         const target = ce.detail?.target
         if (!action || !target) return
         // 健壮性: target 可能是 DOM 元素或普通对象(防御畸形事件导致整页崩溃)
-        const sid = typeof target.getAttribute === 'function'
-          ? target.getAttribute('data-ctx-session-id')
-          : target.dataset?.ctxSessionId
+        const sid =
+          typeof target.getAttribute === 'function'
+            ? target.getAttribute('data-ctx-session-id')
+            : target.dataset?.ctxSessionId
         if (!sid) return
         if (action === 'delete') setPendingDeleteSessionId(sid)
       } catch {
@@ -155,15 +159,18 @@ export function ChatPage() {
     return () => document.removeEventListener('ctx-menu-action', handler)
   }, [])
 
-  const handleModelSelect = useCallback(async (provider: string, model: string) => {
-    setModel(provider, model)
-    try {
-      await getAPI().settings.set('models.defaultProvider', provider)
-      await getAPI().settings.set('models.highQualityModel', model)
-    } catch (err) {
-      console.warn('[ChatPage] failed to persist model selection:', err)
-    }
-  }, [setModel])
+  const handleModelSelect = useCallback(
+    async (provider: string, model: string) => {
+      setModel(provider, model)
+      try {
+        await getAPI().settings.set('models.defaultProvider', provider)
+        await getAPI().settings.set('models.highQualityModel', model)
+      } catch (err) {
+        console.warn('[ChatPage] failed to persist model selection:', err)
+      }
+    },
+    [setModel],
+  )
 
   const handleThinkingLevelChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
     const value = e.target.value
@@ -248,7 +255,8 @@ export function ChatPage() {
 
   // P1 优化: 预计算会话右键菜单 JSON,避免列表每行每次渲染都 JSON.stringify
   const sessionMenuJson = useMemo(
-    () => JSON.stringify([{ label: t('common.delete'), action: 'delete', variant: 'danger' as const }]),
+    () =>
+      JSON.stringify([{ label: t('common.delete'), action: 'delete', variant: 'danger' as const }]),
     [t],
   )
 
@@ -262,9 +270,7 @@ export function ChatPage() {
 
   return (
     <div className="flex h-full">
-      <h1 style={SR_ONLY_STYLE}>
-        {t('page.chat.title')}
-      </h1>
+      <h1 style={SR_ONLY_STYLE}>{t('page.chat.title')}</h1>
       {/* 左侧会话列表 */}
       <div className="w-64 flex-shrink-0 border-r border-gray-200 dark:border-gray-700 flex flex-col bg-gray-50/50 dark:bg-gray-800/50">
         {/* 顶部操作区 */}

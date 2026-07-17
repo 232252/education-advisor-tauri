@@ -59,9 +59,6 @@ export function useForwardConsole(): void {
       }
     }
 
-    // 启动确认日志
-    console.info('[Renderer] useForwardConsole hook installed')
-
     return () => {
       console.debug = origDebug
       console.info = origInfo

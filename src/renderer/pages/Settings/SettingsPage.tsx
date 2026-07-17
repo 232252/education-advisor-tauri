@@ -1196,7 +1196,9 @@ export function SettingsPage() {
           <div>
             <div className="text-base text-gray-800 dark:text-gray-100 font-semibold">
               Education Advisor{' '}
-              <span className="text-sm font-normal text-gray-500 dark:text-gray-400">v0.1.0-rc.1</span>
+              <span className="text-sm font-normal text-gray-500 dark:text-gray-400">
+                v0.1.0-rc.1
+              </span>
             </div>
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 leading-relaxed">
               Education Advisor — Tauri 2 桌面版 · Pi Agent + Education Advisor AI
@@ -1278,13 +1280,15 @@ export function SettingsPage() {
 
           <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
             Education Advisor 内置 EAA Core (Rust) + Pi Agent 运行时 + Pi-AI 通信层 + 18 个教育 AI
-            Agent，遵循 MIT 协议发布。已从 Electron 33 迁移至 Tauri 2 (Rust shell + Node sidecar 架构)。
+            Agent，遵循 MIT 协议发布。已从 Electron 33 迁移至 Tauri 2 (Rust shell + Node sidecar
+            架构)。
           </p>
 
           <div className="pt-3 border-t border-gray-200 dark:border-gray-700/60">
             <div className="text-[10px] text-gray-400 dark:text-gray-500 italic leading-relaxed">
-              本项目已从 Electron 33 迁移至 Tauri 2 桌面框架 (Rust shell + Node sidecar + electron-shim),
-              原有 Electron 入口保留以供兼容。EAA Core 已升级至 v3.2.2 (27 子命令, 流式处理 + 三层缓存)。
+              本项目已从 Electron 33 迁移至 Tauri 2 桌面框架 (Rust shell + Node sidecar +
+              electron-shim), 原有 Electron 入口保留以供兼容。EAA Core 已升级至 v3.2.2 (27 子命令,
+              流式处理 + 三层缓存)。
             </div>
           </div>
         </div>

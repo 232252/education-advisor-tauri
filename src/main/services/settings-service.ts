@@ -9,16 +9,16 @@
 // =============================================================
 
 import fs from 'node:fs'
-import fsp from 'node:fs/promises'
 import path from 'node:path'
 import { app } from 'electron'
 import type { UnifiedSettings } from '../../shared/types'
+import { atomicWrite } from '../utils/atomic-write'
 
 const DEFAULT_SETTINGS: UnifiedSettings = {
   general: {
     dataDir: '',
     defaultOperator: '',
-    theme: 'dark',
+    theme: 'light',
     language: 'zh-CN',
     autoUpdate: true,
     updateUrl: '',
@@ -235,7 +235,11 @@ class SettingsService {
     if (keys[0] === 'shortcuts' && keys.length > 2) {
       const shortcutKey = keys.slice(1).join('.')
       const defaultShortcuts = DEFAULT_SETTINGS.shortcuts as Record<string, unknown>
-      if (defaultShortcuts && typeof defaultShortcuts === 'object' && shortcutKey in defaultShortcuts) {
+      if (
+        defaultShortcuts &&
+        typeof defaultShortcuts === 'object' &&
+        shortcutKey in defaultShortcuts
+      ) {
         const currentShortcuts = this.settings.shortcuts as Record<string, unknown>
         if (currentShortcuts && typeof currentShortcuts === 'object') {
           currentShortcuts[shortcutKey] = value
@@ -313,22 +317,7 @@ class SettingsService {
       do {
         this._needsResave = false
         const json = JSON.stringify(this.settings, null, 2)
-        // L-5 修复: tmpPath 加随机后缀,防止多实例/并发写互踩
-        const tmpPath = `${this.settingsPath}.tmp.${process.pid}.${Date.now()}`
-        // 确保目录存在
-        await fsp.mkdir(path.dirname(this.settingsPath), { recursive: true })
-        try {
-          await fsp.writeFile(tmpPath, json, 'utf-8')
-        } catch (writeErr) {
-          if (writeErr instanceof Error && (writeErr as NodeJS.ErrnoException).code === 'ENOENT') {
-            // 目录可能在 mkdir 后被并发清理, 重试一次
-            await fsp.mkdir(path.dirname(this.settingsPath), { recursive: true })
-            await fsp.writeFile(tmpPath, json, 'utf-8')
-          } else {
-            throw writeErr
-          }
-        }
-        await fsp.rename(tmpPath, this.settingsPath)
+        await atomicWrite(this.settingsPath, json, 'utf-8')
         this._lastError = null
       } while (this._needsResave)
     } catch (err) {

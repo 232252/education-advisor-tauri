@@ -25,7 +25,13 @@ type TabId = 'overview' | 'students' | 'assign'
 
 const RISK_ORDER: Record<EAARiskLevel, number> = { 极高: 0, 高: 1, 中: 2, 低: 3 }
 
-export function ClassProfile({ classEntity, allStudents, allClasses, onClose, onRefresh }: ClassProfileProps) {
+export function ClassProfile({
+  classEntity,
+  allStudents,
+  allClasses,
+  onClose,
+  onRefresh,
+}: ClassProfileProps) {
   const { t } = useT()
   const [tab, setTab] = useState<TabId>('overview')
 
@@ -47,7 +53,10 @@ export function ClassProfile({ classEntity, allStudents, allClasses, onClose, on
   const tabs = useMemo<{ id: TabId; label: string }[]>(
     () => [
       { id: 'overview', label: t('page.classes.profile.tabOverview') },
-      { id: 'students', label: `${t('page.classes.profile.tabStudents')} (${classStudents.length})` },
+      {
+        id: 'students',
+        label: `${t('page.classes.profile.tabStudents')} (${classStudents.length})`,
+      },
       { id: 'assign', label: t('page.classes.profile.tabAssign') },
     ],
     [t, classStudents.length],

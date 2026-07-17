@@ -8,6 +8,7 @@ import fsp from 'node:fs/promises'
 import path from 'node:path'
 import { app } from 'electron'
 import type { StudentProfileData } from '../../shared/types'
+import { atomicWrite } from '../utils/atomic-write'
 
 class ProfileService {
   private profilesDir: string
@@ -46,10 +47,8 @@ class ProfileService {
   async set(name: string, data: StudentProfileData): Promise<{ success: boolean; error?: string }> {
     try {
       const filePath = this.profilePath(name)
-      const tmpPath = `${filePath}.tmp`
       const json = JSON.stringify(data, null, 2)
-      await fsp.writeFile(tmpPath, json, 'utf-8')
-      await fsp.rename(tmpPath, filePath)
+      await atomicWrite(filePath, json, 'utf-8')
       return { success: true }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
@@ -58,7 +57,10 @@ class ProfileService {
   }
 
   /** 部分更新学生扩展档案（合并） */
-  async update(name: string, patch: Partial<StudentProfileData>): Promise<{ success: boolean; error?: string }> {
+  async update(
+    name: string,
+    patch: Partial<StudentProfileData>,
+  ): Promise<{ success: boolean; error?: string }> {
     const existing = await this.get(name)
     const merged = { ...existing, ...patch }
     return this.set(name, merged)

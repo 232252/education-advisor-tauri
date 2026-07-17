@@ -311,13 +311,25 @@ export function registerAIHandlers(win: BrowserWindow) {
         validateOptionalString(msg.sessionId, 'msg.sessionId', 256)
         // 数值字段类型校验: 防止字符串/对象污染统计
         if (msg.tokenInput !== undefined && typeof msg.tokenInput !== 'number') {
-          return { success: false, error: `[IPC] invalid msg.tokenInput: expected number, got ${typeof msg.tokenInput}`, id: -1 }
+          return {
+            success: false,
+            error: `[IPC] invalid msg.tokenInput: expected number, got ${typeof msg.tokenInput}`,
+            id: -1,
+          }
         }
         if (msg.tokenOutput !== undefined && typeof msg.tokenOutput !== 'number') {
-          return { success: false, error: `[IPC] invalid msg.tokenOutput: expected number, got ${typeof msg.tokenOutput}`, id: -1 }
+          return {
+            success: false,
+            error: `[IPC] invalid msg.tokenOutput: expected number, got ${typeof msg.tokenOutput}`,
+            id: -1,
+          }
         }
         if (msg.cost !== undefined && typeof msg.cost !== 'number') {
-          return { success: false, error: `[IPC] invalid msg.cost: expected number, got ${typeof msg.cost}`, id: -1 }
+          return {
+            success: false,
+            error: `[IPC] invalid msg.cost: expected number, got ${typeof msg.cost}`,
+            id: -1,
+          }
         }
         const enrichedMsg = { ...msg, timestamp: msg.timestamp ?? Date.now() }
         const id = dbService.saveChatMessage(enrichedMsg)
@@ -382,14 +394,18 @@ export function registerAIHandlers(win: BrowserWindow) {
   function validateOptionalNumber(value: unknown, field: string): number | undefined {
     if (value === undefined || value === null) return undefined
     if (typeof value !== 'number' || !Number.isFinite(value)) {
-      throw new Error(`[IPC] invalid ${field}: expected finite number, got ${typeof value}=${String(value).slice(0, 32)}`)
+      throw new Error(
+        `[IPC] invalid ${field}: expected finite number, got ${typeof value}=${String(value).slice(0, 32)}`,
+      )
     }
     return value
   }
   function validateOptionalBoolean(value: unknown, field: string): boolean | undefined {
     if (value === undefined || value === null) return undefined
     if (typeof value !== 'boolean') {
-      throw new Error(`[IPC] invalid ${field}: expected boolean, got ${typeof value}=${String(value).slice(0, 32)}`)
+      throw new Error(
+        `[IPC] invalid ${field}: expected boolean, got ${typeof value}=${String(value).slice(0, 32)}`,
+      )
     }
     return value
   }

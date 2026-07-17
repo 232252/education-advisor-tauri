@@ -2,9 +2,9 @@
 // Academic IPC 处理器 — 科目/考试/成绩
 // =============================================================
 
-import { ipcMain } from 'electron'
 import * as fsp from 'node:fs/promises'
 import * as path from 'node:path'
+import { ipcMain } from 'electron'
 import * as IPC from '../../shared/ipc-channels'
 import type { AcademicConfig, ExamDef, GradeRecord } from '../../shared/types'
 import { academicService } from '../services/academic-service'

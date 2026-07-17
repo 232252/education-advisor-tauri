@@ -12,7 +12,7 @@ function getSystemPreference(): EffectiveTheme {
   if (typeof window !== 'undefined' && window.matchMedia) {
     return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
   }
-  return 'dark'
+  return 'light'
 }
 
 function applyTheme(effective: EffectiveTheme): void {
@@ -26,8 +26,7 @@ function applyTheme(effective: EffectiveTheme): void {
 
 export function useTheme(): EffectiveTheme {
   const [effective, setEffective] = useState<EffectiveTheme>(() => {
-    // Default to dark until settings load
-    return 'dark'
+    return 'light'
   })
 
   const applyFromSetting = useCallback((setting: ThemeSetting) => {
@@ -45,7 +44,7 @@ export function useTheme(): EffectiveTheme {
     // Load theme from settings on mount
     let mounted = true
     // 缓存上次的 theme setting，避免系统主题变化时重复 IPC 调用
-    let cachedSetting: ThemeSetting = 'dark'
+    let cachedSetting: ThemeSetting = 'light'
 
     const loadTheme = async () => {
       try {
@@ -55,9 +54,8 @@ export function useTheme(): EffectiveTheme {
           applyFromSetting(cachedSetting)
         }
       } catch {
-        // Fallback to dark if settings load fails
         if (mounted) {
-          applyFromSetting('dark')
+          applyFromSetting('light')
         }
       }
     }
