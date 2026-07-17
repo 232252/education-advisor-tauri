@@ -192,3 +192,8 @@ test-round4-results
 test-round5-results
 test-round4-data-*/
 test-agent-tools-report.json
+# 测试轮次产物(R1-R10 子代理生成)
+test-round*/
+test-agent-tools-report.json
+sidecar/test-round*/
+sidecar/test-round*.mjs
