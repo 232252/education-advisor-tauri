@@ -234,14 +234,18 @@ export function McpTab() {
           <span className="text-sm">
             {mcpEnabled ? (
               <>
-                <span className="text-green-600 dark:text-green-400 font-medium">● {t('page.mcp.banner.enabled')}</span>
+                <span className="text-green-600 dark:text-green-400 font-medium">
+                  ● {t('page.mcp.banner.enabled')}
+                </span>
                 <span className="text-gray-600 dark:text-gray-400 ml-2">
                   Model Context Protocol — {t('page.mcp.empty.hint')}
                 </span>
               </>
             ) : (
               <>
-                <span className="text-amber-600 dark:text-amber-400 font-medium">○ {t('page.mcp.banner.disabled')}</span>
+                <span className="text-amber-600 dark:text-amber-400 font-medium">
+                  ○ {t('page.mcp.banner.disabled')}
+                </span>
               </>
             )}
           </span>

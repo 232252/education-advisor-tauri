@@ -10,8 +10,8 @@ import fsp from 'node:fs/promises'
 import path from 'node:path'
 import { app } from 'electron'
 import type { AcademicConfig, ExamDef, GradeRecord, SubjectDef } from '../../shared/types'
-import { log } from '../utils/logger'
 import { atomicWrite } from '../utils/atomic-write'
+import { log } from '../utils/logger'
 
 const DEFAULT_SUBJECTS: SubjectDef[] = [
   { id: 'chinese', name: '语文', category: 'core', fullMark: 150, isCore: true },

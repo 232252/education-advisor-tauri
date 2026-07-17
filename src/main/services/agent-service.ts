@@ -37,6 +37,7 @@ import type {
   AgentListItem,
   AgentStatus,
 } from '../../shared/types'
+import { atomicWrite } from '../utils/atomic-write'
 import { compactAgentMessages } from './compaction-helper'
 import { cronService } from './cron-service'
 import { dbService } from './db-service'
@@ -48,7 +49,6 @@ import { getMcpToolsForAgent } from './mcp-tools'
 import { settingsService } from './settings-service'
 import { skillService } from './skill-service'
 import { allUtilityTools } from './utility-tools'
-import { atomicWrite } from '../utils/atomic-write'
 
 // =============================================================
 // Agent 运行时实例（每次执行创建一个）

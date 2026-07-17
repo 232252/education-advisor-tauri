@@ -360,7 +360,9 @@ export function registerEAAHandlers(_win: BrowserWindow) {
     if (/[\x00-\x1F\x7F]/.test(safeQuery)) {
       throw new Error('query contains control characters')
     }
-    const cleaned = safeQuery.replace(/[\u200B-\u200F\u2028-\u202F\u2060-\u206F\uFEFF\uFFF9-\uFFFB]/g, '').trim()
+    const cleaned = safeQuery
+      .replace(/[\u200B-\u200F\u2028-\u202F\u2060-\u206F\uFEFF\uFFF9-\uFFFB]/g, '')
+      .trim()
     if (cleaned.length === 0) {
       return { events: [], students: [] }
     }
