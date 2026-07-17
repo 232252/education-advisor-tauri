@@ -19,7 +19,7 @@
 
 | # | 问题 | 影响 | 状态 |
 |---|---|---|---|
-| 1 | better-sqlite3 原生模块无法编译 (Node v26 ABI147 + Python 3.12 无 distutils + node-gyp 链路断) | class 持久化 + 聊天历史持久化降级为 no-op。功能正常但数据不落盘 | 环境问题，用 Node 22 可解。可选: 换 sql.js/@libsql/client 纯 JS 实现 |
+| 1 | better-sqlite3 原生模块无法编译 (Node v26 ABI147 + Python 3.13 无 distutils + node-gyp 链路断) | class 持久化 + 聊天历史持久化降级为 no-op。功能正常但数据不落盘 | 环境问题，用 Node 22 可解。**生产可用**:测试用 `isReady()` 守门(`db-service.test.ts`)兼容无原生模块场景,正式构建需装 Python + 构建工具链。可选:换 sql.js/@libsql/client 纯 JS 实现 |
 
 ## 待你决策的大问题
 
@@ -66,8 +66,8 @@
 | **测试轮次** | 23 轮 (R1-R23) |
 | **IPC 通道覆盖** | 103/115 可测通道 (其余为事件推送/危险操作) |
 | **sidecar 调用总数** | ~13000+ 次 (R12 长时间 11112 + R11 重复 515 + 各轮) |
-| **单元测试** | 437/437 通过 (26 文件, 0 回归) |
-| **e2e 测试** | 44/45 (1 个 pre-existing flaky) |
+| **单元测试** | 972/972 通过 (51 文件, 0 回归; 含 stress-long 排除) |
+| **e2e 测试** | 47/47 (含 1 个 10 分钟 stress-long) |
 | **tauri-bridge 单测** | 15/15 |
 | **综合套件** | 8/8 (R18, R19 各跑一次) |
 | **生产构建** | ✅ 2 次 (NSIS + MSI 安装包) |

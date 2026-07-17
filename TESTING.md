@@ -3,7 +3,7 @@
 > **本文是 `education-advisor-tauri` 测试体系的总索引 + Mock 模式目录。**
 > 目标：让任何人（包括能力较弱的小模型）照着就能写出一个合格的新测试。
 >
-> - **当前规模**：47 个测试文件，**~858 个测试用例**，全绿（2026-07-17 实测）
+> - **当前规模**：51 个测试文件，**972 个测试用例**，全绿（2026-07-18 实测）
 > - **自检**：`scripts/self-check.cjs` 72 项全过
 > - **配套文档**：[`WIKI.md`](./WIKI.md) §5、[`docs/CODE_WIKI.md`](./docs/CODE_WIKI.md) §12
 
@@ -14,7 +14,7 @@
 1. [跑测试（命令速查）](#1-跑测试命令速查)
 2. [Vitest 配置（双 project）](#2-vitest-配置双-project)
 3. [全局 setup（`tests/setup.ts`）](#3-全局-setuptestssetupts)
-4. [测试文件总索引（42 个）](#4-测试文件总索引42-个)
+4. [测试文件总索引（51 个）](#4-测试文件总索引51-个)
 5. [Mock 模式目录（12 种，照抄即可）](#5-mock-模式目录12-种照抄即可)
 6. [覆盖率与门槛](#6-覆盖率与门槛)
 7. [E2E vs 单测哲学](#7-e2e-vs-单测哲学)
@@ -85,15 +85,16 @@ console.error('SUPPRESS: 这条会真的打印', someDetail)
 
 ---
 
-## 4. 测试文件总索引（47 个）
+## 4. 测试文件总索引（51 个）
 
-> 文件分布：`tests/main/` 25 + `tests/renderer/` 11 + `tests/shared/` 1 + `tests/e2e/` 6 + `src/**/__tests__/` 4 = 47。
+> 文件分布：`tests/main/` 26 + `tests/renderer/` 13 + `tests/shared/` 1 + `tests/e2e/` 6 + `src/**/__tests__/` 5 = 51。
 
-### 主进程单测（`tests/main/`，25 个文件）
+### 主进程单测（`tests/main/`，26 个文件）
 
 | 文件 | `it` 数 | 测什么 | Mock 模式 |
-|---|---:|---|---|
+||---|---:|---|---|
 | `academic-service.test.ts` | 21 | 学业数据 CRUD、`safeName` 路径穿越防御、`batchSetGrades` upsert、`deleteExam` 级联 | A（electron + 真 fs） |
+| `atomic-write.test.ts` | 4 | R4 新增：`atomicWrite` 并发安全（s1 同文件并发写 100 次、s2 并发读写一致性、s3 5MB 大文件、s4 `renameWithRetry` EPERM 重试） | K + 真 fs |
 | `class-service.test.ts` | 25 | 班级 CRUD、`validateClassId`、archive/restore 时间戳、`archived` 0/1→bool | B（mock dbService） |
 | `compaction-helper.test.ts` | 23 | `evaluateCompaction` 阈值、token 估算、`compactChatMessagesSimple` 截断、`compactAgentMessages` | E（importActual spread） |
 | `cron-service.test.ts` | 18 | addTask/updateTask/toggle/runNow、bitable sync、`syncAgentSchedules`、`loadPersistedLogs` | A + 多 service mock |
@@ -107,8 +108,9 @@ console.error('SUPPRESS: 这条会真的打印', someDetail)
 | `keystore-service.test.ts` | 11 | setApiKey/getApiKey 原子写、`__secret__:` 前缀、加密不可用降级 | A（含完整 safeStorage mock） |
 | `log-handler-utils.test.ts` | 11 | `readLogTail` 空文件安全、`searchLog`、`readLogTailByLevel`、`listLogFiles` | A（真 fs） |
 | `log-handlers.test.ts` | 31 | initLogger/getLogsDir、listLogFiles（三流）、searchLog 大小写无关、exportLog、clearAllLogs | A（真 fs） |
+| `mcp-agent-integration.test.ts` | 18 | R8 新增：Agent ↔ MCP 集成（agents.yaml `mcp_servers` 字段加载回填到 `AgentConfig.mcpServers`、引用不存在 server 时 graceful 降级、不配 mcpServers 时为 undefined 等） | A（electron + 真 fs + 真 yaml） |
 | `mcp-helpers.test.ts` | 39 | `interpolateEnv`/`deepInterpolate` 环境变量插值、`validateServerConfig` 9 条件 type guard（4 ACCEPT / 17 REJECT）、`validateCommandSafe` 防 shell 注入（5 条） | K（纯函数 + process.env 快照） |
-| `mcp-service-crud.test.ts` | 9 | McpService 增删改 + 覆盖语义：user yaml 覆盖全局、addServer/updateServer/removeServer 原子写、拒绝重复 id / 危险 command、删除不存在 id 抛错 | A（electron + 真 fs） |
+| `mcp-service-crud.test.ts` | 21 | McpService 增删改 + 覆盖语义：user yaml 覆盖全局、addServer/updateServer/removeServer 原子写、拒绝重复 id / 危险 command、删除不存在 id 抛错 + R4-EDGE-MCP-ID 路径分隔符防御 | A（electron + 真 fs） |
 | `mcp-tools.test.ts` | 38 | `jsonSchemaToTypebox`（各种类型）、`sanitizeMcpArgs` 递归、`mcpToolToAgentTool` 命名/execute、去重 | B（三 service mock） |
 | `ollama-service.test.ts` | 28 | isServeRunning、listModels、pullModel NDJSON 流、deleteModel、detect 缓存、RECOMMENDED_MODELS schema | D（spawn mock）+ C（fetch spy） |
 | `pi-ai-helpers.test.ts` | 49 | `dedupeModels`、`costScore`（Infinity 降权）、`selectCheapestModel`、`mapEvent`（12 路 switch）、`extractPartialToolCall`、`isRetryableError`（大小写敏感） | K（纯函数，零 mock） |
@@ -119,15 +121,17 @@ console.error('SUPPRESS: 这条会真的打印', someDetail)
 | `utility-tools.test.ts` | 27 | getCurrentTime 时区、calculate（Math 白名单、全角符号、百分号、除零、安全） | K（纯函数） |
 | `__tests__/feishu-command-router.test.ts`（在 `src/main/services/` 下） | 27 | parseCommand、default router 分发（/help /echo /agents /score /dashboard）、自定义注册、错误截断 | K（纯函数 + 内联 vi.fn） |
 
-### 渲染层单测（`tests/renderer/`，11 个文件）
+### 渲染层单测（`tests/renderer/`，13 个文件）
 
 | 文件 | `it` 数 | 测什么 | Mock 模式 |
-|---|---:|---|---|
+||---|---:|---|---|
 | `lib/class-id.test.ts` | 20 | gradeToNumber（中/阿/混）、classNoFromName、computeAutoClassId | K（纯函数） |
 | `lib/cron-utils.test.ts` | 29 | validateCron（5 段、范围、step、拒绝 `@` 宏）、CRON_PRESETS | K |
 | `lib/dashboard-stats.test.ts` | 26 | computeScoreIntervals 分桶、computeReasonDistribution、computePeriodSummary（top-N）、computeClassComparison | K |
+| `lib/exam-comparison.test.ts` | 40 | 考试对比（ExamComparison）纯函数：scoreDelta、trendScore、风险归因 | K |
 | `lib/ipc-client.test.ts` | 8 | `getErrorMessage`（data → stderr → fallback） | K |
 | `lib/mcp-validate.test.ts` | 9 | 前端表单校验 `validateMcpConfig`：合法 stdio/sse 无错误、id/name 空、id 非法字符、stdio 缺 command、sse 缺 url、url 非法、command 含 shell 元字符 | K（纯函数） |
+| `lib/merge-settings.test.ts` | 10 | UI-1 修复新增：`mergeSettings(partial, defaults)` 递归合并 — 完整 settings 后端覆盖默认、稀疏 settings 缺 feishu/chat.compaction 不抛、空对象/null/undefined 边界、数组按值覆盖、显式 null 覆盖 | K |
 | `lib/student-filters.test.ts` | 25 | filterStudents（班级/搜索/存档）、sortStudentsByRisk、isAllSelected、countArchivedHidden、buildClassIdToNameMap | K |
 | `lib/tauri-bridge.test.ts` | 16 | `installTauriBridge` 命名空间映射 → `invoke('ipc_invoke', {channel, args})` | I（mock @tauri-apps/api） |
 | `lib/ui-utils.test.ts` | 30 | cn、riskColor/BgColor/DotColor、btnStyle、badgeStyle、INPUT_BASE | K |
@@ -147,16 +151,26 @@ console.error('SUPPRESS: 这条会真的打印', someDetail)
 | `e2e/stress-long.test.tsx` | 1 | **10 分钟**（12min 超时）持续随机操作；40% add / 30% event / 20% query / 10% delete | L |
 | `e2e/user-flow-simulation.test.tsx` | 18 | 14 场景（9 个 user action helper）、3 分钟压力、4 个用户报 Bug 验证 | L |
 
-### 渲染层 inline 测试（`src/renderer/**/__tests__/`，5 个文件）
+### 渲染层 inline 测试（`src/renderer/**/__tests__/`，4 个文件）
 
 | 文件 | `it` 数 | 测什么 |
-|---|---:|---|
+||---|---:||
 | `src/renderer/hooks/__tests__/hooks.test.tsx` | — | hooks 聚合测试 |
 | `src/renderer/hooks/__tests__/useDebounce.test.tsx` | — | `useDebounce` 防抖行为 |
 | `src/renderer/i18n/__tests__/i18n.test.ts` | 11 | t/setLang/useT、`i18n-changed` 事件 |
 | `src/renderer/stores/__tests__/agentStore.test.ts` | 7 | subscribeStatus、selectAgent、refreshDetail、runAgent |
 
-**合计 47 个测试文件、~858 个测试用例**（含 `it.each` 展开后的子用例）。跑 `npm test` 全绿（实测 2026-07-17，14 分钟）。本轮 Skills MCP Hub 新增/扩展 3 个测试文件共 23 个用例：`mcp-service-crud.test.ts`（9，CRUD + 覆盖语义，Pattern A）、`mcp-helpers.test.ts` 扩展（+5 `validateCommandSafe` 防注入）、`renderer/lib/mcp-validate.test.ts`（9，前端表单校验，Pattern K）。详见 [`docs/TEST_COVERAGE_REPORT.md`](./docs/TEST_COVERAGE_REPORT.md)。
+> 另有 1 个 main 端 inline 测试 `src/main/services/__tests__/feishu-command-router.test.ts`(27 用例),归在主进程表里。
+
+**合计 51 个测试文件、972 个测试用例**（含 `it.each` 展开后的子用例）。跑 `npm test` 全绿（实测 2026-07-18，14 分钟）。本轮（R1-R10）累计新增/扩展关键测试文件 6 个共 ~125 个用例：
+- `tests/main/atomic-write.test.ts`（4 用例，R4 并发安全）
+- `tests/main/mcp-agent-integration.test.ts`（18 用例，R8 Agent↔MCP 集成）
+- `tests/main/mcp-service-crud.test.ts`（9→21 用例，R4-EDGE-MCP-ID 路径分隔符防御）
+- `tests/renderer/lib/merge-settings.test.ts`（10 用例，UI-1 嵌套访问白屏修复）
+- `tests/renderer/lib/exam-comparison.test.ts`（40 用例，纯函数）
+- `tests/renderer/lib/mcp-validate.test.ts`（9 用例，前端表单校验）
+
+详见 [`docs/TEST_COVERAGE_REPORT.md`](./docs/TEST_COVERAGE_REPORT.md)。
 
 ---
 

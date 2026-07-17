@@ -14,6 +14,13 @@
 - 设计文档:`docs/superpowers/specs/2026-07-17-skills-mcp-hub-design.md`
 - 实施计划:`docs/superpowers/plans/2026-07-17-skills-mcp-hub.md`
 
+### 2026-07-17 补充:R8-1 AgentConfig.mcpServers 字段丢失修复(关键 bug)
+
+✅ **MCP 与 Agent 集成已生效**:`agents.yaml` 中 `mcp_servers` 字段现已正确加载并回填到 `AgentConfig.mcpServers`,之前 Agent 完全感知不到 MCP 工具的 CRITICAL bug 已修复(commit `352eb7a8`)。
+- 修复点:`agent-service.ts` 加载 `agents.yaml` 时新增 `mcpServers` 字段解析
+- 配套 R8-5 静默跳过:Agent 引用不存在的 MCP server 时 graceful 降级到空工具列表,不报错崩溃
+- 新增集成测试:`tests/main/mcp-agent-integration.test.ts`(18 用例,Scenario A.1-A.3 覆盖有/无/缺失 mcpServers 三种情况)
+
 ---
 
 ## 一、背景与目标
