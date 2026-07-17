@@ -77,6 +77,7 @@ class McpService {
   private clients: Map<string, MCPClient> = new Map()
   private config: McpServerConfig[] = []
   private configPath: string
+  private userConfigPath: string
   private initialized = false
 
   constructor() {

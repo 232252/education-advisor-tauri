@@ -146,8 +146,8 @@ export function ChatPage() {
         if (!action || !target) return
         // 健壮性: target 可能是 DOM 元素或普通对象(防御畸形事件导致整页崩溃)
         const sid =
-          typeof target.getAttribute === 'function'
-            ? target.getAttribute('data-ctx-session-id')
+          typeof (target as HTMLElement).getAttribute === 'function'
+            ? (target as HTMLElement).getAttribute('data-ctx-session-id')
             : target.dataset?.ctxSessionId
         if (!sid) return
         if (action === 'delete') setPendingDeleteSessionId(sid)
