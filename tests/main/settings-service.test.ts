@@ -210,4 +210,30 @@ describe('settingsService', () => {
     settingsService.update('shortcuts.chat.send', orig)
     expect(settingsService.getSettings().shortcuts['chat.send']).toBe(orig)
   })
+
+  describe('settings.update 原型污染防护 (FORBIDDEN_KEYS)', () => {
+    it('拒绝 __proto__ 路径', () => {
+      expect(() => settingsService.update('__proto__.polluted', true)).toThrow(/Forbidden key/)
+    })
+    it('拒绝 constructor.prototype 路径', () => {
+      expect(() => settingsService.update('constructor.prototype.polluted', true)).toThrow(
+        /Forbidden key/,
+      )
+    })
+    it('拒绝 prototype 路径', () => {
+      expect(() => settingsService.update('prototype.polluted', true)).toThrow(/Forbidden key/)
+    })
+    it('拒绝嵌套 __proto__ (general.__proto__)', () => {
+      expect(() => settingsService.update('general.__proto__.x', true)).toThrow(/Forbidden key/)
+    })
+    it('更新后全局对象未被污染', () => {
+      try {
+        settingsService.update('__proto__.polluted', true)
+      } catch {
+        /* expected throw */
+      }
+      expect(({} as any).polluted).toBeUndefined()
+      expect((globalThis as any).polluted).toBeUndefined()
+    })
+  })
 })
