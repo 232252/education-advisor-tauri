@@ -23,7 +23,7 @@ import {
 import type { ModelInfo, ProviderInfo, StreamEvent, TestConnectionResult } from '../../shared/types'
 import { logChat } from '../utils/logger'
 import { compactAgentMessages, compactChatMessagesSimple } from './compaction-helper'
-import { costScore, dedupeModels, extractPartialToolCall, isRetryableError, mapEvent, selectCheapestModel } from './pi-ai-helpers'
+import { dedupeModels, extractPartialToolCall, isRetryableError, mapEvent, selectCheapestModel } from './pi-ai-helpers'
 import { keystoreService } from './keystore-service'
 import { KEYLESS_PROVIDERS, OLLAMA_OPENAI_BASE_URL, ollamaService } from './ollama-service'
 import { settingsService } from './settings-service'

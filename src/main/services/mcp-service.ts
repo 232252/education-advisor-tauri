@@ -27,7 +27,7 @@ import fsp from 'node:fs/promises'
 import path from 'node:path'
 import yaml from 'yaml'
 import type { McpServerConfig, McpServerStatus, McpTool, McpTransport } from '../../shared/types'
-import { deepInterpolate, interpolateEnv, validateServerConfig } from './mcp-helpers'
+import { deepInterpolate, validateServerConfig } from './mcp-helpers'
 import { settingsService } from './settings-service'
 
 /** MCP 工具调用结果(兼容 MCP 协议) */
