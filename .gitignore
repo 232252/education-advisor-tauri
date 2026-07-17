@@ -106,6 +106,7 @@ scripts/link*.json
 .continue*
 .files/
 files/
+.zcode/
 
 # ===== OS / shell quirks =====
 nul
