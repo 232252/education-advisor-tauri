@@ -218,7 +218,7 @@ export function mcpToolToAgentTool(serverId: string, mcpTool: McpTool): AnyAgent
       const sanitizedArgs = sanitizeMcpArgs(toolName, rawArgs, mcpTool.inputSchema)
 
       // 2. 调用 MCP server(支持 AbortSignal)
-      let result
+      let result: import('./mcp-service').McpCallResult | undefined
       try {
         if (signal) {
           // 用 AbortSignal 包装调用,超时或取消时拒绝

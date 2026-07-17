@@ -28,9 +28,9 @@ import path from 'node:path'
 import { app } from 'electron'
 import yaml from 'yaml'
 import type { McpServerConfig, McpServerStatus, McpTool } from '../../shared/types'
+import { atomicWrite } from '../utils/atomic-write'
 import { deepInterpolate, validateCommandSafe, validateServerConfig } from './mcp-helpers'
 import { settingsService } from './settings-service'
-import { atomicWrite } from '../utils/atomic-write'
 
 /** MCP 工具调用结果(兼容 MCP 协议) */
 export interface McpCallResult {
@@ -77,7 +77,6 @@ class McpService {
   private clients: Map<string, MCPClient> = new Map()
   private config: McpServerConfig[] = []
   private configPath: string
-  private userConfigPath: string
   private initialized = false
 
   constructor() {
@@ -85,8 +84,6 @@ class McpService {
     const prodConfigDir = path.join(process.resourcesPath || '', 'config')
     const configDir = fs.existsSync(devConfigDir) ? devConfigDir : prodConfigDir
     this.configPath = path.join(configDir, 'mcp.yaml')
-    // 用户级配置(可写),仿 agents.user.yaml
-    this.userConfigPath = path.join(app.getPath('userData'), 'mcp.user.yaml')
   }
 
   /**
@@ -117,7 +114,6 @@ class McpService {
     const globalServers = await this.loadConfigFile(this.configPath, 'global')
     // 每次加载时按当前 userData 解析,避免单例构造期缓存过期路径
     const userPath = path.join(app.getPath('userData'), 'mcp.user.yaml')
-    this.userConfigPath = userPath
     const userServers = await this.loadConfigFile(userPath, 'user')
 
     // 合并:用户级整条覆盖同 id 的全局项
@@ -557,11 +553,12 @@ ${yaml.stringify({ servers })}
         if (!client.buffer) client.buffer = ''
         client.buffer += chunk.toString('utf-8')
         // 按行解析 JSON-RPC
-        let newlineIdx: number
-        while ((newlineIdx = client.buffer.indexOf('\n')) >= 0) {
+        let newlineIdx = client.buffer.indexOf('\n')
+        while (newlineIdx >= 0) {
           const line = client.buffer.slice(0, newlineIdx).trim()
           client.buffer = client.buffer.slice(newlineIdx + 1)
           if (line) this.handleJsonRpcMessage(client, line)
+          newlineIdx = client.buffer.indexOf('\n')
         }
       })
 
@@ -627,70 +624,72 @@ ${yaml.stringify({ servers })}
    * WebSocket 传输:使用 ws 库
    */
   private connectWebSocket(client: MCPClient, server: McpServerConfig): Promise<void> {
-    return new Promise(async (resolve, reject) => {
-      if (!server.url) {
-        reject(new Error(`websocket server ${server.id} missing url`))
-        return
-      }
-      try {
-        const { default: WebSocket } = await import('ws')
-        const ws = new WebSocket(server.url, { headers: server.headers })
-        client.ws = ws
+    return new Promise((resolve, reject) => {
+      void (async () => {
+        if (!server.url) {
+          reject(new Error(`websocket server ${server.id} missing url`))
+          return
+        }
+        try {
+          const { default: WebSocket } = await import('ws')
+          const ws = new WebSocket(server.url, { headers: server.headers })
+          client.ws = ws
 
-        const timeout = setTimeout(() => {
-          reject(new Error(`WebSocket connect timeout after ${CONNECT_TIMEOUT_MS}ms`))
-          ws.close()
-        }, CONNECT_TIMEOUT_MS)
+          const timeout = setTimeout(() => {
+            reject(new Error(`WebSocket connect timeout after ${CONNECT_TIMEOUT_MS}ms`))
+            ws.close()
+          }, CONNECT_TIMEOUT_MS)
 
-        ws.on('open', () => {
-          clearTimeout(timeout)
-          // 发送 initialize 请求
-          this.sendJsonRpc(client, 'initialize', {
-            protocolVersion: '2024-11-05',
-            capabilities: {},
-            clientInfo: { name: 'education-advisor', version: '1.0.0' },
-          })
-            .then(() => {
-              this.sendNotification(client, 'notifications/initialized', {})
-              resolve()
+          ws.on('open', () => {
+            clearTimeout(timeout)
+            // 发送 initialize 请求
+            this.sendJsonRpc(client, 'initialize', {
+              protocolVersion: '2024-11-05',
+              capabilities: {},
+              clientInfo: { name: 'education-advisor', version: '1.0.0' },
             })
-            .catch(reject)
-        })
+              .then(() => {
+                this.sendNotification(client, 'notifications/initialized', {})
+                resolve()
+              })
+              .catch(reject)
+          })
 
-        ws.on('message', (...args: unknown[]) => {
-          const raw = args[0] as Buffer
-          const text = raw.toString('utf-8').trim()
-          if (text) this.handleJsonRpcMessage(client, text)
-        })
+          ws.on('message', (...args: unknown[]) => {
+            const raw = args[0] as Buffer
+            const text = raw.toString('utf-8').trim()
+            if (text) this.handleJsonRpcMessage(client, text)
+          })
 
-        ws.on('error', (...args: unknown[]) => {
-          const err = args[0] as Error
-          clearTimeout(timeout)
-          client.lastError = `ws error: ${err.message}`
-          if (!client.connected) reject(err)
-          else {
+          ws.on('error', (...args: unknown[]) => {
+            const err = args[0] as Error
+            clearTimeout(timeout)
+            client.lastError = `ws error: ${err.message}`
+            if (!client.connected) reject(err)
+            else {
+              client.connected = false
+              // 拒绝所有待响应请求
+              for (const [, entry] of client.pending) {
+                clearTimeout(entry.timer)
+                entry.reject(new Error(`WebSocket error: ${err.message}`))
+              }
+              client.pending.clear()
+            }
+          })
+
+          ws.on('close', () => {
+            console.warn(`[McpService] websocket server ${server.id} closed`)
             client.connected = false
-            // 拒绝所有待响应请求
             for (const [, entry] of client.pending) {
               clearTimeout(entry.timer)
-              entry.reject(new Error(`WebSocket error: ${err.message}`))
+              entry.reject(new Error('WebSocket closed'))
             }
             client.pending.clear()
-          }
-        })
-
-        ws.on('close', () => {
-          console.warn(`[McpService] websocket server ${server.id} closed`)
-          client.connected = false
-          for (const [, entry] of client.pending) {
-            clearTimeout(entry.timer)
-            entry.reject(new Error('WebSocket closed'))
-          }
-          client.pending.clear()
-        })
-      } catch (err) {
-        reject(err)
-      }
+          })
+        } catch (err) {
+          reject(err)
+        }
+      })()
     })
   }
 
@@ -748,7 +747,8 @@ ${yaml.stringify({ servers })}
     const m = msg as { id?: number; result?: unknown; error?: { message: string }; method?: string }
     // 响应(有 id)
     if (m.id !== undefined && client.pending.has(m.id)) {
-      const entry = client.pending.get(m.id)!
+      const entry = client.pending.get(m.id)
+      if (!entry) return
       client.pending.delete(m.id)
       clearTimeout(entry.timer)
       if (m.error) {
@@ -824,7 +824,10 @@ ${yaml.stringify({ servers })}
     toolName: string,
     args: Record<string, unknown>,
   ): Promise<McpCallResult> {
-    const response = await fetch(client.config.url!, {
+    if (!client.config.url) {
+      throw new Error(`sse server ${client.serverId} missing url`)
+    }
+    const response = await fetch(client.config.url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

@@ -1,3 +1,10 @@
+/**
+ * 预设 MCP server 模板(种子数据,用户可任意修改)
+ *
+ * 注意:`${VAR}` 形式是后端 deepInterpolate 占位符(见 src/main/services/mcp-helpers.ts),
+ * 不是 JS 模板字符串,不需要反斜杠转义。biome 的 noTemplateCurlyInString 在此误报。
+ */
+/* biome-ignore-all lint/suspicious/noTemplateCurlyInString: 占位符由后端 deepInterpolate 处理 */
 import type { McpServerConfig } from '@shared/types'
 
 /** 预设 MCP server 模板(种子数据,用户可任意修改) */

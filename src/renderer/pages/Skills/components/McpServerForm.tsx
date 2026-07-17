@@ -186,6 +186,7 @@ export function McpServerForm({ initial, onSubmit, onCancel }: McpServerFormProp
                 <textarea
                   value={draft.env}
                   onChange={(e) => update({ env: e.target.value })}
+                  // biome-ignore lint/suspicious/noTemplateCurlyInString: 占位符由后端 deepInterpolate 处理
                   placeholder={'USER_DOCS=${env.USERPROFILE}/Documents'}
                   rows={2}
                   className="w-full px-2 py-1 border rounded font-mono text-sm dark:bg-gray-700 dark:border-gray-600"
