@@ -68,3 +68,25 @@ export function validateServerConfig(server: unknown): server is McpServerConfig
   if ((transport === 'sse' || transport === 'websocket') && typeof s.url !== 'string') return false
   return true
 }
+
+/** 危险 shell 元字符黑名单(用于校验 stdio server 的 command 字段,防注入) */
+const SHELL_METACHAR_RE = /[;&|`$<>]/
+
+/**
+ * 校验命令安全性(防 shell 注入)。
+ * 规则:
+ *   - 必须是非空字符串(trim 后非空)
+ *   - 长度 ≤ 512
+ *   - 不含危险元字符: ; & | ` $ < >
+ *   - 不含 $(...) 或 ${...} 命令替换
+ * 注意:Windows 路径分隔符 \ 和盘符 C: 允许。
+ */
+export function validateCommandSafe(command: unknown): boolean {
+  if (typeof command !== 'string') return false
+  const trimmed = command.trim()
+  if (trimmed.length === 0 || trimmed.length > 512) return false
+  if (SHELL_METACHAR_RE.test(trimmed)) return false
+  // 拒绝命令替换 $(...) 和 ${...}(但允许环境变量引用在 args/env 中,这里只管 command 本身)
+  if (/\$\(|\$\{/.test(trimmed)) return false
+  return true
+}
