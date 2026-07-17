@@ -81,7 +81,7 @@ for (const f of scriptFiles) {
 
 console.log('\n=== package.json metadata ===')
 const pj = require('../package.json')
-check('name = education-advisor', pj.name === 'education-advisor')
+check('name = education-advisor-tauri', pj.name === 'education-advisor-tauri')
 check('version present', !!pj.version)
 check('license = MIT', pj.license === 'MIT')
 check('private = false (publishable)', pj.private === false)
