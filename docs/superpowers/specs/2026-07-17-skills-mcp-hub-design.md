@@ -189,7 +189,7 @@ export interface McpServerStatus {
 }
 ```
 
-`McpServerConfig` 不变（已完整）。
+`McpServerConfig` 已含 `enabled: boolean` 必填字段，**不变**。但需要新增可选 `overrides?: 'global'` 字段用于覆盖语义（见 §2.2），加载时据此判断 remove 是「删除用户级」还是「恢复全局默认」。
 
 ## 4. MCP Tab 详细交互
 
@@ -291,18 +291,19 @@ export const MCP_PRESETS: McpPreset[] = [
 
 ### 6.2 测试（沿用项目纯函数优先惯例）
 
-**后端**（`tests/unit/main/services/mcp-service.test.ts` 扩展）：
+**后端**（`tests/main/mcp-service-crud.test.ts` 新建，仿 `tests/main/mcp-tools.test.ts` 的 `vi.mock` 风格）：
 
 - `addServer` 写入 `mcp.user.yaml` + 合并到 `this.config`
 - `addServer` 拒绝重复 id（全局已有 / 用户已有）
 - `updateServer` 改用户级条目
-- `updateServer` 拒绝改全局只读项（throw）
+- `updateServer` 改全局项时走「复制覆盖」分支
 - `removeServer` 删用户级 + 断开连接
-- `removeServer` 拒绝删全局项（throw）
+- `removeServer` 删覆盖产生的用户级时恢复全局默认
+- `removeServer` 拒绝删纯全局项（throw）
 - `loadConfig` 合并：用户级覆盖全局同 id
-- 新增 `validateCommandSafe`（shell 元字符白名单）纯函数单测
+- 新增 `validateCommandSafe`（shell 元字符白名单）纯函数单测，放 `tests/main/mcp-helpers.test.ts` 扩展
 
-**前端**（`tests/unit/renderer/pages/Skills/`）：
+**前端**（`tests/renderer/lib/mcp-validate.test.ts` 新建，仿 `tests/renderer/lib/ui-utils.test.ts` 风格）：
 
 - `mcp-validate.ts` 的 `validateMcpConfig(config): errors` 纯函数单测（必填校验、transport 对应字段校验、id 格式校验）
 - 组件本身不测（项目惯例）
@@ -358,8 +359,8 @@ export const MCP_PRESETS: McpPreset[] = [
 - `src/renderer/pages/Skills/components/PresetTemplates.tsx`
 - `src/renderer/pages/Skills/mcp-presets.ts`
 - `src/renderer/pages/Skills/mcp-validate.ts`
-- `tests/unit/main/services/mcp-service-crud.test.ts`（或扩展现有）
-- `tests/unit/renderer/pages/Skills/mcp-validate.test.ts`
+- `tests/main/mcp-service-crud.test.ts`
+- `tests/renderer/lib/mcp-validate.test.ts`
 
 **改动（9 个）**：
 - `src/main/services/mcp-service.ts`（+3 方法 + loadConfig 合并）
