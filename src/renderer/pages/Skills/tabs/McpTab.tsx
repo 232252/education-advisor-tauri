@@ -1,0 +1,309 @@
+// =============================================================
+// McpTab — MCP 服务器管理 Tab(左列表 + 右详情)
+// 左侧:服务器列表 + 添加/从模板添加按钮
+// 右侧:选中项的详情卡片(McpServerCard)或空状态
+// 弹窗:McpServerForm(新增/编辑)、PresetTemplates(模板)
+// 数据:getAPI().mcp.* (Task 5 接好的 IPC)
+// 策略:进入即加载 + 每 5s 粗轮询刷新连接状态;工具列表懒加载(选中且已连接时拉取)
+// =============================================================
+
+import type { McpServerConfig, McpServerStatus, McpTool } from '@shared/types'
+import { useCallback, useEffect, useState } from 'react'
+import { EmptyState } from '../../../components/EmptyState'
+import { useInterval } from '../../../hooks'
+import { useT } from '../../../i18n'
+import { getAPI } from '../../../lib/ipc-client'
+import { toast } from '../../../stores/toastStore'
+import { McpServerCard } from '../components/McpServerCard'
+import { McpServerForm } from '../components/McpServerForm'
+import { PresetTemplates } from '../components/PresetTemplates'
+
+export function McpTab() {
+  const { t } = useT()
+  const [servers, setServers] = useState<McpServerStatus[]>([])
+  const [loading, setLoading] = useState(true)
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [toolsCache, setToolsCache] = useState<Record<string, McpTool[]>>({})
+  const [toolsLoadingId, setToolsLoadingId] = useState<string | null>(null)
+  const [showForm, setShowForm] = useState(false)
+  const [editingServer, setEditingServer] = useState<McpServerConfig | null>(null)
+  const [showPresets, setShowPresets] = useState(false)
+  const [presetDraft, setPresetDraft] = useState<McpServerConfig | null>(null)
+
+  const loadServers = useCallback(async () => {
+    try {
+      const result = await getAPI().mcp.list()
+      if (result.success) {
+        setServers(result.servers)
+      } else if (result.error) {
+        toast.error(result.error)
+      }
+    } catch (err) {
+      console.error('[MCP] load failed:', err)
+      toast.error(t('toast.mcp.loadFailed'))
+    } finally {
+      setLoading(false)
+    }
+  }, [t])
+
+  useEffect(() => {
+    loadServers()
+  }, [loadServers])
+
+  // 每 5s 轮询刷新连接状态(粗轮询,工具列表懒加载)
+  useInterval(loadServers, 5000)
+
+  const selected = servers.find((s) => s.id === selectedId) ?? null
+
+  // 拉取某 server 的工具列表(选中且已连接时)
+  const loadTools = useCallback(async (serverId: string) => {
+    setToolsLoadingId(serverId)
+    try {
+      const result = await getAPI().mcp.listTools(serverId)
+      if (result.success) {
+        setToolsCache((prev) => ({ ...prev, [serverId]: result.tools }))
+      }
+    } catch (err) {
+      console.error('[MCP] listTools failed:', err)
+    } finally {
+      setToolsLoadingId(null)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (selected?.connected && selectedId && !toolsCache[selectedId]) {
+      loadTools(selectedId)
+    }
+  }, [selected, selectedId, toolsCache, loadTools])
+
+  const handleTest = async (id: string) => {
+    try {
+      const result = await getAPI().mcp.test(id)
+      if (result.success) {
+        toast.success(t('toast.mcp.testOk').replace('{count}', String(result.toolCount)))
+        await loadServers()
+        await loadTools(id)
+      } else {
+        toast.error(result.error || t('toast.mcp.testFail'))
+      }
+    } catch (err) {
+      toast.error((err as Error).message)
+    }
+  }
+
+  const handleConnect = async (id: string) => {
+    try {
+      const result = await getAPI().mcp.connect(id)
+      if (result.success) {
+        toast.success(t('toast.mcp.connectSuccess'))
+        await loadServers()
+        await loadTools(id)
+      } else {
+        toast.error(result.error || t('toast.mcp.connectFailed'))
+      }
+    } catch (err) {
+      toast.error((err as Error).message)
+    }
+  }
+
+  const handleDisconnect = async (id: string) => {
+    try {
+      await getAPI().mcp.disconnect(id)
+      setToolsCache((prev) => {
+        const next = { ...prev }
+        delete next[id]
+        return next
+      })
+      await loadServers()
+    } catch (err) {
+      toast.error((err as Error).message)
+    }
+  }
+
+  const handleToggleEnabled = async (id: string, enabled: boolean) => {
+    try {
+      const result = await getAPI().mcp.update(id, { enabled })
+      if (result.success) {
+        toast.success(t('toast.mcp.updated'))
+        await loadServers()
+      } else {
+        toast.error(result.error || t('toast.mcp.updated'))
+      }
+    } catch (err) {
+      toast.error((err as Error).message)
+    }
+  }
+
+  const handleDelete = async (id: string) => {
+    try {
+      const result = await getAPI().mcp.remove(id)
+      if (result.success) {
+        toast.success(t('toast.mcp.removed'))
+        if (selectedId === id) setSelectedId(null)
+        await loadServers()
+      } else {
+        toast.error(result.error || t('toast.mcp.removed'))
+      }
+    } catch (err) {
+      toast.error((err as Error).message)
+    }
+  }
+
+  const handleEdit = async (id: string) => {
+    // listServers 不返回完整 config(command/args/env 等)
+    // 用已知字段(id/name/enabled/transport)预填,未知字段留空让用户补
+    const s = servers.find((x) => x.id === id)
+    if (!s) return
+    setEditingServer({
+      id: s.id,
+      name: s.name,
+      enabled: s.enabled,
+      transport: s.transport,
+    })
+    setPresetDraft(null)
+    setShowForm(true)
+  }
+
+  const handleFormSubmit = async (config: McpServerConfig) => {
+    try {
+      const isEdit = editingServer !== null
+      const result = isEdit
+        ? await getAPI().mcp.update(editingServer!.id, config)
+        : await getAPI().mcp.add(config)
+      if (result.success) {
+        toast.success(isEdit ? t('toast.mcp.updated') : t('toast.mcp.added'))
+        setShowForm(false)
+        setEditingServer(null)
+        setPresetDraft(null)
+        await loadServers()
+      } else {
+        toast.error(result.error || 'Failed')
+      }
+    } catch (err) {
+      toast.error((err as Error).message)
+    }
+  }
+
+  if (loading) {
+    return <div className="p-4 text-gray-500">Loading...</div>
+  }
+
+  return (
+    <section className="h-full flex">
+      {/* 左侧服务器列表 */}
+      <div className="w-72 flex-shrink-0 border-r border-gray-200 dark:border-gray-700 flex flex-col bg-gray-50/30 dark:bg-gray-800/30">
+        <div className="p-3 border-b border-gray-200 dark:border-gray-700 space-y-2">
+          <button
+            type="button"
+            onClick={() => {
+              setEditingServer(null)
+              setPresetDraft(null)
+              setShowForm(true)
+            }}
+            className="w-full px-3 py-1.5 text-sm rounded bg-blue-500 text-white hover:bg-blue-600"
+          >
+            + {t('page.mcp.add')}
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowPresets(true)}
+            className="w-full px-3 py-1.5 text-sm rounded border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700"
+          >
+            ⚡ {t('page.mcp.addFromTemplate')}
+          </button>
+        </div>
+        <div className="flex-1 overflow-auto">
+          {servers.length === 0 ? (
+            <div className="p-4">
+              <EmptyState
+                icon="🔌"
+                title={t('page.mcp.empty.title')}
+                description={t('page.mcp.empty.hint')}
+              />
+            </div>
+          ) : (
+            <ul>
+              {servers.map((s) => (
+                <li key={s.id}>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedId(s.id)}
+                    className={`w-full text-left px-3 py-2 text-sm border-b border-gray-100 dark:border-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700/50 ${
+                      selectedId === s.id ? 'bg-blue-50 dark:bg-blue-900/20' : ''
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`inline-block w-1.5 h-1.5 rounded-full ${
+                          s.connected ? 'bg-green-500' : 'bg-gray-400'
+                        }`}
+                      />
+                      <span className="truncate font-medium text-gray-900 dark:text-gray-100">
+                        {s.name}
+                      </span>
+                    </div>
+                    <div className="ml-3.5 text-xs text-gray-500 dark:text-gray-400">
+                      {s.transport} ·{' '}
+                      {s.connected
+                        ? `${s.toolCount} ${t('page.mcp.tools')}`
+                        : t('page.mcp.status.disconnected')}
+                    </div>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+
+      {/* 右侧详情 */}
+      <div className="flex-1 overflow-auto p-4">
+        {selected ? (
+          <McpServerCard
+            server={selected}
+            tools={toolsCache[selected.id] ?? []}
+            toolsLoading={toolsLoadingId === selected.id}
+            onTest={() => handleTest(selected.id)}
+            onConnect={() => handleConnect(selected.id)}
+            onDisconnect={() => handleDisconnect(selected.id)}
+            onEdit={() => handleEdit(selected.id)}
+            onDelete={() => handleDelete(selected.id)}
+            onToggleEnabled={(enabled) => handleToggleEnabled(selected.id, enabled)}
+          />
+        ) : (
+          <EmptyState
+            icon="🔌"
+            title={t('page.mcp.empty.title')}
+            description={t('page.mcp.empty.hint')}
+          />
+        )}
+      </div>
+
+      {/* 新增/编辑表单弹窗 */}
+      {showForm && (
+        <McpServerForm
+          initial={editingServer ?? presetDraft}
+          onSubmit={handleFormSubmit}
+          onCancel={() => {
+            setShowForm(false)
+            setEditingServer(null)
+            setPresetDraft(null)
+          }}
+        />
+      )}
+
+      {/* 预设模板弹窗 */}
+      {showPresets && (
+        <PresetTemplates
+          onSelect={(config) => {
+            setShowPresets(false)
+            setEditingServer(null)
+            setPresetDraft(config)
+            setShowForm(true)
+          }}
+          onCancel={() => setShowPresets(false)}
+        />
+      )}
+    </section>
+  )
+}

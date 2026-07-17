@@ -21,13 +21,14 @@
 //   详见 mcp-tools.ts
 // =============================================================
 
+import { app } from 'electron'
 import { spawn, type ChildProcess } from 'node:child_process'
 import fs from 'node:fs'
 import fsp from 'node:fs/promises'
 import path from 'node:path'
 import yaml from 'yaml'
 import type { McpServerConfig, McpServerStatus, McpTool, McpTransport } from '../../shared/types'
-import { deepInterpolate, validateServerConfig } from './mcp-helpers'
+import { deepInterpolate, validateCommandSafe, validateServerConfig } from './mcp-helpers'
 import { settingsService } from './settings-service'
 
 /** MCP 工具调用结果(兼容 MCP 协议) */
@@ -72,6 +73,7 @@ class McpService {
   private clients: Map<string, MCPClient> = new Map()
   private config: McpServerConfig[] = []
   private configPath: string
+  private userConfigPath: string
   private initialized = false
 
   constructor() {
@@ -79,6 +81,8 @@ class McpService {
     const prodConfigDir = path.join(process.resourcesPath || '', 'config')
     const configDir = fs.existsSync(devConfigDir) ? devConfigDir : prodConfigDir
     this.configPath = path.join(configDir, 'mcp.yaml')
+    // 用户级配置(可写),仿 agents.user.yaml
+    this.userConfigPath = path.join(app.getPath('userData'), 'mcp.user.yaml')
   }
 
   /**
@@ -103,32 +107,45 @@ class McpService {
   }
 
   /**
-   * 加载 mcp.yaml 配置文件
+   * 加载配置:全局 mcp.yaml + 用户级 mcp.user.yaml(用户覆盖全局同 id)
    */
   private async loadConfig(): Promise<void> {
+    const globalServers = await this.loadConfigFile(this.configPath, 'global')
+    // 每次加载时按当前 userData 解析,避免单例构造期缓存过期路径
+    const userPath = path.join(app.getPath('userData'), 'mcp.user.yaml')
+    this.userConfigPath = userPath
+    const userServers = await this.loadConfigFile(userPath, 'user')
+
+    // 合并:用户级整条覆盖同 id 的全局项
+    const byId = new Map<string, McpServerConfig>()
+    for (const s of globalServers) byId.set(s.id, s)
+    for (const s of userServers) byId.set(s.id, s) // user 覆盖 global
+    this.config = Array.from(byId.values())
+    console.log(
+      `[McpService] Loaded ${globalServers.length} global + ${userServers.length} user servers → ${this.config.length} total`,
+    )
+  }
+
+  /**
+   * 读单个 yaml 文件并解析为带 source 标记的 server 列表
+   */
+  private async loadConfigFile(
+    filePath: string,
+    source: 'global' | 'user',
+  ): Promise<McpServerConfig[]> {
     try {
-      const content = await fsp.readFile(this.configPath, 'utf-8')
+      const content = await fsp.readFile(filePath, 'utf-8')
       const parsed = yaml.parse(content)
       const servers = parsed?.servers
-      if (!Array.isArray(servers)) {
-        console.warn('[McpService] mcp.yaml has no servers array, entering no-op mode')
-        this.config = []
-        return
-      }
-      // 过滤有效配置 + 环境变量插值
-      this.config = servers
+      if (!Array.isArray(servers)) return []
+      return servers
         .filter(validateServerConfig)
-        .map((s) => deepInterpolate(s))
+        .map((s) => deepInterpolate({ ...s, source }))
         .filter((s) => s.enabled)
-      console.log(`[McpService] Loaded ${this.config.length} enabled servers from ${this.configPath}`)
     } catch (err) {
-      if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
-        console.log('[McpService] mcp.yaml not found, entering no-op mode')
-        this.config = []
-        return
-      }
-      console.error('[McpService] Failed to load mcp.yaml:', err)
-      this.config = []
+      if ((err as NodeJS.ErrnoException).code === 'ENOENT') return []
+      console.warn(`[McpService] Failed to load ${filePath}:`, err)
+      return []
     }
   }
 
@@ -156,8 +173,162 @@ class McpService {
         toolCount: client?.tools.length ?? 0,
         lastError: client?.lastError,
         transport: c.transport,
+        source: c.source ?? 'global',
+        enabled: c.enabled,
       }
     })
+  }
+
+  /**
+   * 新增 server(写入 mcp.user.yaml)
+   * 校验:id 唯一、配置合法、command 安全
+   */
+  async addServer(config: McpServerConfig): Promise<void> {
+    if (!validateServerConfig(config)) {
+      throw new Error('Invalid server config')
+    }
+    if (this.config.some((s) => s.id === config.id)) {
+      throw new Error(`Server ${config.id} already exists`)
+    }
+    if (config.transport === 'stdio' && !validateCommandSafe(config.command)) {
+      throw new Error(`Server ${config.id} command failed safety check`)
+    }
+    // 读取现有 user 配置 + 追加
+    const userServers = await this.readUserConfig()
+    const newServer: McpServerConfig = { ...config, source: 'user' }
+    userServers.push(newServer)
+    await this.writeUserConfig(userServers)
+    // 更新内存
+    this.config.push(newServer)
+    console.log(`[McpService] Added server ${config.id}`)
+  }
+
+  /**
+   * 更新 server(用户级直接改;全局级复制覆盖到 user)
+   */
+  async updateServer(id: string, patch: Partial<McpServerConfig>): Promise<void> {
+    const existing = this.config.find((s) => s.id === id)
+    if (!existing) throw new Error(`Server ${id} not found`)
+
+    // 若 command 被改,校验安全性
+    if (patch.command !== undefined && !validateCommandSafe(patch.command)) {
+      throw new Error(`Server ${id} command failed safety check`)
+    }
+
+    // 若正在连接,先断开(新配置下次连接生效)
+    if (this.clients.has(id)) {
+      await this.disconnectServer(id)
+    }
+
+    const userServers = await this.readUserConfig()
+    const userIdx = userServers.findIndex((s) => s.id === id)
+
+    if (existing.source === 'user' || userIdx >= 0) {
+      // 已是用户级(或覆盖过),直接 patch user 配置中的对应条目
+      if (userIdx >= 0) {
+        userServers[userIdx] = { ...userServers[userIdx], ...patch, source: 'user' }
+      } else {
+        // 内存中是 user 但文件里没有(异常情况),追加
+        userServers.push({ ...existing, ...patch, source: 'user' })
+      }
+    } else {
+      // 全局项首次覆盖:复制到 user 级 + 应用 patch + 标记 overrides
+      userServers.push({ ...existing, ...patch, source: 'user', overrides: 'global' })
+    }
+    await this.writeUserConfig(userServers)
+
+    // 更新内存 config
+    const idx = this.config.findIndex((s) => s.id === id)
+    if (idx >= 0) {
+      this.config[idx] = { ...this.config[idx], ...patch, source: 'user' }
+    }
+    console.log(`[McpService] Updated server ${id}`)
+  }
+
+  /**
+   * 删除 server
+   * - 纯用户级:从 mcp.user.yaml 删除
+   * - 覆盖全局产生的用户级:删除覆盖,恢复全局默认(overrides='global')
+   * - 纯全局:拒绝
+   */
+  async removeServer(id: string): Promise<void> {
+    const existing = this.config.find((s) => s.id === id)
+    if (!existing) throw new Error(`Server ${id} not found`)
+
+    // 断开连接
+    if (this.clients.has(id)) {
+      await this.disconnectServer(id)
+    }
+
+    const userServers = await this.readUserConfig()
+    const userIdx = userServers.findIndex((s) => s.id === id)
+
+    if (userIdx < 0) {
+      // 不在 user yaml 里 = 纯全局项
+      throw new Error(`Server ${id} is global (read-only), cannot remove`)
+    }
+
+    const userEntry = userServers[userIdx]
+    userServers.splice(userIdx, 1)
+    await this.writeUserConfig(userServers)
+
+    // 更新内存
+    if (userEntry.overrides === 'global') {
+      // 恢复全局默认:重新加载该项
+      const globalServers = await this.loadConfigFile(this.configPath, 'global')
+      const globalEntry = globalServers.find((s) => s.id === id)
+      const idx = this.config.findIndex((s) => s.id === id)
+      if (globalEntry && idx >= 0) {
+        this.config[idx] = globalEntry
+      } else if (idx >= 0) {
+        this.config.splice(idx, 1)
+      }
+      console.log(`[McpService] Removed override for ${id}, restored global default`)
+    } else {
+      // 纯用户级,直接从内存删除
+      const idx = this.config.findIndex((s) => s.id === id)
+      if (idx >= 0) this.config.splice(idx, 1)
+      console.log(`[McpService] Removed server ${id}`)
+    }
+  }
+
+  /**
+   * 读取 mcp.user.yaml 的 server 列表(不过滤 enabled,保留全部以便编辑)
+   */
+  private async readUserConfig(): Promise<McpServerConfig[]> {
+    try {
+      const userPath = path.join(app.getPath('userData'), 'mcp.user.yaml')
+      const content = await fsp.readFile(userPath, 'utf-8')
+      const parsed = yaml.parse(content)
+      const servers = parsed?.servers
+      if (!Array.isArray(servers)) return []
+      return servers.filter(validateServerConfig)
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code === 'ENOENT') return []
+      console.warn('[McpService] Failed to read user config:', err)
+      return []
+    }
+  }
+
+  /**
+   * 写入 mcp.user.yaml(原子写:tmp + rename)
+   */
+  private async writeUserConfig(servers: McpServerConfig[]): Promise<void> {
+    // 大小上限 1MB
+    const payload = `\
+# Education Advisor MCP 用户配置
+# 此文件由 UI 自动生成,主配置文件 config/mcp.yaml 不会被修改
+# 仅记录用户添加或覆盖的 MCP server
+${yaml.stringify({ servers })}
+`
+    if (Buffer.byteLength(payload, 'utf-8') > 1024 * 1024) {
+      throw new Error('mcp.user.yaml exceeds 1MB limit')
+    }
+    const userPath = path.join(app.getPath('userData'), 'mcp.user.yaml')
+    const tmpPath = `${userPath}.tmp.${process.pid}.${Date.now()}`
+    await fsp.mkdir(path.dirname(userPath), { recursive: true })
+    await fsp.writeFile(tmpPath, payload, 'utf-8')
+    await fsp.rename(tmpPath, userPath)
   }
 
   /**

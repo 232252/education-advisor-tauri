@@ -117,6 +117,9 @@ const CH = {
   MCP_DISCONNECT: 'mcp:disconnect',
   MCP_LIST_TOOLS: 'mcp:list-tools',
   MCP_TEST: 'mcp:test',
+  MCP_ADD: 'mcp:add',
+  MCP_UPDATE: 'mcp:update',
+  MCP_REMOVE: 'mcp:remove',
   // System
   SYS_OPEN_DIALOG: 'sys:open-dialog',
   SYS_SAVE_DIALOG: 'sys:save-dialog',
@@ -372,6 +375,9 @@ function buildAPI() {
       disconnect: (serverId: string) => call(CH.MCP_DISCONNECT, serverId),
       listTools: (serverId: string) => call(CH.MCP_LIST_TOOLS, serverId),
       test: (serverId: string) => call(CH.MCP_TEST, serverId),
+      add: (config: unknown) => call(CH.MCP_ADD, config),
+      update: (serverId: string, patch: unknown) => call(CH.MCP_UPDATE, serverId, patch),
+      remove: (serverId: string) => call(CH.MCP_REMOVE, serverId),
     },
 
     // ---------- 系统 ----------

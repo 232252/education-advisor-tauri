@@ -6,6 +6,16 @@
 
 ---
 
+## 状态 (2026-07-17 更新)
+
+✅ **MCP 管理 UI 已落地**:技能页面新增「MCP 服务器」Tab,支持服务器 CRUD、连接测试、工具浏览、预设模板。
+- 配置存储:用户级 `mcp.user.yaml`(仿 `agents.user.yaml`),全局 `mcp.yaml` 保持只读
+- 覆盖语义:全局项永不写入,用户改动复制覆盖到用户级
+- 设计文档:`docs/superpowers/specs/2026-07-17-skills-mcp-hub-design.md`
+- 实施计划:`docs/superpowers/plans/2026-07-17-skills-mcp-hub.md`
+
+---
+
 ## 一、背景与目标
 
 ### 1.1 项目现状
