@@ -16,6 +16,7 @@
 
 import { type BrowserWindow, ipcMain } from 'electron'
 import * as IPC from '../../shared/ipc-channels'
+import type { McpServerConfig } from '../../shared/types'
 import { mcpService } from '../services/mcp-service'
 
 /** 校验 serverId 格式(防注入) */
@@ -94,6 +95,44 @@ export function registerMcpHandlers(_win: BrowserWindow) {
       const msg = err instanceof Error ? err.message : String(err)
       console.error(`[IPC] mcp:test(${serverId}) failed:`, msg)
       return { success: false, toolCount: 0, error: msg }
+    }
+  })
+
+  // 新增 server
+  ipcMain.handle(IPC.IPC_MCP_ADD, async (_e, config: unknown) => {
+    try {
+      await mcpService.addServer(config as McpServerConfig)
+      return { success: true }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      console.error('[IPC] mcp:add failed:', msg)
+      return { success: false, error: msg }
+    }
+  })
+
+  // 更新 server
+  ipcMain.handle(IPC.IPC_MCP_UPDATE, async (_e, id: unknown, patch: unknown) => {
+    try {
+      const safeId = validateServerId(id)
+      await mcpService.updateServer(safeId, (patch as Partial<McpServerConfig>) || {})
+      return { success: true }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      console.error(`[IPC] mcp:update(${id}) failed:`, msg)
+      return { success: false, error: msg }
+    }
+  })
+
+  // 删除 server
+  ipcMain.handle(IPC.IPC_MCP_REMOVE, async (_e, id: unknown) => {
+    try {
+      const safeId = validateServerId(id)
+      await mcpService.removeServer(safeId)
+      return { success: true }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      console.error(`[IPC] mcp:remove(${id}) failed:`, msg)
+      return { success: false, error: msg }
     }
   })
 

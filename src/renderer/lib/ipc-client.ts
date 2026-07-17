@@ -32,6 +32,9 @@ import type {
   ExamDef,
   FeishuBotStatusInfo,
   GradeRecord,
+  McpServerConfig,
+  McpServerStatus,
+  McpTool,
   ModelInfo,
   OllamaModelInfo,
   OllamaPullProgressInfo,
@@ -193,11 +196,17 @@ interface WindowAPI {
     reset: () => Promise<{ success: boolean }>
   }
   mcp: {
-    list: () => Promise<{ success: boolean; servers: unknown[]; error?: string }>
+    list: () => Promise<{ success: boolean; servers: McpServerStatus[]; error?: string }>
     connect: (serverId: string) => Promise<{ success: boolean; error?: string }>
     disconnect: (serverId: string) => Promise<{ success: boolean; error?: string }>
-    listTools: (serverId: string) => Promise<{ success: boolean; tools: unknown[]; error?: string }>
+    listTools: (serverId: string) => Promise<{ success: boolean; tools: McpTool[]; error?: string }>
     test: (serverId: string) => Promise<{ success: boolean; toolCount: number; error?: string }>
+    add: (config: McpServerConfig) => Promise<{ success: boolean; error?: string }>
+    update: (
+      serverId: string,
+      patch: Partial<McpServerConfig>,
+    ) => Promise<{ success: boolean; error?: string }>
+    remove: (serverId: string) => Promise<{ success: boolean; error?: string }>
   }
   profile: {
     get: (name: string) => Promise<{ success: boolean; data: StudentProfileData }>
