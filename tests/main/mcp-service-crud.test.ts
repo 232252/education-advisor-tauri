@@ -67,3 +67,115 @@ describe('McpService loadConfig 合并', () => {
     expect(testFs?.name).toBe('测试文件系统')
   })
 })
+
+describe('McpService addServer', () => {
+  it('写入 user yaml 并出现在 listServers', async () => {
+    await mcpService.init()
+    await mcpService.addServer({
+      id: 'add-test',
+      name: '新增测试',
+      enabled: true,
+      transport: 'stdio',
+      command: 'npx',
+      args: ['-y', 'some-server'],
+    })
+    const servers = mcpService.listServers()
+    const found = servers.find((s) => s.id === 'add-test')
+    expect(found).toBeDefined()
+    expect(found?.source).toBe('user')
+
+    // 文件确实被写入
+    const userYaml = path.join(tmpDir, 'mcp.user.yaml')
+    expect(fs.existsSync(userYaml)).toBe(true)
+    const content = fs.readFileSync(userYaml, 'utf-8')
+    expect(content).toContain('add-test')
+  })
+
+  it('拒绝重复 id(用户级已存在)', async () => {
+    await mcpService.init()
+    await mcpService.addServer({
+      id: 'dup',
+      name: '第一个',
+      enabled: true,
+      transport: 'stdio',
+      command: 'npx',
+    })
+    await expect(
+      mcpService.addServer({
+        id: 'dup',
+        name: '第二个',
+        enabled: true,
+        transport: 'stdio',
+        command: 'node',
+      }),
+    ).rejects.toThrow(/already exists/)
+  })
+
+  it('拒绝危险 command', async () => {
+    await mcpService.init()
+    await expect(
+      mcpService.addServer({
+        id: 'evil',
+        name: '恶意',
+        enabled: true,
+        transport: 'stdio',
+        command: 'npx && rm -rf /',
+      }),
+    ).rejects.toThrow(/command/)
+  })
+})
+
+describe('McpService updateServer', () => {
+  it('更新用户级 server 的字段', async () => {
+    await mcpService.init()
+    await mcpService.addServer({
+      id: 'upd',
+      name: '原名',
+      enabled: true,
+      transport: 'stdio',
+      command: 'npx',
+    })
+    await mcpService.updateServer('upd', { name: '新名' })
+    const servers = mcpService.listServers()
+    expect(servers.find((s) => s.id === 'upd')?.name).toBe('新名')
+  })
+
+  it('更新 server 的 enabled 开关', async () => {
+    await mcpService.init()
+    await mcpService.addServer({
+      id: 'toggle',
+      name: '开关测试',
+      enabled: true,
+      transport: 'stdio',
+      command: 'npx',
+    })
+    await mcpService.updateServer('toggle', { enabled: false })
+    // update 直接改内存 config,不重新 load(否则 disabled 的会被过滤)
+    // listServers 读的是内存 config,所以仍能看到该项
+    const servers = mcpService.listServers()
+    const found = servers.find((s) => s.id === 'toggle')
+    expect(found).toBeDefined()
+    expect(found?.enabled).toBe(false)
+  })
+})
+
+describe('McpService removeServer', () => {
+  it('删除用户级 server', async () => {
+    await mcpService.init()
+    await mcpService.addServer({
+      id: 'rm-me',
+      name: '待删',
+      enabled: true,
+      transport: 'stdio',
+      command: 'npx',
+    })
+    expect(mcpService.listServers().some((s) => s.id === 'rm-me')).toBe(true)
+    await mcpService.removeServer('rm-me')
+    expect(mcpService.listServers().some((s) => s.id === 'rm-me')).toBe(false)
+  })
+
+  it('删除不存在的 id 抛错', async () => {
+    await mcpService.init()
+    await expect(mcpService.removeServer('nonexistent-id')).rejects.toThrow(/not found/)
+  })
+})
