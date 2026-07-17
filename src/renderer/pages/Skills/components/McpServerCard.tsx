@@ -58,9 +58,7 @@ export function McpServerCard({
           <span className={cn('inline-block w-2 h-2 rounded-full', statusColor)} />
           <h3 className="font-medium text-gray-900 dark:text-gray-100">{server.name}</h3>
           <span className="text-xs px-2 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400">
-            {server.source === 'global'
-              ? t('page.mcp.source.global')
-              : t('page.mcp.source.user')}
+            {server.source === 'global' ? t('page.mcp.source.global') : t('page.mcp.source.user')}
           </span>
         </div>
         <label className="flex items-center gap-1 text-xs text-gray-600 dark:text-gray-400 cursor-pointer">

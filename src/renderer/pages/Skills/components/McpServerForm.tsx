@@ -35,7 +35,7 @@ function toDraft(initial: Partial<McpServerConfig> | null): DraftState {
     enabled: initial?.enabled ?? true,
     transport: (initial?.transport as McpTransport) ?? 'stdio',
     command: initial?.command ?? '',
-    args: Array.isArray(initial?.args) ? initial!.args!.join('\n') : '',
+    args: Array.isArray(initial?.args) ? initial?.args?.join('\n') : '',
     env: initial?.env ? stringifyKv(initial.env, '=') : '',
     url: initial?.url ?? '',
     headers: initial?.headers ? stringifyKv(initial.headers, ': ') : '',
@@ -273,7 +273,7 @@ function FormField({
 
 /** 把多行字符串解析为 args 数组(每行一个 arg,或空格分隔) */
 function parseArgs(input?: string): string[] {
-  if (!input || !input.trim()) return []
+  if (!input?.trim()) return []
   return input
     .split(/\n/)
     .map((l) => l.trim())
@@ -283,7 +283,7 @@ function parseArgs(input?: string): string[] {
 
 /** 把 KEY=VALUE 或 KEY: VALUE 多行解析为对象 */
 function parseKv(input?: string): Record<string, string> | undefined {
-  if (!input || !input.trim()) return undefined
+  if (!input?.trim()) return undefined
   const result: Record<string, string> = {}
   for (const line of input.split(/\n/)) {
     const trimmed = line.trim()
