@@ -3,7 +3,7 @@
 // 右侧使用 StudentProfile 多选项卡组件
 // =============================================================
 
-import type { ClassEntity, EAARiskLevel, EAAStudent } from '@shared/types'
+import type { ClassEntity, EAAStudent } from '@shared/types'
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
@@ -14,6 +14,7 @@ import { useT } from '../../i18n'
 import { getAPI, getErrorMessage } from '../../lib/ipc-client'
 import { riskColor } from '../../lib/ui-utils'
 import { toast } from '../../stores/toastStore'
+import { countArchivedHidden, filterStudents, isAllSelected, sortStudentsByRisk } from './student-filters'
 import { StudentProfile } from './StudentProfile'
 
 // Electron 文件对话框返回类型
@@ -26,7 +27,7 @@ interface SaveDialogResult {
   filePath: string
 }
 
-const RISK_ORDER: Record<EAARiskLevel, number> = { 极高: 0, 高: 1, 中: 2, 低: 3 }
+// RISK_ORDER 已移至 student-filters.ts（纯函数模块，可独立测试）
 
 // P 优化: 将表格行抽成 memo 组件,避免点击切换选中时整表重渲染
 interface StudentRowProps {
@@ -533,42 +534,24 @@ export function StudentsPage() {
   // 活跃班级列表（用于筛选下拉 + 批量调班目标下拉）
   const activeClassList = useMemo(() => classList.filter((c) => !c.archived), [classList])
 
-  // 过滤：班级筛选 + 搜索 + 按已存档班级隐藏
+  // 过滤：班级筛选 + 搜索 + 按已存档班级隐藏（逻辑提取到 student-filters.ts）
   const filtered = useMemo(
-    () =>
-      students.filter((s) => {
-        // 班级筛选
-        if (classFilter === '__NONE__') {
-          if (s.class_id) return false
-        } else if (classFilter !== '__ALL__') {
-          if (s.class_id !== classFilter) return false
-        }
-        // 默认隐藏已存档班级的学生（除非用户开启"显示已存档班级学生"）
-        if (!showArchivedClass && s.class_id && archivedClassIds.has(s.class_id)) return false
-        return (
-          s.name.includes(search) ||
-          s.groups.some((g) => g.includes(search)) ||
-          s.roles.some((r) => r.includes(search))
-        )
-      }),
+    () => filterStudents(students, classFilter, search, archivedClassIds, showArchivedClass),
     [students, classFilter, showArchivedClass, archivedClassIds, search],
   )
 
   // 被隐藏的已存档班级学生数（用于提示）
   const archivedHiddenCount = useMemo(
-    () => students.filter((s) => s.class_id && archivedClassIds.has(s.class_id)).length,
+    () => countArchivedHidden(students, archivedClassIds),
     [students, archivedClassIds],
   )
 
   // 排序: 高风险优先
-  const sorted = useMemo(
-    () => [...filtered].sort((a, b) => RISK_ORDER[a.risk] - RISK_ORDER[b.risk]),
-    [filtered],
-  )
+  const sorted = useMemo(() => sortStudentsByRisk(filtered), [filtered])
 
   // 当前可见列表是否全选
   const allVisibleSelected = useMemo(
-    () => sorted.length > 0 && sorted.every((s) => selectedNames.has(s.name)),
+    () => isAllSelected(sorted, selectedNames),
     [sorted, selectedNames],
   )
 

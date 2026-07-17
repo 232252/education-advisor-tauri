@@ -13,6 +13,7 @@ import { useAutoDismiss } from '../../hooks/useAutoDismiss'
 import { useT } from '../../i18n'
 import { getAPI } from '../../lib/ipc-client'
 import { toast } from '../../stores/toastStore'
+import { computeAutoClassId } from './class-id'
 import { ClassProfile } from './ClassProfile'
 
 /** 学生数统计：class_id → 人数 */
@@ -132,22 +133,7 @@ export function ClassesPage() {
     [classes],
   )
 
-  // 班级编号自动生成：根据年级 + 班号拼出 G7-3 这种格式。
-  // 年级映射规则：一/二/.../九 年级 → 1~9；若年级文本里含阿拉伯数字则直接用。
-  const gradeToNumber = (grade: string): string | null => {
-    if (!grade) return null
-    const cnMap = ['一', '二', '三', '四', '五', '六', '七', '八', '九']
-    for (let i = 0; i < cnMap.length; i++) {
-      if (grade.includes(cnMap[i])) return String(i + 1)
-    }
-    const m = grade.match(/\d+/)
-    return m ? m[0] : null
-  }
-  // 从班级名称里提取班号（如 "3班" → "3"）
-  const classNoFromName = (name: string): string | null => {
-    const m = name.match(/\d+/)
-    return m ? m[0] : null
-  }
+  // 班级编号自动生成逻辑已提取到 class-id.ts（gradeToNumber/classNoFromName/computeAutoClassId）
 
   const openCreate = () => {
     setEditingId(null)
@@ -193,9 +179,8 @@ export function ClassesPage() {
 
   // 自动重算班级编号：年级数字-班号，如 七年级 + 3班 → G7-3
   const recomputeAutoClassId = (grade: string, name: string) => {
-    const g = gradeToNumber(grade)
-    const n = classNoFromName(name)
-    if (g && n) setForm((f) => ({ ...f, class_id: `G${g}-${n}` }))
+    const autoId = computeAutoClassId(grade, name)
+    if (autoId) setForm((f) => ({ ...f, class_id: autoId }))
   }
   const onNameChange = (v: string) => {
     setForm((f) => ({ ...f, name: v }))

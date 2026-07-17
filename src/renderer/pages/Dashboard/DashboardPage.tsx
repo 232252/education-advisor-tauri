@@ -33,6 +33,7 @@ import { useT } from '../../i18n'
 import { getAPI } from '../../lib/ipc-client'
 import { cn } from '../../lib/ui-utils'
 import { toast } from '../../stores/toastStore'
+import { computeClassComparison, computePeriodSummary, computeReasonDistribution, computeScoreIntervals } from './dashboard-stats'
 
 // MEDIUM 修复: 类型守卫,区分 EAATagListData 和 EAATagDetailData,避免不安全的 as 断言
 function isTagListData(d: EAATagListData | EAATagDetailData): d is EAATagListData {
@@ -320,22 +321,11 @@ export function DashboardPage() {
     return allStudents.filter((s) => s.class_id === classFilter)
   }, [allStudents, classFilter])
 
-  // 按班级过滤后的分数分布 (区间定义与 stats.score_intervals 保持一致)
-  const classScoreIntervals = useMemo(() => {
-    const buckets: Record<string, number> = {
-      '极高(<60)': 0,
-      '高(60-80)': 0,
-      '中(80-100)': 0,
-      '低(>=100)': 0,
-    }
-    for (const s of filteredStudents) {
-      if (s.score < 60) buckets['极高(<60)']++
-      else if (s.score < 80) buckets['高(60-80)']++
-      else if (s.score < 100) buckets['中(80-100)']++
-      else buckets['低(>=100)']++
-    }
-    return buckets
-  }, [filteredStudents])
+  // 按班级过滤后的分数分布（逻辑提取到 dashboard-stats.ts）
+  const classScoreIntervals = useMemo(
+    () => computeScoreIntervals(filteredStudents),
+    [filteredStudents],
+  )
 
   // 按班级过滤后的事件集合 (基于 entityIdToClassId 映射)
   const filteredEvents = useMemo(() => {
@@ -354,81 +344,31 @@ export function DashboardPage() {
     return m
   }, [allStudents])
 
-  // 按班级过滤后的事件原因分布
-  const classReasonDist = useMemo(() => {
-    const counts: Record<string, number> = {}
-    for (const e of filteredEvents) {
-      const code = e.reason_code || 'UNKNOWN'
-      counts[code] = (counts[code] ?? 0) + 1
-    }
-    return Object.entries(counts)
-      .map(([code, count]) => ({ code, count }))
-      .sort((a, b) => b.count - a.count)
-  }, [filteredEvents])
+  // 按班级过滤后的事件原因分布（逻辑提取到 dashboard-stats.ts）
+  const classReasonDist = useMemo(
+    () => computeReasonDistribution(filteredEvents),
+    [filteredEvents],
+  )
 
-  // 按班级过滤后的周期摘要 (事件计数 + top_gainers/losers)
-  const classPeriodSummary = useMemo(() => {
-    let bonusCount = 0
-    let deductCount = 0
-    let bonusTotal = 0
-    let deductTotal = 0
-    const deltaByEntity: Record<string, number> = {}
-    for (const e of filteredEvents) {
-      const d = e.score_delta
-      if (d > 0) {
-        bonusCount++
-        bonusTotal += d
-      } else if (d < 0) {
-        deductCount++
-        deductTotal += d
-      }
-      deltaByEntity[e.entity_id] = (deltaByEntity[e.entity_id] ?? 0) + d
-    }
-    const gainers = Object.entries(deltaByEntity)
-      .filter(([, d]) => d > 0)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 3)
-      .map(([eid, d]) => ({ name: entityIdToName[eid] ?? eid, delta: d }))
-    const losers = Object.entries(deltaByEntity)
-      .filter(([, d]) => d < 0)
-      .sort((a, b) => a[1] - b[1])
-      .slice(0, 3)
-      .map(([eid, d]) => ({ name: entityIdToName[eid] ?? eid, delta: d }))
-    return {
-      events: {
-        total: filteredEvents.length,
-        bonus_count: bonusCount,
-        deduct_count: deductCount,
-        bonus_total: bonusTotal,
-        deduct_total: deductTotal,
-      },
-      top_gainers: gainers,
-      top_losers: losers,
-    }
-  }, [filteredEvents, entityIdToName])
+  // 按班级过滤后的周期摘要 (事件计数 + top_gainers/losers，逻辑提取到 dashboard-stats.ts)
+  const classPeriodSummary = useMemo(
+    () => computePeriodSummary(filteredEvents, entityIdToName),
+    [filteredEvents, entityIdToName],
+  )
 
-  // 班级对比数据: 每个班级的学生数/平均分/高风险数
-  const classComparison = useMemo(() => {
-    return activeClassList.map((c) => {
-      const students = allStudents.filter((s) => s.class_id === c.class_id)
-      const riskCount = { 极高: 0, 高: 0, 中: 0, 低: 0 }
-      let totalScore = 0
-      for (const s of students) {
-        riskCount[s.risk] = (riskCount[s.risk] ?? 0) + 1
-        totalScore += s.score
-      }
-      return {
-        classId: c.class_id,
-        className: c.name,
-        grade: c.grade ?? '-',
-        teacher: c.teacher ?? '-',
-        studentCount: students.length,
-        avgScore: students.length > 0 ? totalScore / students.length : 0,
-        highRisk: riskCount.极高 + riskCount.高,
-        riskDistribution: riskCount,
-      }
-    })
-  }, [activeClassList, allStudents])
+  // 班级对比数据: 每个班级的学生数/平均分/高风险数（逻辑提取到 dashboard-stats.ts）
+  const classComparison = useMemo(
+    () =>
+      computeClassComparison(activeClassList, allStudents).map((c) => {
+        const cls = activeClassList.find((x) => x.class_id === c.classId)
+        return {
+          ...c,
+          grade: cls?.grade ?? '-',
+          teacher: cls?.teacher ?? '-',
+        }
+      }),
+    [activeClassList, allStudents],
+  )
 
   // 双班级对比数据
   const compareDataA = useMemo(() => {
