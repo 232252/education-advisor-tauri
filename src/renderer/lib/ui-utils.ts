@@ -66,6 +66,30 @@ export function agentStatusColor(status: string): string {
   }
 }
 
+/**
+ * 分数/总分变化颜色(正=进步绿,负=退步红,零=持平灰)。
+ * 用于考试对比中的 scoreDelta、totalScoreDelta、conductDelta。
+ * null(数据缺失)返回浅灰。
+ */
+export function deltaColor(delta: number | null): string {
+  if (delta === null || delta === undefined) return 'text-gray-400'
+  if (delta > 0) return 'text-green-600 dark:text-green-400'
+  if (delta < 0) return 'text-red-600 dark:text-red-400'
+  return 'text-gray-500 dark:text-gray-400'
+}
+
+/**
+ * 名次变化颜色。名次语义与分数相反:数值变小=上升=进步。
+ * 因此 delta < 0(名次数字下降)显示绿色,delta > 0 显示红色。
+ * null(未录入)返回浅灰。
+ */
+export function rankDeltaColor(delta: number | null): string {
+  if (delta === null || delta === undefined) return 'text-gray-400'
+  if (delta < 0) return 'text-green-600 dark:text-green-400' // 名次数字变小 = 上升
+  if (delta > 0) return 'text-red-600 dark:text-red-400' // 名次数字变大 = 下降
+  return 'text-gray-500 dark:text-gray-400'
+}
+
 /** 条件 class 合并（轻量版 clsx） */
 export function cn(...classes: (string | false | null | undefined)[]): string {
   return classes.filter(Boolean).join(' ')

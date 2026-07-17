@@ -6,6 +6,7 @@
 import type {
   AcademicConfig,
   ClassEntity,
+  EAAEventRecord,
   EAAStudent,
   ExamDef,
   ExamType,
@@ -27,14 +28,20 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Badge } from '../../components/Badge'
 import { Card } from '../../components/Card'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
+import { DeltaBadge } from '../../components/DeltaBadge'
 import { EmptyState } from '../../components/EmptyState'
 import { CardSkeleton, PageSkeleton } from '../../components/Skeleton'
 import { useTheme } from '../../hooks/useTheme'
 import { useT } from '../../i18n'
 import { getAPI, getErrorMessage } from '../../lib/ipc-client'
-import { cn } from '../../lib/ui-utils'
-import { toast } from '../../stores/toastStore'
+import { cn, deltaColor } from '../../lib/ui-utils'
 import { useChatStore } from '../../stores/chatStore'
+import { toast } from '../../stores/toastStore'
+import {
+  aggregateConductDelta,
+  compareClassGrades,
+  summarizeClassComparison,
+} from './exam-comparison'
 
 echarts.use([
   LineChart,
@@ -151,12 +158,13 @@ function getCurrentSemester(): string {
 // 主组件
 // =============================================================
 
-type AcademicsTab = 'overview' | 'exams' | 'entry'
+type AcademicsTab = 'overview' | 'exams' | 'entry' | 'compare'
 
 const TAB_LIST: Array<{ id: AcademicsTab; label: string; icon: string }> = [
   { id: 'overview', label: '成绩总览', icon: '📊' },
   { id: 'exams', label: '考试管理', icon: '📝' },
   { id: 'entry', label: '成绩录入', icon: '✏️' },
+  { id: 'compare', label: '成绩对比', icon: '📈' },
 ]
 
 export function AcademicsPage() {
@@ -182,13 +190,13 @@ export function AcademicsPage() {
 
   /** 当前使用的科目列表 (config 优先, 否则用默认) */
   const subjects = useMemo<SubjectDef[]>(
-    () => config?.subjects?.length ? config.subjects : DEFAULT_SUBJECTS,
+    () => (config?.subjects?.length ? config.subjects : DEFAULT_SUBJECTS),
     [config],
   )
 
   /** 当前使用的考试类型列表 */
   const examTypes = useMemo(
-    () => config?.defaultExamTypes?.length ? config.defaultExamTypes : DEFAULT_EXAM_TYPES,
+    () => (config?.defaultExamTypes?.length ? config.defaultExamTypes : DEFAULT_EXAM_TYPES),
     [config],
   )
 
@@ -295,29 +303,26 @@ export function AcademicsPage() {
     }
   }, [t])
 
-  const loadGrades = useCallback(
-    async (studentName: string) => {
-      if (!studentName) {
+  const loadGrades = useCallback(async (studentName: string) => {
+    if (!studentName) {
+      setGrades([])
+      return
+    }
+    setGradesLoading(true)
+    try {
+      const res = await getAPI().academic.getGrades(studentName)
+      if (res.success && res.data) {
+        setGrades(res.data)
+      } else {
         setGrades([])
-        return
       }
-      setGradesLoading(true)
-      try {
-        const res = await getAPI().academic.getGrades(studentName)
-        if (res.success && res.data) {
-          setGrades(res.data)
-        } else {
-          setGrades([])
-        }
-      } catch (err) {
-        console.warn('[Academics] Failed to load grades:', err)
-        setGrades([])
-      } finally {
-        setGradesLoading(false)
-      }
-    },
-    [],
-  )
+    } catch (err) {
+      console.warn('[Academics] Failed to load grades:', err)
+      setGrades([])
+    } finally {
+      setGradesLoading(false)
+    }
+  }, [])
 
   useEffect(() => {
     loadInitialData()
@@ -456,9 +461,7 @@ export function AcademicsPage() {
                 {t('page.academics.title', '学业管理')}
               </h1>
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                {selectedStudentObj
-                  ? `当前学生: ${selectedStudentObj.name}`
-                  : '请从左侧选择学生'}
+                {selectedStudentObj ? `当前学生: ${selectedStudentObj.name}` : '请从左侧选择学生'}
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -532,6 +535,14 @@ export function AcademicsPage() {
               exams={exams}
               onRefresh={handleRefreshExams}
             />
+          ) : activeTab === 'compare' ? (
+            <CompareTab
+              students={students}
+              classList={classList}
+              subjects={subjects}
+              exams={exams}
+              themeProps={themeProps}
+            />
           ) : (
             <GradeEntryTab
               studentName={selectedStudent ?? ''}
@@ -547,6 +558,349 @@ export function AcademicsPage() {
           )}
         </div>
       </main>
+    </div>
+  )
+}
+
+// =============================================================
+// 成绩对比 Tab — 选两场考试,对比全班学生的分数/名次/操行分变化
+// =============================================================
+
+interface CompareTabProps {
+  students: EAAStudent[]
+  classList: ClassEntity[]
+  subjects: SubjectDef[]
+  exams: ExamDef[]
+  themeProps: ThemeProps
+}
+
+function CompareTab({
+  students,
+  classList,
+  subjects,
+  exams,
+  themeProps,
+}: CompareTabProps) {
+  const { axisColor, gridColor } = themeProps
+  const [classFilter, setClassFilter] = useState<string>('__ALL__')
+  const [examAId, setExamAId] = useState<string>('')
+  const [examBId, setExamBId] = useState<string>('')
+  const [loading, setLoading] = useState(false)
+  const [classGradesA, setClassGradesA] = useState<Record<string, GradeRecord[]> | null>(null)
+  const [classGradesB, setClassGradesB] = useState<Record<string, GradeRecord[]> | null>(null)
+  const [conductEvents, setConductEvents] = useState<EAAEventRecord[] | null>(null)
+
+  // subjectId → 中文名(纯函数模块要求 Record<string,string>)
+  const subjectNameMap = useMemo(() => {
+    const m: Record<string, string> = {}
+    for (const s of subjects) m[s.id] = s.name
+    return m
+  }, [subjects])
+
+  // 当前班级的学生名(按 classFilter 过滤,status 非 Deleted)
+  const targetStudentNames = useMemo(() => {
+    let list = students.filter((s) => s.status !== 'Deleted')
+    if (classFilter === '__NONE__') {
+      list = list.filter((s) => !s.class_id)
+    } else if (classFilter !== '__ALL__') {
+      list = list.filter((s) => s.class_id === classFilter)
+    }
+    return list.map((s) => s.name)
+  }, [students, classFilter])
+
+  // 按日期升序的考试列表
+  const sortedExams = useMemo(
+    () => [...exams].sort((a, b) => (a.date ?? '').localeCompare(b.date ?? '')),
+    [exams],
+  )
+
+  // 默认选最近两场
+  useEffect(() => {
+    if (sortedExams.length >= 2 && !examAId && !examBId) {
+      setExamAId(sortedExams[sortedExams.length - 2].id)
+      setExamBId(sortedExams[sortedExams.length - 1].id)
+    }
+  }, [sortedExams, examAId, examBId])
+
+  // 加载对比数据
+  const loadComparison = useCallback(async () => {
+    if (!examAId || !examBId || examAId === examBId || targetStudentNames.length === 0) {
+      setClassGradesA(null)
+      setClassGradesB(null)
+      setConductEvents(null)
+      return
+    }
+    setLoading(true)
+    try {
+      const examA = exams.find((e) => e.id === examAId)
+      const examB = exams.find((e) => e.id === examBId)
+      const [resA, resB] = await Promise.allSettled([
+        getAPI().academic.getClassGrades(targetStudentNames, examAId),
+        getAPI().academic.getClassGrades(targetStudentNames, examBId),
+      ])
+      if (resA.status === 'fulfilled' && resA.value.success && resA.value.data) {
+        setClassGradesA(resA.value.data)
+      }
+      if (resB.status === 'fulfilled' && resB.value.success && resB.value.data) {
+        setClassGradesB(resB.value.data)
+      }
+      // 加载两次考试日期之间的操行分事件
+      if (examA?.date && examB?.date) {
+        const start = examA.date <= examB.date ? examA.date : examB.date
+        const end = examA.date <= examB.date ? examB.date : examA.date
+        try {
+          const rangeRes = await getAPI().eaa.range(start, end, 5000)
+          if (rangeRes.success && rangeRes.data) {
+            setConductEvents(rangeRes.data.events ?? [])
+          } else {
+            setConductEvents(null)
+          }
+        } catch {
+          setConductEvents(null)
+        }
+      }
+    } catch (err) {
+      console.warn('[CompareTab] load failed:', err)
+      toast.error(getErrorMessage({ success: false } as never, '加载对比数据失败'))
+    } finally {
+      setLoading(false)
+    }
+  }, [examAId, examBId, exams, targetStudentNames])
+
+  useEffect(() => {
+    loadComparison()
+  }, [loadComparison])
+
+  // 计算对比结果(纯函数)
+  const { studentComparisons, summary } = useMemo(() => {
+    if (!classGradesA || !classGradesB) return { studentComparisons: [], summary: null }
+    // 聚合每个学生的操行分变化
+    const conductDeltas: Record<string, number> = {}
+    if (conductEvents) {
+      for (const name of targetStudentNames) {
+        conductDeltas[name] = aggregateConductDelta(conductEvents, name)
+      }
+    }
+    const comps = compareClassGrades(classGradesA, classGradesB, subjectNameMap, conductDeltas)
+    // 按 totalScoreDelta 降序(进步多的在前)
+    comps.sort((a, b) => {
+      const da = a.totalScoreDelta ?? -Infinity
+      const db = b.totalScoreDelta ?? -Infinity
+      return db - da
+    })
+    return { studentComparisons: comps, summary: summarizeClassComparison(comps) }
+  }, [classGradesA, classGradesB, conductEvents, targetStudentNames, subjectNameMap])
+
+  const canCompare = examAId && examBId && examAId !== examBId && targetStudentNames.length > 0
+
+  return (
+    <div className="space-y-4">
+      {/* 选择器栏 */}
+      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
+        <div className="flex flex-wrap items-center gap-3">
+          <select
+            value={classFilter}
+            onChange={(e) => setClassFilter(e.target.value)}
+            className={cn(
+              'text-sm rounded-lg border border-gray-300 dark:border-gray-600',
+              'bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 px-3 py-1.5',
+            )}
+          >
+            <option value="__ALL__">全部班级</option>
+            <option value="__NONE__">未分班</option>
+            {classList.map((c) => (
+              <option key={c.class_id} value={c.class_id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+          <span className="text-gray-400 text-sm">|</span>
+          <select
+            value={examAId}
+            onChange={(e) => setExamAId(e.target.value)}
+            className={cn(
+              'text-sm rounded-lg border border-gray-300 dark:border-gray-600',
+              'bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 px-3 py-1.5',
+            )}
+          >
+            <option value="">选择考试 A</option>
+            {sortedExams.map((e) => (
+              <option key={e.id} value={e.id}>
+                {e.name}（{e.date}）
+              </option>
+            ))}
+          </select>
+          <span className="text-gray-400">→</span>
+          <select
+            value={examBId}
+            onChange={(e) => setExamBId(e.target.value)}
+            className={cn(
+              'text-sm rounded-lg border border-gray-300 dark:border-gray-600',
+              'bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 px-3 py-1.5',
+            )}
+          >
+            <option value="">选择考试 B</option>
+            {sortedExams.map((e) => (
+              <option key={e.id} value={e.id}>
+                {e.name}（{e.date}）
+              </option>
+            ))}
+          </select>
+          <span className="text-xs text-gray-400 ml-auto">{targetStudentNames.length} 名学生</span>
+        </div>
+      </div>
+
+      {loading ? (
+        <CardSkeleton />
+      ) : !canCompare ? (
+        <EmptyState
+          icon="📈"
+          title="选择两场考试进行对比"
+          description={
+            sortedExams.length < 2
+              ? '至少需要 2 场考试才能对比'
+              : examAId === examBId && examAId
+                ? '请选择两场不同的考试'
+                : '从上方选择班级和两场考试'
+          }
+        />
+      ) : studentComparisons.length === 0 ? (
+        <EmptyState icon="📭" title="暂无对比数据" description="所选班级在两次考试中均无成绩记录" />
+      ) : (
+        <>
+          {/* 汇总卡片 */}
+          {summary && (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-3">
+                <div className="text-xs text-gray-400 mb-1">班级平均分变化</div>
+                <div className={cn('text-lg font-bold', deltaColor(summary.avgScoreDelta))}>
+                  {summary.avgScoreDelta > 0 ? '+' : ''}
+                  {summary.avgScoreDelta.toFixed(1)}
+                </div>
+              </div>
+              <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-3">
+                <div className="text-xs text-gray-400 mb-1">进步最多</div>
+                <div className="text-sm font-medium text-gray-700 dark:text-gray-200 truncate">
+                  {summary.mostImprovedStudent ?? '-'}
+                </div>
+                {summary.mostImprovedDelta !== null && (
+                  <DeltaBadge delta={summary.mostImprovedDelta} suffix="分" />
+                )}
+              </div>
+              <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-3">
+                <div className="text-xs text-gray-400 mb-1">退步最多</div>
+                <div className="text-sm font-medium text-gray-700 dark:text-gray-200 truncate">
+                  {summary.mostDeclinedStudent ?? '-'}
+                </div>
+                {summary.mostDeclinedDelta !== null && (
+                  <DeltaBadge delta={summary.mostDeclinedDelta} suffix="分" />
+                )}
+              </div>
+              <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-3">
+                <div className="text-xs text-gray-400 mb-1">参与对比</div>
+                <div className="text-lg font-bold text-gray-700 dark:text-gray-200">
+                  {summary.totalStudents}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 科目平均变化柱状图 */}
+          {summary && summary.subjectDeltas.length > 0 && (
+            <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
+              <h5 className="text-sm font-medium text-gray-600 dark:text-gray-300 mb-3">
+                📊 各科目平均分变化
+              </h5>
+              <ReactEChartsCore
+                echarts={echarts}
+                style={{ height: 240 }}
+                option={{
+                  tooltip: { trigger: 'axis', formatter: '{b}: {c} 分' },
+                  grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
+                  xAxis: {
+                    type: 'category',
+                    data: summary.subjectDeltas.map((s) => s.subjectName),
+                    axisLabel: { color: axisColor, fontSize: 11 },
+                    axisLine: { lineStyle: { color: gridColor } },
+                  },
+                  yAxis: {
+                    type: 'value',
+                    axisLabel: { color: axisColor },
+                    splitLine: { lineStyle: { color: gridColor, type: 'dashed' } },
+                  },
+                  series: [
+                    {
+                      type: 'bar',
+                      data: summary.subjectDeltas.map((s) => ({
+                        value: Number(s.avgDelta.toFixed(2)),
+                        // 正=进步绿,负=退步红
+                        itemStyle: {
+                          color: s.avgDelta >= 0 ? '#22c55e' : '#ef4444',
+                          borderRadius: [4, 4, 0, 0],
+                        },
+                      })),
+                      barWidth: '40%',
+                      label: { show: true, position: 'top', color: axisColor, fontSize: 10 },
+                    },
+                  ],
+                }}
+              />
+            </div>
+          )}
+
+          {/* 学生对比表 */}
+          <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 dark:bg-gray-900/50 text-xs text-gray-500 dark:text-gray-400">
+                  <tr>
+                    <th className="text-left px-3 py-2 font-medium">学生</th>
+                    <th className="text-center px-3 py-2 font-medium">总分 A</th>
+                    <th className="text-center px-3 py-2 font-medium">总分 B</th>
+                    <th className="text-center px-3 py-2 font-medium">总分变化</th>
+                    <th className="text-center px-3 py-2 font-medium">进步/退步</th>
+                    <th className="text-center px-3 py-2 font-medium">操行分变化</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                  {studentComparisons.map((sc) => (
+                    <tr key={sc.studentName} className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
+                      <td className="px-3 py-2 text-gray-700 dark:text-gray-300">
+                        {sc.studentName}
+                      </td>
+                      <td className="text-center px-3 py-2 font-mono text-gray-600 dark:text-gray-300">
+                        {sc.totalScoreA ?? '-'}
+                      </td>
+                      <td className="text-center px-3 py-2 font-mono text-gray-600 dark:text-gray-300">
+                        {sc.totalScoreB ?? '-'}
+                      </td>
+                      <td className="text-center px-3 py-2">
+                        <DeltaBadge delta={sc.totalScoreDelta} suffix="分" />
+                      </td>
+                      <td className="text-center px-3 py-2 text-xs">
+                        <span className="text-green-600 dark:text-green-400">
+                          {sc.improvedSubjects}
+                        </span>
+                        <span className="text-gray-300 mx-1">/</span>
+                        <span className="text-red-600 dark:text-red-400">
+                          {sc.declinedSubjects}
+                        </span>
+                      </td>
+                      <td className="text-center px-3 py-2">
+                        {sc.conductDelta !== null ? (
+                          <DeltaBadge delta={sc.conductDelta} suffix="分" />
+                        ) : (
+                          <span className="text-gray-400 text-xs">-</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   )
 }
@@ -597,9 +951,7 @@ function OverviewTab({
     const series = subjects
       .map((sub, idx) => {
         const data = sortedExamsWithGrades.map((exam) => {
-          const g = grades.find(
-            (gr) => gr.examId === exam.id && gr.subjectId === sub.id,
-          )
+          const g = grades.find((gr) => gr.examId === exam.id && gr.subjectId === sub.id)
           return g?.score ?? null
         })
         // 只显示有数据的科目
@@ -730,7 +1082,13 @@ function OverviewTab({
         center: ['50%', '50%'],
         axisName: { color: axisColor, fontSize: 11 },
         splitLine: { lineStyle: { color: gridColor } },
-        splitArea: { areaStyle: { color: isDark ? ['transparent', 'rgba(255,255,255,0.02)'] : ['transparent', 'rgba(0,0,0,0.02)'] } },
+        splitArea: {
+          areaStyle: {
+            color: isDark
+              ? ['transparent', 'rgba(255,255,255,0.02)']
+              : ['transparent', 'rgba(0,0,0,0.02)'],
+          },
+        },
         axisLine: { lineStyle: { color: gridColor } },
       },
       series: [
@@ -799,11 +1157,7 @@ function OverviewTab({
             <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200">📈 成绩趋势</h3>
           </div>
           {sortedExamsWithGrades.length > 0 ? (
-            <ReactEChartsCore
-              echarts={echarts}
-              style={{ height: 300 }}
-              option={trendChartOption}
-            />
+            <ReactEChartsCore echarts={echarts} style={{ height: 300 }} option={trendChartOption} />
           ) : (
             <div className="flex items-center justify-center h-[300px] text-gray-400 text-sm">
               暂无趋势数据
@@ -831,11 +1185,7 @@ function OverviewTab({
             </h3>
           </div>
           {radarChartOption ? (
-            <ReactEChartsCore
-              echarts={echarts}
-              style={{ height: 260 }}
-              option={radarChartOption}
-            />
+            <ReactEChartsCore echarts={echarts} style={{ height: 260 }} option={radarChartOption} />
           ) : (
             <div className="flex items-center justify-center h-[260px] text-gray-400 text-sm">
               暂无数据
@@ -876,9 +1226,7 @@ function OverviewTab({
                     {exam.name}
                   </td>
                   <td className="py-2 px-3">
-                    <Badge variant={EXAM_TYPE_BADGE[exam.type]}>
-                      {EXAM_TYPE_LABEL[exam.type]}
-                    </Badge>
+                    <Badge variant={EXAM_TYPE_BADGE[exam.type]}>{EXAM_TYPE_LABEL[exam.type]}</Badge>
                   </td>
                   <td className="py-2 px-3 text-gray-500 dark:text-gray-400 text-xs">
                     {exam.date}
@@ -1100,9 +1448,7 @@ function ExamManagementTab({ subjects, examTypes, exams, onRefresh }: ExamManage
               />
             </div>
             <div>
-              <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
-                学期
-              </label>
+              <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">学期</label>
               <input
                 type="text"
                 value={formSemester}
@@ -1509,56 +1855,58 @@ function GradeEntryTab({
     let fullText = ''
     let streamDone = false
 
-    const unsub = getAPI().ai.onStream((event: { type: string; delta?: string; message?: string }) => {
-      if (event.type === 'text_delta' && event.delta) {
-        fullText += event.delta
-        setAiProgress(`已接收 ${fullText.length} 字符...`)
-      } else if (event.type === 'done') {
-        streamDone = true
-        try {
-          // 从响应中提取 JSON 数组
-          const jsonMatch = fullText.match(/\[[\s\S]*\]/)
-          if (jsonMatch) {
-            const parsed = JSON.parse(jsonMatch[0]) as Array<{
-              name: string
-              score?: number
-              rank?: number
-            }>
-            const newScores: Record<string, { score: string; rank: string }> = {}
-            let matched = 0
-            for (const item of parsed) {
-              if (!item.name || item.score == null) continue
-              // 模糊匹配学生姓名
-              const matchedName = studentNames.find(
-                (n) => n === item.name || n.includes(item.name) || item.name.includes(n),
-              )
-              if (matchedName) {
-                newScores[matchedName] = {
-                  score: String(item.score),
-                  rank: item.rank != null ? String(item.rank) : '',
+    const unsub = getAPI().ai.onStream(
+      (event: { type: string; delta?: string; message?: string }) => {
+        if (event.type === 'text_delta' && event.delta) {
+          fullText += event.delta
+          setAiProgress(`已接收 ${fullText.length} 字符...`)
+        } else if (event.type === 'done') {
+          streamDone = true
+          try {
+            // 从响应中提取 JSON 数组
+            const jsonMatch = fullText.match(/\[[\s\S]*\]/)
+            if (jsonMatch) {
+              const parsed = JSON.parse(jsonMatch[0]) as Array<{
+                name: string
+                score?: number
+                rank?: number
+              }>
+              const newScores: Record<string, { score: string; rank: string }> = {}
+              let matched = 0
+              for (const item of parsed) {
+                if (!item.name || item.score == null) continue
+                // 模糊匹配学生姓名
+                const matchedName = studentNames.find(
+                  (n) => n === item.name || n.includes(item.name) || item.name.includes(n),
+                )
+                if (matchedName) {
+                  newScores[matchedName] = {
+                    score: String(item.score),
+                    rank: item.rank != null ? String(item.rank) : '',
+                  }
+                  matched++
                 }
-                matched++
               }
+              setSingleScores((prev) => ({ ...prev, ...newScores }))
+              setAiProgress(`解析完成: 匹配 ${matched} 名学生`)
+              toast.success(`AI 已填充 ${matched} 名学生成绩`)
+            } else {
+              setAiProgress('解析失败: AI 返回格式异常')
+              toast.error('AI 返回格式异常,请检查文本')
             }
-            setSingleScores((prev) => ({ ...prev, ...newScores }))
-            setAiProgress(`解析完成: 匹配 ${matched} 名学生`)
-            toast.success(`AI 已填充 ${matched} 名学生成绩`)
-          } else {
-            setAiProgress('解析失败: AI 返回格式异常')
-            toast.error('AI 返回格式异常,请检查文本')
+          } catch {
+            setAiProgress('解析失败: JSON 解析错误')
+            toast.error('解析 AI 响应失败')
           }
-        } catch {
-          setAiProgress('解析失败: JSON 解析错误')
-          toast.error('解析 AI 响应失败')
+          setAiParsing(false)
+        } else if (event.type === 'error') {
+          streamDone = true
+          setAiParsing(false)
+          setAiProgress(`错误: ${event.message ?? '未知错误'}`)
+          toast.error(`AI 错误: ${event.message ?? '未知'}`)
         }
-        setAiParsing(false)
-      } else if (event.type === 'error') {
-        streamDone = true
-        setAiParsing(false)
-        setAiProgress(`错误: ${event.message ?? '未知错误'}`)
-        toast.error(`AI 错误: ${event.message ?? '未知'}`)
-      }
-    })
+      },
+    )
 
     try {
       await getAPI().ai.chat({
@@ -1585,19 +1933,16 @@ function GradeEntryTab({
   }, [aiInputText, currentProvider, currentModel, students])
 
   /** 单科模式: 更新学生分数 */
-  const updateSingleScore = useCallback(
-    (name: string, field: 'score' | 'rank', value: string) => {
-      setSingleScores((prev) => ({
-        ...prev,
-        [name]: {
-          score: prev[name]?.score ?? '',
-          rank: prev[name]?.rank ?? '',
-          [field]: value,
-        },
-      }))
-    },
-    [],
-  )
+  const updateSingleScore = useCallback((name: string, field: 'score' | 'rank', value: string) => {
+    setSingleScores((prev) => ({
+      ...prev,
+      [name]: {
+        score: prev[name]?.score ?? '',
+        rank: prev[name]?.rank ?? '',
+        [field]: value,
+      },
+    }))
+  }, [])
 
   /** 全科模式: 更新科目分数 */
   const updateAllScore = useCallback(
@@ -1712,9 +2057,7 @@ function GradeEntryTab({
   if (showQuickCreate) {
     return (
       <Card padding="lg">
-        <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-4">
-          快速创建考试
-        </h3>
+        <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-4">快速创建考试</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl">
           <div>
             <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
@@ -1730,9 +2073,7 @@ function GradeEntryTab({
             />
           </div>
           <div>
-            <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
-              考试类型
-            </label>
+            <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">考试类型</label>
             <select
               value={quickType}
               onChange={(e) => setQuickType(e.target.value as ExamType)}
@@ -1995,7 +2336,11 @@ function GradeEntryTab({
       {/* 成绩录入表 */}
       {mode === 'single-subject' ? (
         !selectedSubjectId ? (
-          <EmptyState icon="👆" title="请先选择科目" description="选择科目后即可录入成绩,考试可不选" />
+          <EmptyState
+            icon="👆"
+            title="请先选择科目"
+            description="选择科目后即可录入成绩,考试可不选"
+          />
         ) : (
           <Card padding="md">
             <div className="flex items-center justify-between mb-3">
@@ -2106,9 +2451,7 @@ function GradeEntryTab({
                     >
                       <td className="py-2 px-3 font-medium text-gray-700 dark:text-gray-200">
                         {sub.name}
-                        {sub.isCore && (
-                          <span className="ml-1 text-[10px] text-blue-500">主科</span>
-                        )}
+                        {sub.isCore && <span className="ml-1 text-[10px] text-blue-500">主科</span>}
                       </td>
                       <td className="py-2 px-3 text-center text-gray-400 dark:text-gray-500 font-mono">
                         {sub.fullMark}
