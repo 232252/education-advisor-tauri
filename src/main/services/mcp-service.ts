@@ -29,7 +29,7 @@ import { app } from 'electron'
 import yaml from 'yaml'
 import type { McpServerConfig, McpServerStatus, McpTool } from '../../shared/types'
 import { atomicWrite } from '../utils/atomic-write'
-import { deepInterpolate, validateCommandSafe, validateServerConfig } from './mcp-helpers'
+import { deepInterpolate, isSafeMcpUrl, validateCommandSafe, validateServerConfig } from './mcp-helpers'
 import { settingsService } from './settings-service'
 
 /** MCP 工具调用结果(兼容 MCP 协议) */
@@ -62,6 +62,8 @@ interface MCPClient {
 
 /** 连接超时(毫秒) */
 const CONNECT_TIMEOUT_MS = 30_000
+/** server id 格式(与 mcp-handlers.ts validateServerId 一致) */
+const SERVER_ID_RE = /^[a-zA-Z0-9_-]+$/
 /** 工具调用超时(毫秒) */
 const CALL_TIMEOUT_MS = 60_000
 /** 最大重连次数 */
@@ -71,7 +73,19 @@ const _RECONNECT_DELAY_MS = 1000
 /** 返回内容最大大小(5MB,防止超大响应撑爆上下文) */
 const MAX_RESPONSE_SIZE = 5 * 1024 * 1024
 
-// interpolateEnv / deepInterpolate / validateServerConfig 已提取到 mcp-helpers.ts
+// interpolateEnv / deepInterpolate / validateServerConfig / isSafeMcpUrl 已提取到 mcp-helpers.ts
+
+/**
+ * SSRF 防护断言(薄封装,逻辑在 mcp-helpers.isSafeMcpUrl 纯函数,便于单测)。
+ * R4-SSRF-1 修复:防止 sidecar 被诱导连接云元数据服务或扫描内网。
+ */
+function assertSafeMcpUrl(rawUrl: string | undefined, serverId: string): void {
+  if (!isSafeMcpUrl(rawUrl)) {
+    throw new Error(
+      `MCP server ${serverId} url refused (SSRF protection): ${rawUrl ?? '(missing)'}`,
+    )
+  }
+}
 
 class McpService {
   private clients: Map<string, MCPClient> = new Map()
@@ -193,6 +207,13 @@ class McpService {
   private async addServerInternal(config: McpServerConfig): Promise<void> {
     if (!validateServerConfig(config)) {
       throw new Error('Invalid server config')
+    }
+    // R4-EDGE-MCP-ID 修复: id 格式校验,与 mcp-handlers.ts 的 validateServerId 一致
+    // 防止 add 接受非法 id 但 remove/update 拒绝,形成不可删除的脏配置
+    if (!SERVER_ID_RE.test(config.id)) {
+      throw new Error(
+        `Server id "${config.id}" contains invalid characters (only a-zA-Z0-9_- allowed)`,
+      )
     }
     if (this.config.some((s) => s.id === config.id)) {
       throw new Error(`Server ${config.id} already exists`)
@@ -518,6 +539,10 @@ ${yaml.stringify({ servers })}
    * 根据传输方式连接
    */
   private async connectTransport(client: MCPClient, server: McpServerConfig): Promise<void> {
+    // R4-SSRF-1 修复: sse/websocket 连接前校验 URL,拒绝内网/云元数据地址
+    if (server.transport === 'sse' || server.transport === 'websocket') {
+      assertSafeMcpUrl(server.url, server.id)
+    }
     const connectPromise = (() => {
       switch (server.transport) {
         case 'stdio':
@@ -902,15 +927,20 @@ ${yaml.stringify({ servers })}
     client.pending.clear()
 
     // stdio: kill 子进程
-    if (client.childProcess) {
+    // R4-MAP-LEAK-3 修复: 用局部变量捕获 childProcess,避免 setTimeout 触发时
+    // client.childProcess 已被置 undefined 导致可选链 no-op,SIGKILL fallback 永不执行
+    const cp = client.childProcess
+    if (cp) {
       try {
-        client.childProcess.kill('SIGTERM')
+        cp.kill('SIGTERM')
         // 给 1s 优雅退出,然后 SIGKILL
-        setTimeout(() => {
-          if (!client.childProcess?.killed) {
-            client.childProcess?.kill('SIGKILL')
+        const killTimer = setTimeout(() => {
+          if (!cp.killed) {
+            cp.kill('SIGKILL')
           }
         }, 1000)
+        // 子进程已退出则清理 timer,避免内存泄漏
+        cp.once('exit', () => clearTimeout(killTimer))
       } catch {
         // ignore
       }

@@ -233,3 +233,57 @@ describe('McpService 并发安全 (M7 修复)', () => {
     }
   })
 })
+
+describe('McpService id 格式校验 (R4-EDGE-MCP-ID 修复)', () => {
+  it('拒绝含空格的 id', async () => {
+    await mcpService.init()
+    await expect(
+      mcpService.addServer({
+        id: 'bad id',
+        name: '坏id',
+        enabled: true,
+        transport: 'stdio',
+        command: 'npx',
+      }),
+    ).rejects.toThrow(/invalid characters/)
+  })
+
+  it('拒绝含特殊字符的 id (!@#)', async () => {
+    await mcpService.init()
+    await expect(
+      mcpService.addServer({
+        id: 'bad!@#',
+        name: '特殊字符',
+        enabled: true,
+        transport: 'stdio',
+        command: 'npx',
+      }),
+    ).rejects.toThrow(/invalid characters/)
+  })
+
+  it('拒绝含路径分隔符的 id (路径遍历尝试)', async () => {
+    await mcpService.init()
+    await expect(
+      mcpService.addServer({
+        id: '../etc',
+        name: '遍历',
+        enabled: true,
+        transport: 'stdio',
+        command: 'npx',
+      }),
+    ).rejects.toThrow(/invalid characters/)
+  })
+
+  it('接受合法 id (字母数字下划线连字符)', async () => {
+    await mcpService.init()
+    await mcpService.addServer({
+      id: 'my-server_1',
+      name: '合法',
+      enabled: true,
+      transport: 'stdio',
+      command: 'npx',
+    })
+    const servers = mcpService.listServers()
+    expect(servers.some((s) => s.id === 'my-server_1')).toBe(true)
+  })
+})
