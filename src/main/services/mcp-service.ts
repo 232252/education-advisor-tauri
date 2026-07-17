@@ -21,6 +21,7 @@
 //   详见 mcp-tools.ts
 // =============================================================
 
+import { app } from 'electron'
 import { spawn, type ChildProcess } from 'node:child_process'
 import fs from 'node:fs'
 import fsp from 'node:fs/promises'
@@ -72,6 +73,7 @@ class McpService {
   private clients: Map<string, MCPClient> = new Map()
   private config: McpServerConfig[] = []
   private configPath: string
+  private userConfigPath: string
   private initialized = false
 
   constructor() {
@@ -79,6 +81,8 @@ class McpService {
     const prodConfigDir = path.join(process.resourcesPath || '', 'config')
     const configDir = fs.existsSync(devConfigDir) ? devConfigDir : prodConfigDir
     this.configPath = path.join(configDir, 'mcp.yaml')
+    // 用户级配置(可写),仿 agents.user.yaml
+    this.userConfigPath = path.join(app.getPath('userData'), 'mcp.user.yaml')
   }
 
   /**
@@ -103,32 +107,45 @@ class McpService {
   }
 
   /**
-   * 加载 mcp.yaml 配置文件
+   * 加载配置:全局 mcp.yaml + 用户级 mcp.user.yaml(用户覆盖全局同 id)
    */
   private async loadConfig(): Promise<void> {
+    const globalServers = await this.loadConfigFile(this.configPath, 'global')
+    // 每次加载时按当前 userData 解析,避免单例构造期缓存过期路径
+    const userPath = path.join(app.getPath('userData'), 'mcp.user.yaml')
+    this.userConfigPath = userPath
+    const userServers = await this.loadConfigFile(userPath, 'user')
+
+    // 合并:用户级整条覆盖同 id 的全局项
+    const byId = new Map<string, McpServerConfig>()
+    for (const s of globalServers) byId.set(s.id, s)
+    for (const s of userServers) byId.set(s.id, s) // user 覆盖 global
+    this.config = Array.from(byId.values())
+    console.log(
+      `[McpService] Loaded ${globalServers.length} global + ${userServers.length} user servers → ${this.config.length} total`,
+    )
+  }
+
+  /**
+   * 读单个 yaml 文件并解析为带 source 标记的 server 列表
+   */
+  private async loadConfigFile(
+    filePath: string,
+    source: 'global' | 'user',
+  ): Promise<McpServerConfig[]> {
     try {
-      const content = await fsp.readFile(this.configPath, 'utf-8')
+      const content = await fsp.readFile(filePath, 'utf-8')
       const parsed = yaml.parse(content)
       const servers = parsed?.servers
-      if (!Array.isArray(servers)) {
-        console.warn('[McpService] mcp.yaml has no servers array, entering no-op mode')
-        this.config = []
-        return
-      }
-      // 过滤有效配置 + 环境变量插值
-      this.config = servers
+      if (!Array.isArray(servers)) return []
+      return servers
         .filter(validateServerConfig)
-        .map((s) => deepInterpolate(s))
+        .map((s) => deepInterpolate({ ...s, source }))
         .filter((s) => s.enabled)
-      console.log(`[McpService] Loaded ${this.config.length} enabled servers from ${this.configPath}`)
     } catch (err) {
-      if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
-        console.log('[McpService] mcp.yaml not found, entering no-op mode')
-        this.config = []
-        return
-      }
-      console.error('[McpService] Failed to load mcp.yaml:', err)
-      this.config = []
+      if ((err as NodeJS.ErrnoException).code === 'ENOENT') return []
+      console.warn(`[McpService] Failed to load ${filePath}:`, err)
+      return []
     }
   }
 
@@ -156,6 +173,8 @@ class McpService {
         toolCount: client?.tools.length ?? 0,
         lastError: client?.lastError,
         transport: c.transport,
+        source: c.source ?? 'global',
+        enabled: c.enabled,
       }
     })
   }
