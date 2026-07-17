@@ -223,10 +223,11 @@ describe('academicService.batchSetGrades', () => {
   it('按学生分组写入，返回写入条数', async () => {
     const a = uniqStudent()
     const b = uniqStudent()
+    const examId = await seedExam(['math', 'english'])
     const count = await academicService.batchSetGrades([
-      { studentName: a, examId: 'e1', subjectId: 'math', score: 70 },
-      { studentName: a, examId: 'e1', subjectId: 'english', score: 75 },
-      { studentName: b, examId: 'e1', subjectId: 'math', score: 80 },
+      { studentName: a, examId, subjectId: 'math', score: 70 },
+      { studentName: a, examId, subjectId: 'english', score: 75 },
+      { studentName: b, examId, subjectId: 'math', score: 80 },
     ])
     expect(count).toBe(3)
     const gotA = await academicService.getGrades(a)
@@ -237,9 +238,10 @@ describe('academicService.batchSetGrades', () => {
 
   it('同学生同 examId+subjectId 的多条记录只保留最后一条', async () => {
     const a = uniqStudent()
+    const examId = await seedExam(['math'])
     const count = await academicService.batchSetGrades([
-      { studentName: a, examId: 'e1', subjectId: 'math', score: 50 },
-      { studentName: a, examId: 'e1', subjectId: 'math', score: 99 },
+      { studentName: a, examId, subjectId: 'math', score: 50 },
+      { studentName: a, examId, subjectId: 'math', score: 99 },
     ])
     expect(count).toBe(2) // 两次都计入 count
     const got = await academicService.getGrades(a)
@@ -250,21 +252,21 @@ describe('academicService.batchSetGrades', () => {
 
 describe('academicService.deleteExam（级联删除）', () => {
   it('删除考试并级联清理学生成绩文件中的对应条目', async () => {
-    const examId = 'exam-cascade-test'
+    const examId = await seedExam(['math', 'english'])
+    const otherExamId = await seedExam(['math'])
     const a = uniqStudent()
     const b = uniqStudent()
     await academicService.batchSetGrades([
       { studentName: a, examId, subjectId: 'math', score: 80 },
-      { studentName: a, examId: 'exam-other', subjectId: 'math', score: 90 },
+      { studentName: a, examId: otherExamId, subjectId: 'math', score: 90 },
       { studentName: b, examId, subjectId: 'english', score: 85 },
     ])
-    await academicService.createExam({ name: 'cascade', semester: 's1', type: 't', date: '', id: examId } as never)
 
     await academicService.deleteExam(examId)
 
     const gotA = await academicService.getGrades(a)
     expect(gotA).toHaveLength(1)
-    expect(gotA[0].examId).toBe('exam-other')
+    expect(gotA[0].examId).toBe(otherExamId)
     const gotB = await academicService.getGrades(b)
     expect(gotB).toHaveLength(0)
   })
@@ -285,23 +287,25 @@ describe('academicService.getClassGrades', () => {
   it('按 examId 过滤返回每个学生的成绩', async () => {
     const a = uniqStudent()
     const b = uniqStudent()
+    const examId = await seedExam(['math', 'english'])
     await academicService.batchSetGrades([
-      { studentName: a, examId: 'exam-cls', subjectId: 'math', score: 80 },
-      { studentName: a, examId: 'exam-cls', subjectId: 'english', score: 85 },
-      { studentName: b, examId: 'exam-cls', subjectId: 'math', score: 90 },
+      { studentName: a, examId, subjectId: 'math', score: 80 },
+      { studentName: a, examId, subjectId: 'english', score: 85 },
+      { studentName: b, examId, subjectId: 'math', score: 90 },
     ])
-    const result = await academicService.getClassGrades([a, b], 'exam-cls')
+    const result = await academicService.getClassGrades([a, b], examId)
     expect(result[a]).toHaveLength(2)
     expect(result[b]).toHaveLength(1)
   })
 
   it('同时按 subjectId 过滤', async () => {
     const a = uniqStudent()
+    const examId = await seedExam(['math', 'english'])
     await academicService.batchSetGrades([
-      { studentName: a, examId: 'exam-cls2', subjectId: 'math', score: 80 },
-      { studentName: a, examId: 'exam-cls2', subjectId: 'english', score: 85 },
+      { studentName: a, examId, subjectId: 'math', score: 80 },
+      { studentName: a, examId, subjectId: 'english', score: 85 },
     ])
-    const result = await academicService.getClassGrades([a], 'exam-cls2', 'math')
+    const result = await academicService.getClassGrades([a], examId, 'math')
     expect(result[a]).toHaveLength(1)
     expect(result[a][0].subjectId).toBe('math')
   })
@@ -404,5 +408,47 @@ describe('academicService.setGrade 输入校验 (R9-1/2/3/4)', () => {
         fullMark: 100,
       }),
     ).rejects.toThrow(/examId/)
+  })
+})
+
+// =============================================================
+// R9-5 修复: batchSetGrades 输入校验测试
+// 覆盖：空数组拒绝 / 批量里假 examId / 越界 score / 混合校验(原子性) / 合法批量通过
+// =============================================================
+
+describe('academicService.batchSetGrades 输入校验 (R9-5)', () => {
+  it('拒绝空数组', async () => {
+    await expect(academicService.batchSetGrades([])).rejects.toThrow(/非空数组/)
+  })
+
+  it('拒绝批量里的假 examId', async () => {
+    await expect(academicService.batchSetGrades([
+      { studentName: '批量学生', examId: 'FAKE', subjectId: 'math', score: 80, fullMark: 100 },
+    ])).rejects.toThrow(/考试不存在/)
+  })
+
+  it('拒绝批量里的越界 score', async () => {
+    const examId = await seedExam(['math'])
+    await expect(academicService.batchSetGrades([
+      { studentName: '批量学生', examId, subjectId: 'math', score: 200, fullMark: 100 },
+    ])).rejects.toThrow(/超出范围/)
+  })
+
+  it('批量混合校验:一条坏数据导致整批拒绝', async () => {
+    const examId = await seedExam(['math'])
+    await expect(academicService.batchSetGrades([
+      { studentName: '学生A', examId, subjectId: 'math', score: 80, fullMark: 100 },
+      { studentName: '学生B', examId: 'NONEXISTENT', subjectId: 'math', score: 90, fullMark: 100 },
+    ])).rejects.toThrow(/考试不存在/)
+  })
+
+  it('合法批量全部通过', async () => {
+    const examId = await seedExam(['math', 'english'])
+    const count = await academicService.batchSetGrades([
+      { studentName: '批量学生1', examId, subjectId: 'math', score: 80, fullMark: 100 },
+      { studentName: '批量学生1', examId, subjectId: 'english', score: 90, fullMark: 100 },
+      { studentName: '批量学生2', examId, subjectId: 'math', score: 70, fullMark: 100 },
+    ])
+    expect(count).toBe(3)
   })
 })

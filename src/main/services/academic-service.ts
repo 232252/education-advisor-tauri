@@ -180,6 +180,40 @@ class AcademicService {
 
   /** 设置单条成绩(upsert by examId + subjectId) */
   async setGrade(record: Omit<GradeRecord, 'updatedAt'>): Promise<GradeRecord> {
+    // R9-1/2/3/4 修复: setGrade 输入校验(之前完全无校验,可写入幽灵成绩/孤儿数据/越界分数)
+    if (!record.examId || typeof record.examId !== 'string') {
+      throw new Error('setGrade: examId 必须是非空字符串')
+    }
+    if (!record.subjectId || typeof record.subjectId !== 'string') {
+      throw new Error('setGrade: subjectId 必须是非空字符串')
+    }
+    if (!record.studentName || typeof record.studentName !== 'string') {
+      throw new Error('setGrade: studentName 必须是非空字符串')
+    }
+    // R9-4: score 类型校验(number | null,null 表示缺考)
+    if (record.score !== null && (typeof record.score !== 'number' || !Number.isFinite(record.score))) {
+      throw new Error(`setGrade: score 必须是有限数字或 null,收到 ${typeof record.score}`)
+    }
+    // R9-4: score 范围校验(0 到 fullMark)
+    if (record.score !== null && record.fullMark > 0) {
+      if (record.score < 0 || record.score > record.fullMark) {
+        throw new Error(
+          `setGrade: score ${record.score} 超出范围 [0, ${record.fullMark}]`,
+        )
+      }
+    }
+    // R9-1: examId 必须存在于 exams 列表
+    const exams = await this.listExams()
+    const exam = exams.find((e) => e.id === record.examId)
+    if (!exam) {
+      throw new Error(`setGrade: 考试不存在: ${record.examId}`)
+    }
+    // R9-3: subjectId 必须属于该考试
+    if (exam.subjects.length > 0 && !exam.subjects.includes(record.subjectId)) {
+      throw new Error(
+        `setGrade: 科目 ${record.subjectId} 不属于考试 ${record.examId}(${exam.name})`,
+      )
+    }
     const existing = await this.getGrades(record.studentName)
     const idx = existing.findIndex(
       (g) => g.examId === record.examId && g.subjectId === record.subjectId,
@@ -196,6 +230,37 @@ class AcademicService {
 
   /** 批量设置成绩(按学生分组,每个学生文件只读写一次) */
   async batchSetGrades(records: Omit<GradeRecord, 'updatedAt'>[]): Promise<number> {
+    // R9-5 修复: 批量接口也做与 setGrade 一致的输入校验(之前完全跳过,可批量写入孤儿成绩)
+    if (!Array.isArray(records) || records.length === 0) {
+      throw new Error('batchSetGrades: records 必须是非空数组')
+    }
+    // 一次性加载 exams,避免循环里重复 listExams
+    const exams = await this.listExams()
+    const examMap = new Map(exams.map((e) => [e.id, e]))
+    for (const [i, r] of records.entries()) {
+      if (!r.examId || typeof r.examId !== 'string') {
+        throw new Error(`batchSetGrades: records[${i}].examId 必须是非空字符串`)
+      }
+      if (!r.studentName || typeof r.studentName !== 'string') {
+        throw new Error(`batchSetGrades: records[${i}].studentName 必须是非空字符串`)
+      }
+      if (r.score !== null && (typeof r.score !== 'number' || !Number.isFinite(r.score))) {
+        throw new Error(`batchSetGrades: records[${i}].score 必须是有限数字或 null`)
+      }
+      if (r.score !== null && r.fullMark > 0 && (r.score < 0 || r.score > r.fullMark)) {
+        throw new Error(`batchSetGrades: records[${i}].score ${r.score} 超出范围 [0, ${r.fullMark}]`)
+      }
+      const exam = examMap.get(r.examId)
+      if (!exam) {
+        throw new Error(`batchSetGrades: records[${i}] 考试不存在: ${r.examId}`)
+      }
+      if (exam.subjects.length > 0 && !exam.subjects.includes(r.subjectId)) {
+        throw new Error(
+          `batchSetGrades: records[${i}] 科目 ${r.subjectId} 不属于考试 ${r.examId}`,
+        )
+      }
+    }
+
     const byStudent = new Map<string, Omit<GradeRecord, 'updatedAt'>[]>()
     for (const r of records) {
       const arr = byStudent.get(r.studentName)
