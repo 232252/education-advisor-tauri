@@ -159,7 +159,8 @@ export function McpTab() {
         toast.success(t('toast.mcp.updated'))
         await loadServers()
       } else {
-        toast.error(result.error || t('toast.mcp.updated'))
+        // R5-I18N-1 修复: 失败 fallback 不再用 "已更新" 文案,改用 toggleFailed
+        toast.error(result.error || t('toast.mcp.toggleFailed'))
       }
     } catch (err) {
       toast.error((err as Error).message)

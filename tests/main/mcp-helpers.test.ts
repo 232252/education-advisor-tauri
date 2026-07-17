@@ -200,6 +200,53 @@ describe('mcp-helpers: validateServerConfig', () => {
  ])('%s → 期望返回 %s', (_name, input, expected) => {
   expect(validateServerConfig(input)).toBe(expected)
  })
+
+ // R5-ERR-4 修复: id 长度上限 128
+ it('拒绝超长 id (>128)', () => {
+  expect(
+   validateServerConfig({
+    id: 'a'.repeat(129),
+    name: 'x',
+    enabled: true,
+    transport: 'stdio',
+    command: 'npx',
+   }),
+  ).toBe(false)
+  expect(
+   validateServerConfig({
+    id: 'a'.repeat(128),
+    name: 'x',
+    enabled: true,
+    transport: 'stdio',
+    command: 'npx',
+   }),
+  ).toBe(true)
+ })
+
+ // R5-ERR-3 修复: sse/websocket 拒绝空 url (含纯空白)
+ it('拒绝 sse 空 url', () => {
+  expect(
+   validateServerConfig({ id: 'x', name: 'x', enabled: true, transport: 'sse', url: '' }),
+  ).toBe(false)
+  expect(
+   validateServerConfig({ id: 'x', name: 'x', enabled: true, transport: 'sse', url: '   ' }),
+  ).toBe(false)
+ })
+
+ it('拒绝 websocket 空 url', () => {
+  expect(
+   validateServerConfig({ id: 'x', name: 'x', enabled: true, transport: 'websocket', url: '' }),
+  ).toBe(false)
+  expect(
+   validateServerConfig({
+    id: 'x',
+    name: 'x',
+    enabled: true,
+    transport: 'websocket',
+    url: '\t\n ',
+   }),
+  ).toBe(false)
+ })
 })
 
 // =============================================================

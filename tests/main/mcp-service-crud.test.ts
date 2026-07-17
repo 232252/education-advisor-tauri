@@ -123,6 +123,59 @@ describe('McpService addServer', () => {
       }),
     ).rejects.toThrow(/command/)
   })
+
+  // R5-ERR-2 修复: addServer 时校验 URL SSRF(不只是 connect 时)
+  it('add sse 内网地址被拒 (R5-ERR-2)', async () => {
+    await mcpService.init()
+    await expect(
+      mcpService.addServer({
+        id: 'evil-meta',
+        name: '元数据',
+        enabled: true,
+        transport: 'sse',
+        url: 'http://169.254.169.254/latest/meta-data/',
+      }),
+    ).rejects.toThrow(/SSRF|url failed/)
+  })
+
+  it('add file:// 协议被拒 (R5-ERR-2)', async () => {
+    await mcpService.init()
+    await expect(
+      mcpService.addServer({
+        id: 'evil-file',
+        name: '文件',
+        enabled: true,
+        transport: 'sse',
+        url: 'file:///etc/passwd',
+      }),
+    ).rejects.toThrow(/SSRF|url failed/)
+  })
+
+  it('add websocket 内网 IP 被拒 (R5-ERR-2)', async () => {
+    await mcpService.init()
+    await expect(
+      mcpService.addServer({
+        id: 'evil-ws',
+        name: 'WS内网',
+        enabled: true,
+        transport: 'websocket',
+        url: 'ws://10.0.0.5/ws',
+      }),
+    ).rejects.toThrow(/SSRF|url failed/)
+  })
+
+  it('add sse 公网 URL 通过 (R5-ERR-2 正向)', async () => {
+    await mcpService.init()
+    await mcpService.addServer({
+      id: 'public-sse',
+      name: '公网SSE',
+      enabled: true,
+      transport: 'sse',
+      url: 'https://example.com/sse',
+    })
+    const servers = mcpService.listServers()
+    expect(servers.some((s) => s.id === 'public-sse')).toBe(true)
+  })
 })
 
 describe('McpService updateServer', () => {
@@ -156,6 +209,36 @@ describe('McpService updateServer', () => {
     const found = servers.find((s) => s.id === 'toggle')
     expect(found).toBeDefined()
     expect(found?.enabled).toBe(false)
+  })
+
+  // R5-ERR-2 修复: updateServer 时也校验 URL SSRF
+  it('update 改为危险 url 被拒 (R5-ERR-2)', async () => {
+    await mcpService.init()
+    await mcpService.addServer({
+      id: 'upd-safe',
+      name: '安全SSE',
+      enabled: true,
+      transport: 'sse',
+      url: 'https://example.com/sse',
+    })
+    await expect(
+      mcpService.updateServer('upd-safe', { url: 'file:///etc/passwd' }),
+    ).rejects.toThrow(/SSRF|url failed/)
+  })
+
+  it('update 仅改 name 不触发 URL 校验 (R5-ERR-2 保守路径)', async () => {
+    await mcpService.init()
+    await mcpService.addServer({
+      id: 'upd-name',
+      name: '原名',
+      enabled: true,
+      transport: 'stdio',
+      command: 'npx',
+    })
+    // stdio + 仅改 name → 不应触发任何 URL 校验(保守路径)
+    await mcpService.updateServer('upd-name', { name: '新名' })
+    const servers = mcpService.listServers()
+    expect(servers.find((s) => s.id === 'upd-name')?.name).toBe('新名')
   })
 })
 

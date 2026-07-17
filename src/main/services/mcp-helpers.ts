@@ -58,14 +58,22 @@ export function validateServerConfig(server: unknown): server is McpServerConfig
   if (!server || typeof server !== 'object') return false
   const s = server as Record<string, unknown>
   if (typeof s.id !== 'string' || s.id.length === 0) return false
+  // R5-ERR-4 修复: id 长度上限,与 mcp-handlers.ts 的 validateServerId 一致
+  if (s.id.length > 128) return false
   if (typeof s.name !== 'string') return false
   if (typeof s.enabled !== 'boolean') return false
   const transport = s.transport
   if (transport !== 'stdio' && transport !== 'sse' && transport !== 'websocket') return false
   // stdio 需要 command
   if (transport === 'stdio' && typeof s.command !== 'string') return false
-  // sse/websocket 需要 url
-  if ((transport === 'sse' || transport === 'websocket') && typeof s.url !== 'string') return false
+  // sse/websocket 需要 url 且非空(拒空字符串/纯空白)
+  // R5-ERR-3 修复: typeof 'string' 接受空串,要求 trim 后非空
+  if (
+    (transport === 'sse' || transport === 'websocket') &&
+    (typeof s.url !== 'string' || s.url.trim().length === 0)
+  ) {
+    return false
+  }
   return true
 }
 

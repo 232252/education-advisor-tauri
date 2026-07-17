@@ -221,6 +221,11 @@ class McpService {
     if (config.transport === 'stdio' && !validateCommandSafe(config.command)) {
       throw new Error(`Server ${config.id} command failed safety check`)
     }
+    // R5-ERR-2 修复: sse/websocket 的 URL 在 add 时也校验 SSRF(不只是 connect 时),
+    // 防止 file:// 等危险 URL 写入 mcp.user.yaml
+    if (config.transport !== 'stdio' && !isSafeMcpUrl(config.url)) {
+      throw new Error(`Server ${config.id} url failed SSRF check`)
+    }
     // 读取现有 user 配置 + 追加
     const userServers = await this.readUserConfig()
     const newServer: McpServerConfig = { ...config, source: 'user' }
@@ -266,6 +271,21 @@ class McpService {
     // 若 command 被改,校验安全性
     if (patch.command !== undefined && !validateCommandSafe(patch.command)) {
       throw new Error(`Server ${id} command failed safety check`)
+    }
+
+    // R5-ERR-2 修复: patch 含 url → 校验 SSRF;
+    // patch 改为非 stdio transport → 校验 existing.url(新 transport 会用到它)
+    // 注意:patch 同时含 transport + url 时,patch.url 优先(校验 patch.url 即可)
+    if (patch.url !== undefined) {
+      if (!isSafeMcpUrl(patch.url)) {
+        throw new Error(`Server ${id} url failed SSRF check`)
+      }
+    } else if (
+      patch.transport !== undefined &&
+      patch.transport !== 'stdio' &&
+      !isSafeMcpUrl(existing.url)
+    ) {
+      throw new Error(`Server ${id} url failed SSRF check`)
     }
 
     // 若正在连接,先断开(新配置下次连接生效)
