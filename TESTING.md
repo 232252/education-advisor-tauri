@@ -85,11 +85,11 @@ console.error('SUPPRESS: 这条会真的打印', someDetail)
 
 ---
 
-## 4. 测试文件总索引（42 个）
+## 4. 测试文件总索引（45 个）
 
-> 文件分布：`tests/main/` 21 + `tests/renderer/` 10 + `tests/shared/` 1 + `tests/e2e/` 6 + `src/**/__tests__/` 4 = 42。
+> 文件分布：`tests/main/` 24 + `tests/renderer/` 10 + `tests/shared/` 1 + `tests/e2e/` 6 + `src/**/__tests__/` 4 = 45。
 
-### 主进程单测（`tests/main/`，21 个文件）
+### 主进程单测（`tests/main/`，24 个文件）
 
 | 文件 | `it` 数 | 测什么 | Mock 模式 |
 |---|---:|---|---|
@@ -101,13 +101,16 @@ console.error('SUPPRESS: 这条会真的打印', someDetail)
 | `eaa-bridge.test.ts` | 26 | EAABridge ctor、`execute()` JSON 解析、`--output json` 注入、ENOENT 自愈、`initialize` 健康检查 | D（MockChildProcess + cross-spawn mock）+ G（existsSync） |
 | `eaa-tools-sanitize.test.ts` | 27 | `safeExecute`（控制字符 / shell 元字符 / `--` 拒绝）、`sanitizeArg` flags、`tokenizeQuery` | B（mock eaa-bridge）+ `it.each` |
 | `eaa-tools-tokenize.test.ts` | 12 | `tokenizeQuery` 引号 / 空格 / 空 / 边界 | B + K（纯函数） |
+| `feishu-message-utils.test.ts` | 28 | R6-7 原型链污染防御（`sanitizeObject`）、`safeJsonParse`、`extractText` 去 @占位符 | K（纯函数，零 mock） |
 | `feishu-service.test.ts` | 21 | testConnection token 截断、tenantToken 缓存、listBitableTables、sendTextMessage、URL 注入防御 | C（fetch spy）+ F（resetModules） |
 | `file-tools.test.ts` | 21 | read/write_file/excel/csv、list_dir 往返、BOM、CSV 转义、5MB 限制、maxRows | K（无 mock，真 fs+xlsx） |
 | `keystore-service.test.ts` | 11 | setApiKey/getApiKey 原子写、`__secret__:` 前缀、加密不可用降级 | A（含完整 safeStorage mock） |
 | `log-handler-utils.test.ts` | 11 | `readLogTail` 空文件安全、`searchLog`、`readLogTailByLevel`、`listLogFiles` | A（真 fs） |
 | `log-handlers.test.ts` | 31 | initLogger/getLogsDir、listLogFiles（三流）、searchLog 大小写无关、exportLog、clearAllLogs | A（真 fs） |
+| `mcp-helpers.test.ts` | 34 | `interpolateEnv`/`deepInterpolate` 环境变量插值、`validateServerConfig` 9 条件 type guard（4 ACCEPT / 17 REJECT） | K（纯函数 + process.env 快照） |
 | `mcp-tools.test.ts` | 38 | `jsonSchemaToTypebox`（各种类型）、`sanitizeMcpArgs` 递归、`mcpToolToAgentTool` 命名/execute、去重 | B（三 service mock） |
 | `ollama-service.test.ts` | 28 | isServeRunning、listModels、pullModel NDJSON 流、deleteModel、detect 缓存、RECOMMENDED_MODELS schema | D（spawn mock）+ C（fetch spy） |
+| `pi-ai-helpers.test.ts` | 49 | `dedupeModels`、`costScore`（Infinity 降权）、`selectCheapestModel`、`mapEvent`（12 路 switch）、`extractPartialToolCall`、`isRetryableError`（大小写敏感） | K（纯函数，零 mock） |
 | `profile-service.test.ts` | 7 | profile get/set/update、路径穿越、中文名 | A（真 fs） |
 | `settings-service.test.ts` | 19 | dotPath 校验、深合并、原子写、节流、shortcuts 含点号键、3 个回归 | A（真 fs） |
 | `skill-service.test.ts` | 11 | list/save/get/delete、YAML frontmatter、名字校验 | A（真 fs + isPackaged:false） |
@@ -151,7 +154,7 @@ console.error('SUPPRESS: 这条会真的打印', someDetail)
 | `src/renderer/i18n/__tests__/i18n.test.ts` | 11 | t/setLang/useT、`i18n-changed` 事件 |
 | `src/renderer/stores/__tests__/agentStore.test.ts` | 7 | subscribeStatus、selectAgent、refreshDetail、runAgent |
 
-**合计 42 个测试文件、724 个测试用例**（含 `it.each` 展开后的子用例）。跑 `npm test` 全绿（实测 2026-07-17，14 分钟）。
+**合计 45 个测试文件、~835 个测试用例**（含 `it.each` 展开后的子用例）。跑 `npm test` 全绿（实测 2026-07-17，14 分钟）。本轮新增的 3 个 `*-helpers.test.ts` 共 111 个用例，全部走 Pattern K（纯函数，零 mock），<1 秒跑完。详见 [`docs/TEST_COVERAGE_REPORT.md`](./docs/TEST_COVERAGE_REPORT.md)。
 
 ---
 
