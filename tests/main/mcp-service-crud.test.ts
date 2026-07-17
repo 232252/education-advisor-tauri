@@ -179,3 +179,57 @@ describe('McpService removeServer', () => {
     await expect(mcpService.removeServer('nonexistent-id')).rejects.toThrow(/not found/)
   })
 })
+
+describe('McpService 并发安全 (M7 修复)', () => {
+  it('并发 add 同一 id 应只成功1次', async () => {
+    await mcpService.init()
+    const results = await Promise.all(
+      Array.from({ length: 5 }, () =>
+        mcpService
+          .addServer({
+            id: 'race-target',
+            name: '竞态目标',
+            enabled: true,
+            transport: 'stdio',
+            command: 'npx',
+          })
+          .then(
+            () => 'success' as const,
+            (e) => `error: ${(e as Error).message}` as const,
+          ),
+      ),
+    )
+    const successCount = results.filter((r) => r === 'success').length
+    expect(successCount).toBe(1)
+    // 内存里只有1条
+    const servers = mcpService.listServers()
+    const matches = servers.filter((s) => s.id === 'race-target')
+    expect(matches).toHaveLength(1)
+  })
+
+  it('并发 add 不同 id 应全部成功', async () => {
+    await mcpService.init()
+    const ids = ['a', 'b', 'c', 'd', 'e']
+    const results = await Promise.all(
+      ids.map((id) =>
+        mcpService
+          .addServer({
+            id,
+            name: `server-${id}`,
+            enabled: true,
+            transport: 'stdio',
+            command: 'npx',
+          })
+          .then(
+            () => 'success' as const,
+            () => 'error' as const,
+          ),
+      ),
+    )
+    expect(results.every((r) => r === 'success')).toBe(true)
+    const servers = mcpService.listServers()
+    for (const id of ids) {
+      expect(servers.some((s) => s.id === id)).toBe(true)
+    }
+  })
+})

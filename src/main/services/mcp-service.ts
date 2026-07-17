@@ -78,6 +78,8 @@ class McpService {
   private config: McpServerConfig[] = []
   private configPath: string
   private initialized = false
+  /** 写操作串行队列(防止 add/update/remove 并发竞态) */
+  private writeQueue: Promise<unknown> = Promise.resolve()
 
   constructor() {
     const devConfigDir = path.join(__dirname, '..', '..', 'config')
@@ -184,6 +186,11 @@ class McpService {
    * 校验:id 唯一、配置合法、command 安全
    */
   async addServer(config: McpServerConfig): Promise<void> {
+    return this.serializeWrite(() => this.addServerInternal(config))
+  }
+
+  /** addServer 的串行化实现 */
+  private async addServerInternal(config: McpServerConfig): Promise<void> {
     if (!validateServerConfig(config)) {
       throw new Error('Invalid server config')
     }
@@ -204,9 +211,34 @@ class McpService {
   }
 
   /**
+   * 把写操作串行化执行(防止并发 add/update/remove 竞态)
+   * 每个操作等前一个完成后再开始
+   *
+   * 关键:
+   *   - run = writeQueue.then(fn, fn) — 即使前一个操作 reject,本操作也能基于
+   *     已 settle 的队列开始(reject/recover 都会触发 .then 的第2个 handler)
+   *   - writeQueue = run.then(_, _)  — 即使本操作 reject,后续操作依然能排队
+   *     (catch 会吞掉 reject,否则后续 addServer 会卡死)
+   */
+  private async serializeWrite<T>(fn: () => Promise<T>): Promise<T> {
+    const run = this.writeQueue.then(fn, fn)
+    // 关键: 即使 fn 失败也要让队列继续(reject 不应阻塞后续操作)
+    this.writeQueue = run.then(
+      () => undefined,
+      () => undefined,
+    )
+    return run
+  }
+
+  /**
    * 更新 server(用户级直接改;全局级复制覆盖到 user)
    */
   async updateServer(id: string, patch: Partial<McpServerConfig>): Promise<void> {
+    return this.serializeWrite(() => this.updateServerInternal(id, patch))
+  }
+
+  /** updateServer 的串行化实现 */
+  private async updateServerInternal(id: string, patch: Partial<McpServerConfig>): Promise<void> {
     const existing = this.config.find((s) => s.id === id)
     if (!existing) throw new Error(`Server ${id} not found`)
 
@@ -252,6 +284,11 @@ class McpService {
    * - 纯全局:拒绝
    */
   async removeServer(id: string): Promise<void> {
+    return this.serializeWrite(() => this.removeServerInternal(id))
+  }
+
+  /** removeServer 的串行化实现 */
+  private async removeServerInternal(id: string): Promise<void> {
     const existing = this.config.find((s) => s.id === id)
     if (!existing) throw new Error(`Server ${id} not found`)
 
