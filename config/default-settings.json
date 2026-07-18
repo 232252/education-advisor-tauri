@@ -1,15 +1,17 @@
 {
   "general": {
     "dataDir": "",
-    "defaultOperator": "班主任",
+    "defaultOperator": "",
     "theme": "light",
     "language": "zh-CN",
     "autoUpdate": true,
+    "updateUrl": "",
     "telemetry": false,
     "logLevel": "info",
     "autoStart": false,
     "minimizeToTray": true,
-    "closeBehavior": "ask"
+    "closeBehavior": "ask",
+    "timezone": "Asia/Shanghai"
   },
   "mcp": {
     "enabled": false
@@ -21,13 +23,15 @@
     "lowCostModel": "",
     "enabledModels": [],
     "transport": "auto",
-    "cacheRetention": "none",
+    "cacheRetention": "short",
     "retry": {
       "enabled": true,
       "maxRetries": 3,
       "baseDelayMs": 1000,
       "providerTimeoutMs": 60000
-    }
+    },
+    "providerBlacklist": [],
+    "customModels": {}
   },
   "chat": {
     "compaction": {
@@ -38,7 +42,8 @@
     "steeringMode": "all",
     "followUpMode": "all",
     "showImages": true,
-    "maxTokens": 4096,
+    "maxTokens": 32768,
+    "conversationLogging": true,
     "thinkingLevel": "medium"
   },
   "privacy": {
