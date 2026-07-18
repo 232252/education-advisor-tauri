@@ -495,6 +495,13 @@ ${yaml.stringify({ servers })}
     }
 
     // 2. 技能级临时 server(优先级高,覆盖同名全局 server)
+    // ⚠️ 未接线(NOT WIRED): 此分支目前是死代码。
+    //   - skill-service.ts 不解析 SKILL.md frontmatter 的 mcp_servers 字段
+    //   - agent-service.ts:699 调 getMcpToolsForAgent 时只传 2 个参数,第三参恒为 undefined
+    //   设计文档(specs/2026-07-17-skills-mcp-hub-design.md §7)明确本次不做技能级 MCP。
+    //   保留此分支是为了未来接线时三层合并逻辑已就绪。若要启用,需:
+    //   1) skill-service.ts 解析 frontmatter mcp_servers → Skill.mcpServers
+    //   2) agent-service.ts 把激活技能的 mcpServers 传给 getMcpToolsForAgent 第三参
     if (skillMcpServers && skillMcpServers.length > 0) {
       for (const skillServer of skillMcpServers) {
         // 移除同名的全局 server
@@ -522,16 +529,29 @@ ${yaml.stringify({ servers })}
   }
 
   /**
-   * 调用 MCP 工具
+   * 调用 MCP 工具。
+   *
+   * R2-2 修复: 若 client 存在但已断开(child exit / ws close),尝试惰性重连一次,
+   * 而非直接抛 "not connected" 让调用方永久失败直到重启。
+   * 重连失败才抛错。这覆盖了 stdio 子进程崩溃后 Agent 下次调用自动恢复的场景。
    */
   async callTool(
     serverId: string,
     toolName: string,
     args: Record<string, unknown>,
   ): Promise<McpCallResult> {
-    const client = this.clients.get(serverId)
+    let client = this.clients.get(serverId)
     if (!client?.connected) {
-      throw new Error(`MCP server ${serverId} not connected`)
+      // 惰性重连: 找到配置则重连,无配置才抛错
+      const serverConfig = this.config.find((s) => s.id === serverId)
+      if (!serverConfig) {
+        throw new Error(`MCP server ${serverId} not connected and no config to reconnect`)
+      }
+      try {
+        client = await this.ensureConnected(serverConfig)
+      } catch (err) {
+        throw new Error(`MCP server ${serverId} reconnect failed: ${(err as Error).message}`)
+      }
     }
     return this.callToolInternal(client, toolName, args)
   }
