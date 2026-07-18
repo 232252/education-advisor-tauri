@@ -47,7 +47,7 @@
     "build:tauri": "npm run build:sidecar && node scripts/copy-sidecar-deps.mjs && npm run build",
     "tauri": "tauri",
     "tauri:dev": "npm run build:sidecar && tauri dev",
-    "tauri:build": "npm run build:tauri && tauri build",
+    "tauri:build": "npm run prebuild:check && npm run build:tauri && tauri build",
     "package": "tauri build",
     "prebuild:check": "node scripts/prebuild-check.mjs",
     "self-check": "node scripts/self-check.cjs",

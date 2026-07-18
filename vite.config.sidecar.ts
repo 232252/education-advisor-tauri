@@ -2,7 +2,9 @@ import { defineConfig } from 'vite'
 import { resolve } from 'path'
 
 // Sidecar 构建配置
-// 把 src/sidecar/sidecar-entry.ts 编译为 dist/sidecar/sidecar.cjs
+// 把 src/sidecar/sidecar-entry.ts 编译为 dist/sidecar/sidecar.{mjs,js}(ESM)
+// 注: fileName 配 'sidecar.mjs' 但 vite SSR 实际产物可能是 sidecar.js,
+//     由 sidecar/edu-sidecar.mjs 的 findBundle 兼容查找(.mjs/.js/.cjs)解耦。
 // 关键: resolve.alias 把 'electron' 重定向到 src/sidecar/electron-shim.ts
 //       这样所有 services/handlers 里的 `from 'electron'` 都用上 shim
 export default defineConfig({
