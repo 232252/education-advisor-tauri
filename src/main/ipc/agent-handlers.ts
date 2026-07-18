@@ -289,6 +289,12 @@ export function registerAgentHandlers(win: BrowserWindow) {
         if (!exists) {
           return { success: false, message: `Agent not found: ${id}` }
         }
+        // R13-2 修复:同步校验 agent 是否启用(disabled agent 不应返回 success:true
+        // 再异步报 error,会让前端收到矛盾信号)
+        const agent = agentService.listAgents().find((a) => a.id === id)
+        if (agent && !agent.enabled) {
+          return { success: false, message: `Agent is disabled: ${id}` }
+        }
         // 不 await:手动触发是 fire-and-forget,通过 stream 推送状态
         // 但同步 try/catch 同步参数错误,异步错误由 runAgent 内部 sendStatus 推送
         agentService.runAgent(id, prompt, win, safeHistory).catch((err) => {

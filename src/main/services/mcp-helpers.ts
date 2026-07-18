@@ -14,17 +14,32 @@
 import type { McpServerConfig } from '../../shared/types'
 
 /**
- * 环境变量插值: ${VAR} → process.env[VAR]
+ * 环境变量插值: ${VAR} 或 ${env.VAR} → process.env[VAR]
  * 未定义的环境变量替换为空字符串。
+ * 支持两种写法以兼容 mcp.yaml 文档约定与预设模板:
+ *   ${USERPROFILE}     → process.env.USERPROFILE
+ *   ${env.USERPROFILE} → process.env.USERPROFILE (剥离 env. 前缀)
+ * @example interpolateEnv('${env.USERPROFILE}/Documents') → 'C:\\Users\\sq\\Documents'
  * @example interpolateEnv('http://${HOST}') → 'http://example.com'(当 HOST=example.com)
  */
 export function interpolateEnv(value: string): string {
-  return value.replace(/\$\{([^}]+)\}/g, (_, name) => process.env[name] ?? '')
+  return value.replace(/\$\{([^}]+)\}/g, (_, rawName: string) => {
+    // 剥离可选的 env. 前缀(预设模板 mcp-presets.ts 使用 ${env.VAR} 写法)
+    const name = rawName.startsWith('env.') ? rawName.slice(4) : rawName
+    return process.env[name] ?? ''
+  })
 }
 
 /**
+ * 危险的原型污染 key(在对象展开/重建时过滤,防止 __proto__/constructor 污染)。
+ * R1-5 修复: deepInterpolate 与 mcp-service 的 spread 合并都会复制 enumerable own
+ * 属性,若配置含 __proto__/constructor 字段会污染运行时对象。这里统一过滤。
+ */
+const FORBIDDEN_KEYS = new Set(['__proto__', 'constructor', 'prototype'])
+
+/**
  * 深度插值:递归处理对象/数组中的所有字符串值。
- * 非字符串原样返回。
+ * 非字符串原样返回。同时过滤原型污染 key(__proto__/constructor/prototype)。
  */
 export function deepInterpolate<T>(obj: T): T {
   if (typeof obj === 'string') return interpolateEnv(obj) as unknown as T
@@ -32,11 +47,27 @@ export function deepInterpolate<T>(obj: T): T {
   if (obj && typeof obj === 'object') {
     const result: Record<string, unknown> = {}
     for (const [key, value] of Object.entries(obj)) {
+      // 跳过原型污染 key,防止 mcp.user.yaml 注入 __proto__ 等
+      if (FORBIDDEN_KEYS.has(key)) continue
       result[key] = deepInterpolate(value)
     }
     return result as unknown as T
   }
   return obj
+}
+
+/**
+ * 过滤对象中的原型污染 key,返回安全副本(浅拷贝)。
+ * 用于 mcp-service add/update 合并前对 patch/config 做净化,
+ * 防止 IPC 传入的 __proto__/constructor 字段经 spread 污染运行时对象。
+ */
+export function sanitizeObject<T extends Record<string, unknown>>(obj: T): T {
+  const result: Record<string, unknown> = {}
+  for (const [key, value] of Object.entries(obj)) {
+    if (FORBIDDEN_KEYS.has(key)) continue
+    result[key] = value
+  }
+  return result as T
 }
 
 /**
@@ -124,6 +155,11 @@ export function isSafeMcpUrl(rawUrl: string | undefined): boolean {
   const hostNoBracket = host.startsWith('[') && host.endsWith(']') ? host.slice(1, -1) : host
   // 显式允许 localhost(本地开发 MCP server 常用)
   if (host === 'localhost') return true
+  // R1-4 修复: 拦截短格式/十进制 IP 形式的危险地址
+  //   - 纯数字主机(如 "0", "0x7f000001", "2130706433")多数系统会当 IP 解析,
+  //     可能绕过下面的 4 段 IPv4 正则,直接拒绝。
+  //   - "0" / "0.0.0.0" / "[::]" 等绑定所有接口的地址拒绝。
+  if (/^\d+$/.test(host)) return false
   // IPv4 解析
   const ipv4Match = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/)
   if (ipv4Match) {

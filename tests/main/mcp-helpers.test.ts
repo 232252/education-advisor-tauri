@@ -76,6 +76,19 @@ describe('mcp-helpers: interpolateEnv', () => {
  it('空字符串输入返回空字符串', () => {
   expect(interpolateEnv('')).toBe('')
  })
+
+ // env. 前缀剥离(预设模板 mcp-presets.ts 使用 ${env.VAR} 写法)
+ it('${env.VAR} 剥离 env. 前缀后替换', () => {
+  expect(interpolateEnv('${env.' + ENV_A + '}')).toBe('alpha')
+ })
+
+ it('${env.VAR}/path 剥离前缀并拼接路径', () => {
+  expect(interpolateEnv('${env.' + ENV_HOST + '}/api')).toBe('example.com/api')
+ })
+
+ it('混合 ${VAR} 和 ${env.VAR} 都正确替换', () => {
+  expect(interpolateEnv('${' + ENV_A + '}-${env.' + ENV_B + '}')).toBe('alpha-beta')
+ })
 })
 
 describe('mcp-helpers: deepInterpolate', () => {
@@ -132,6 +145,29 @@ describe('mcp-helpers: deepInterpolate', () => {
   ports: [8080, 'beta'],
   meta: { token: 'gamma' },
   })
+ })
+
+ // FORBIDDEN_KEYS 过滤(防 mcp.user.yaml 原型污染)
+ // 注意: 对象字面量的 __proto__ 是原型链, Object.entries 不遍历它。
+ // 真实风险是 JSON.parse('{"__proto__":...}') 产生的 own 属性,或
+ // 从外部数据赋值 obj['__proto__']。这里用方括号赋值模拟真实攻击。
+ it('过滤 __proto__ own 属性(防原型污染)', () => {
+  const input = { normal: 'ok' } as Record<string, unknown>
+  // 用方括号赋值模拟 JSON.parse 或外部数据注入的 own 属性
+  input['__proto__'] = { polluted: 'evil' } as Record<string, unknown>
+  const result = deepInterpolate(input) as Record<string, unknown>
+  expect(result.normal).toBe('ok')
+  expect(Object.prototype.hasOwnProperty.call(result, '__proto__')).toBe(false)
+ })
+
+ it('过滤 constructor 和 prototype own 属性', () => {
+  const input = { a: '1' } as Record<string, unknown>
+  input['constructor'] = { x: 'y' }
+  input['prototype'] = { z: 'w' }
+  const result = deepInterpolate(input) as Record<string, unknown>
+  expect(result.a).toBe('1')
+  expect(Object.prototype.hasOwnProperty.call(result, 'constructor')).toBe(false)
+  expect(Object.prototype.hasOwnProperty.call(result, 'prototype')).toBe(false)
  })
 })
 
@@ -342,5 +378,11 @@ describe('isSafeMcpUrl (SSRF 防护)', () => {
     expect(isSafeMcpUrl('https://example.com/sse')).toBe(true)
     expect(isSafeMcpUrl('https://8.8.8.8/sse')).toBe(true)
     expect(isSafeMcpUrl('wss://mcp.example.com/ws')).toBe(true)
+  })
+
+  // 纯数字/十进制 IP 形式的 SSRF 绕过防护
+  it('拒绝纯数字主机(十进制 IP 绕过尝试)', () => {
+    expect(isSafeMcpUrl('http://2130706433/sse')).toBe(false)
+    expect(isSafeMcpUrl('http://0/sse')).toBe(false)
   })
 })
