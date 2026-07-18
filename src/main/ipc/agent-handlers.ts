@@ -168,13 +168,15 @@ export function registerAgentHandlers(win: BrowserWindow) {
       // P4-1 修复: 校验 patch 字段类型 + 长度 + null byte
       const p = patch as Record<string, unknown>
       const safePatch: Partial<
-        Pick<AgentConfig, 'name' | 'description' | 'modelTier' | 'capabilities'>
+        Pick<AgentConfig, 'name' | 'description' | 'modelTier' | 'capabilities' | 'mcpServers'>
       > = {}
       if (p.name !== undefined) safePatch.name = validateOptionalAgentString(p.name, 'name', 256)
       if (p.description !== undefined)
         safePatch.description = validateOptionalAgentString(p.description, 'description', 2000)
       if (p.modelTier !== undefined) safePatch.modelTier = validateModelTier(p.modelTier)
       if (p.capabilities !== undefined) safePatch.capabilities = p.capabilities as string[]
+      // R6-1: 接受 mcpServers(agent 级 MCP server 引用),透传给 updateAgent 做数组校验
+      if (p.mcpServers !== undefined) safePatch.mcpServers = p.mcpServers as string[]
       return agentService.updateAgent(id, safePatch)
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)

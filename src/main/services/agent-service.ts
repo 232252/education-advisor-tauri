@@ -71,6 +71,8 @@ interface UserAgentOverride {
   description?: string
   modelTier?: 'high_quality' | 'low_cost'
   capabilities?: string[]
+  // R6-1: agent 级 MCP server 引用(用户在 UI 配置的 agent↔MCP 连接)
+  mcpServers?: string[]
 }
 
 const WAIT_FOR_IDLE_TIMEOUT_MS = 5 * 60_000 // 5 分钟
@@ -189,6 +191,8 @@ class AgentService {
           if (a.modelTier === 'high_quality' || a.modelTier === 'low_cost')
             override.modelTier = a.modelTier
           if (Array.isArray(a.capabilities)) override.capabilities = a.capabilities
+          // R6-1: 读 snake_case mcp_servers → camelCase mcpServers(与 persist 写入对称)
+          if (Array.isArray(a.mcp_servers)) override.mcpServers = a.mcp_servers
           this.userOverrides.set(a.id, override)
         }
       }
@@ -210,6 +214,8 @@ class AgentService {
           description?: string
           modelTier?: 'high_quality' | 'low_cost'
           capabilities?: string[]
+          // R6-1: snake_case 与 config/agents.yaml + loadAgents 的 a.mcp_servers 对应
+          mcp_servers?: string[]
         } = { id }
         if (typeof v.enabled === 'boolean') entry.enabled = v.enabled
         if (typeof v.name === 'string') entry.name = v.name
@@ -217,12 +223,14 @@ class AgentService {
         if (v.modelTier === 'high_quality' || v.modelTier === 'low_cost')
           entry.modelTier = v.modelTier
         if (Array.isArray(v.capabilities)) entry.capabilities = v.capabilities
+        // R6-1: 持久化 mcpServers(用 snake_case mcp_servers 与加载侧一致)
+        if (Array.isArray(v.mcpServers)) entry.mcp_servers = v.mcpServers
         return entry
       })
     const payload = `\
 # Education Advisor Agent 用户覆盖配置
 # 此文件由 UI 自动生成,主配置文件 config/agents.yaml 不会被修改
-# 仅记录用户在 UI 中改过的字段（enabled/name/description/modelTier/capabilities）
+# 仅记录用户在 UI 中改过的字段（enabled/name/description/modelTier/capabilities/mcp_servers）
 # 删除此文件可重置所有覆盖
 ${yaml.stringify({ agents: list })}
 `
@@ -263,7 +271,8 @@ ${yaml.stringify({ agents: list })}
           riskThresholds: a.risk_thresholds,
           // R8-1 修复: 映射 yaml 的 mcp_servers → AgentConfig.mcpServers
           // 之前此字段在加载时丢失,导致 agent 永远拿不到 MCP 工具
-          mcpServers: a.mcp_servers,
+          // R6-1: override 优先(用户在 UI 配的 agent↔MCP 连接覆盖主配置)
+          mcpServers: override?.mcpServers ?? a.mcp_servers,
         }
         this.agents.set(config.id, config)
         this.agentStatus.set(config.id, 'idle')
@@ -337,10 +346,12 @@ ${yaml.stringify({ agents: list })}
     return { success: true }
   }
 
-  /** 更新 Agent 配置（name, description, modelTier, capabilities 等） */
+  /** 更新 Agent 配置（name, description, modelTier, capabilities, mcpServers 等） */
   updateAgent(
     id: string,
-    patch: Partial<Pick<AgentConfig, 'name' | 'description' | 'modelTier' | 'capabilities'>>,
+    patch: Partial<
+      Pick<AgentConfig, 'name' | 'description' | 'modelTier' | 'capabilities' | 'mcpServers'>
+    >,
   ): { success: boolean; error?: string } {
     const config = this.agents.get(id)
     if (!config) return { success: false, error: 'Agent not found' }
@@ -357,6 +368,19 @@ ${yaml.stringify({ agents: list })}
         return { success: false, error: 'capabilities must contain only strings' }
       }
       config.capabilities = validCaps
+    }
+    // R6-1: 支持通过 updateAgent 配置 agent 级 MCP server 引用。
+    // 此前 mcpServers 只能手编 config/agents.yaml,UI 完全无法接线 agent↔MCP,
+    // 导致 MCP 功能对终端用户实际不可用(管道正确但无入口)。
+    if (patch.mcpServers !== undefined) {
+      if (!Array.isArray(patch.mcpServers)) {
+        return { success: false, error: 'mcpServers must be an array of strings' }
+      }
+      const validIds = patch.mcpServers.filter((s) => typeof s === 'string')
+      if (validIds.length !== patch.mcpServers.length) {
+        return { success: false, error: 'mcpServers must contain only strings' }
+      }
+      config.mcpServers = validIds
     }
     // 持久化到 user overrides
     this.userOverrides.set(id, { ...(this.userOverrides.get(id) ?? {}), ...patch })

@@ -590,6 +590,7 @@ interface ConfigTabProps {
       description: string
       modelTier: 'high_quality' | 'low_cost'
       capabilities: string[]
+      mcpServers: string[]
     }>,
   ) => Promise<void>
 }
@@ -598,6 +599,10 @@ function ConfigTab({ detail, onUpdate }: ConfigTabProps) {
   const [name, setName] = useState(detail.name)
   const [description, setDescription] = useState(detail.description)
   const [modelTier, setModelTier] = useState<'high_quality' | 'low_cost'>(detail.modelTier)
+  // R6-2: agent 级 MCP server 引用(多选)。detail.mcpServers 可能为 undefined。
+  const [mcpServers, setMcpServers] = useState<string[]>(detail.mcpServers ?? [])
+  // 可用的 MCP server 列表(从 mcp:list 拉取,供用户勾选)
+  const [availableServers, setAvailableServers] = useState<{ id: string; name: string }[]>([])
   const [saving, setSaving] = useState(false)
   const [dirty, setDirty] = useState(false)
 
@@ -610,14 +615,35 @@ function ConfigTab({ detail, onUpdate }: ConfigTabProps) {
       setName(detail.name)
       setDescription(detail.description)
       setModelTier(detail.modelTier)
+      setMcpServers(detail.mcpServers ?? [])
       setDirty(false)
     }
   }, [detail])
 
+  // R6-2: 拉取可用 MCP server 列表(进入 config tab 时)。
+  // 用动态 import 避免在未启用 MCP 时引入 ipc-client 开销;失败则空列表(只显示已选)。
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const { getAPI } = await import('../../lib/ipc-client')
+        const result = await getAPI().mcp.list()
+        if (!cancelled && result?.success && Array.isArray(result.servers)) {
+          setAvailableServers(result.servers.map((s) => ({ id: s.id, name: s.name })))
+        }
+      } catch {
+        // MCP 未启用或 IPC 不可用,availableServers 保持空,用户仍可看到已选 id
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   const handleSave = async () => {
     setSaving(true)
     try {
-      await onUpdate(detail.id, { name, description, modelTier })
+      await onUpdate(detail.id, { name, description, modelTier, mcpServers })
       setDirty(false)
     } catch {
       // updateAgent 内部已 toast
@@ -722,6 +748,50 @@ function ConfigTab({ detail, onUpdate }: ConfigTabProps) {
               高质量
             </button>
           </div>
+        </div>
+
+        {/* R6-2: MCP server 引用(多选) — 让 agent 在运行时获得这些 MCP server 的工具 */}
+        <div>
+          <span className="text-xs text-gray-500 dark:text-gray-400 font-medium block mb-1">
+            MCP 服务器
+          </span>
+          <p className="text-[11px] text-gray-400 dark:text-gray-500 mb-2">
+            勾选后,该 Agent 运行时可使用这些 MCP 服务器提供的工具。在「技能 → MCP 服务器」管理。
+          </p>
+          {availableServers.length === 0 ? (
+            <p className="text-xs text-gray-400 dark:text-gray-500 italic">
+              {mcpServers.length === 0
+                ? '暂无可用的 MCP 服务器(请在技能页添加,或未启用 MCP 功能)'
+                : `已选: ${mcpServers.join(', ')} (服务列表加载中或 MCP 未启用)`}
+            </p>
+          ) : (
+            <div className="space-y-1">
+              {availableServers.map((srv) => {
+                const checked = mcpServers.includes(srv.id)
+                return (
+                  <label
+                    key={srv.id}
+                    className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={(e) => {
+                        setMcpServers((prev) =>
+                          e.target.checked
+                            ? [...prev, srv.id]
+                            : prev.filter((id) => id !== srv.id),
+                        )
+                        markDirty()
+                      }}
+                    />
+                    <span className="font-mono text-xs text-blue-500">{srv.id}</span>
+                    <span className="text-gray-400 dark:text-gray-500">— {srv.name}</span>
+                  </label>
+                )
+              })}
+            </div>
+          )}
         </div>
 
         {/* 只读信息 */}
