@@ -154,10 +154,13 @@ export const IPC_FEISHU_SEND = 'feishu:send'
 export const IPC_FEISHU_STATUS = 'feishu:status'
 export const IPC_FEISHU_SYNC_NOW = 'feishu:sync-now'
 // 飞书长连接机器人:启动/停止/状态查询 + 状态推送(主→渲染)
+// 关键修复 R15-1：通道名拼写对齐渲染层 tauri-bridge.ts，原 'feishu:bot-status' 与
+// 渲染层 'feishu:bot:status'（带冒号）字面不等，导致 sidecar 分派器找不到 handler，
+// 飞书机器人状态查询在 sidecar 模式下完全不可用。统一为 'feishu:bot:status'。
 export const IPC_FEISHU_BOT_START = 'feishu:bot-start'
 export const IPC_FEISHU_BOT_STOP = 'feishu:bot-stop'
-export const IPC_FEISHU_BOT_STATUS = 'feishu:bot-status'
-export const IPC_FEISHU_BOT_STATUS_UPDATE = 'feishu:bot-status-update'
+export const IPC_FEISHU_BOT_STATUS = 'feishu:bot:status'
+export const IPC_FEISHU_BOT_STATUS_UPDATE = 'feishu:bot:status-update'
 
 // ===== 日志 =====
 // arch-P0-1 修复：原硬编码字符串，迁入共享常量

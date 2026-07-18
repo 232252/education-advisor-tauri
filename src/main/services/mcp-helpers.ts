@@ -91,12 +91,24 @@ export function validateServerConfig(server: unknown): server is McpServerConfig
   if (typeof s.id !== 'string' || s.id.length === 0) return false
   // R5-ERR-4 修复: id 长度上限,与 mcp-handlers.ts 的 validateServerId 一致
   if (s.id.length > 128) return false
+  // R15-2 修复: id 拒 null byte（防注入到下游 YAML 解析 / 文件名）
+  if (s.id.includes('\0')) return false
   if (typeof s.name !== 'string') return false
+  // R15-2: name 拒 null byte
+  if (s.name.includes('\0')) return false
   if (typeof s.enabled !== 'boolean') return false
   const transport = s.transport
   if (transport !== 'stdio' && transport !== 'sse' && transport !== 'websocket') return false
   // stdio 需要 command
   if (transport === 'stdio' && typeof s.command !== 'string') return false
+  // R15-2: command 拒 null byte（防 stdio spawn 命令注入）
+  if (transport === 'stdio' && typeof s.command === 'string' && s.command.includes('\0')) return false
+  // R15-2: args 数组每项拒 null byte
+  if (Array.isArray(s.args)) {
+    for (const a of s.args) {
+      if (typeof a === 'string' && a.includes('\0')) return false
+    }
+  }
   // sse/websocket 需要 url 且非空(拒空字符串/纯空白)
   // R5-ERR-3 修复: typeof 'string' 接受空串,要求 trim 后非空
   if (
