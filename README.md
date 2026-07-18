@@ -103,7 +103,7 @@ Privacy is not a checkbox. The Rust PII engine builds a per-install **encrypted 
 | **Students** | `#/students` | Roster, conduct scores, history, profile expansion |
 | **Agents** | `#/agents` | The 18-agent control panel — enable, disable, edit SOUL.md |
 | **Models** | `#/models` | LLM providers, API keys, custom models, model tier assignment |
-| **Skills** | `#/skills` | Markdown-defined "skills" that get injected into agent prompts |
+| **Skills (能力中心)** | `#/skills` | 3 Tab 工作台:Markdown 技能 / MCP 服务器管理(stdio·sse·websocket 三种传输 + 预设模板) / 插件(预留) |
 | **Scheduler** | `#/scheduler` | Cron jobs across all agents, logs, manual triggers |
 | **Privacy** | `#/privacy` | PII mapping table, anonymization, per-recipient filtering |
 | **Settings** | `#/settings` | Theme, language, log level, update channel, factory reset |

@@ -7,6 +7,8 @@
 // =============================================================
 
 import { app, type BrowserWindow, ipcMain } from 'electron'
+import fsp from 'node:fs/promises'
+import path from 'node:path'
 import * as IPC from '../../shared/ipc-channels'
 import { feishuBotService } from '../services/feishu-bot-service'
 import { keystoreService } from '../services/keystore-service'
@@ -238,6 +240,15 @@ export function registerSettingsHandlers(win: BrowserWindow) {
       updateTray(newSettings.general.minimizeToTray)
       // T5: 重置后恢复 logLevel
       setLogLevel(newSettings.general.logLevel)
+      // R7-2 修复: 重置时同时删除 mcp.user.yaml(用户添加/覆盖的 MCP server 配置),
+      // 否则 factory reset 后这些残留配置会留在磁盘上,reloadConfig 看到 enabled=true 还会再次加载。
+      const mcpUserYaml = path.join(app.getPath('userData'), 'mcp.user.yaml')
+      await fsp.unlink(mcpUserYaml).catch((err) => {
+        // ENOENT 不算错(用户本来就没有 user yaml)
+        if ((err as NodeJS.ErrnoException).code !== 'ENOENT') {
+          log('warn', 'settings', `mcp.user.yaml delete failed (reset): ${err}`)
+        }
+      })
       // 重置后重新加载 MCP 配置(默认 mcp.enabled=false)
       await mcpService.reloadConfig().catch((err) => {
         log('warn', 'settings', `MCP reloadConfig after reset failed: ${err}`)

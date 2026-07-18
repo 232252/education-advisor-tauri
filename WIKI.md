@@ -299,7 +299,7 @@ education-advisor-tuari/
 | `chat:*` | 4 | `:144-147` | `save-message`, `load-messages`, `list-sessions` |
 | `feishu:*` | 9 | `:151-160` | `test`, `bot-start`, `bot-status-update`(event) |
 | `log:*` | 9 | `:164-172` | `list`, `read`, `clear`, `write-renderer` |
-| `mcp:*` | 5 | `:179-183` | `list`, `connect`, `list-tools`, `test` |
+| `mcp:*` | 8 | `:178-185` | `list`, `connect`, `disconnect`, `list-tools`, `test`, `add`, `update`, `remove` |
 
 **合计约 141 个通道常量、135 个 handler 端点**（有的通道是 send-only 事件，没有 handler）。
 
@@ -322,7 +322,7 @@ export async function registerAllHandlers(win) {
   registerFeishuHandlers(win)     // 8 个
   registerOllamaHandlers(win)     // 6 个
   registerClassHandlers()         // 8 个
-  registerMcpHandlers(win)        // 5 个
+  registerMcpHandlers(win)        // 8 个
   await eaaBridge.initialize()    // EAA 引导
   await agentService.init(win)    // Agent 运行时引导
 }
@@ -563,7 +563,10 @@ ipcMain.handle(IPC.IPC_ACADEMIC_SET_GRADE, async (_e, record) => {
 
 **risk_thresholds** 统一为 `{ high: 85, medium: 93, low: 93 }`（P2-12 修复后）。
 
-**MCP 配置**（`config/mcp.yaml`）：当前 `servers: []` 是空的（文件只是模板，有 3 个注释掉的示例）。没有任何 agent 引用 MCP 服务器，系统作为单进程 sidecar 跑，没有外部工具服务器。安全护栏（路径校验 + shell 元字符消毒）实现了但当前未启用。
+**MCP 配置**（`config/mcp.yaml` + `mcp.user.yaml`）：全局 `mcp.yaml` 只读、用户改动落到 `userData/mcp.user.yaml`（仿 `agents.user.yaml`）。
+Agent 可在「Agent → Config → MCP 服务器」勾选要启用的 server，配置写入 `agents.user.yaml` 的 `mcp_servers` 字段。
+运行时由 `agent-service.runAgent` 通过 `getMcpToolsForAgent(agentId, config.mcpServers)` 合并到 Agent 工具集。
+R6 (2026-07-18) 修复前此 UI 不存在，终端用户只能手编 `agents.yaml`。安全护栏（SSRF / shell 元字符 / 原型污染）已落地并默认开启。
 
 ---
 

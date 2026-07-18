@@ -21,6 +21,14 @@
 - 配套 R8-5 静默跳过:Agent 引用不存在的 MCP server 时 graceful 降级到空工具列表,不报错崩溃
 - 新增集成测试:`tests/main/mcp-agent-integration.test.ts`(18 用例,Scenario A.1-A.3 覆盖有/无/缺失 mcpServers 三种情况)
 
+### 2026-07-18 补充:R6 Agent ↔ MCP UI 接线(关键功能补全)
+
+✅ **Agent 级 MCP 启用 UI 已上线**:AgentsPage 配置 Tab 新增「MCP 服务器」多选框,勾选后写入 `agents.user.yaml` 的 `mcp_servers` 字段,运行时由 `agent-service.runAgent` 通过 `getMcpToolsForAgent(agentId, config.mcpServers)` 合并到 Agent 工具集。
+- 后端:`agent-service.updateAgent` 接受 `mcpServers: string[]`(数组校验),持久化 snake_case `mcp_servers` 到 user overrides
+- 前端:`AgentsPage` ConfigTab 新增 MCP 服务器区块,从 `mcp:list` 拉取可用 server 列表展示
+- 此前管道正确但 UI 完全无入口(只能手编 `agents.yaml`),R6 补完后终端用户可在 UI 配置 Agent ↔ MCP 接线
+- commit:`0fca6b13 feat(mcp): R6 打通 agent↔MCP 接线(此前管道正确但 UI 无入口)`
+
 ---
 
 ## 一、背景与目标

@@ -1,7 +1,9 @@
 # 设计：技能页面升级为「能力中心」(技能 + MCP + 预留插件)
 
 - **日期**：2026-07-17
-- **状态**：已与用户确认，待出实施计划
+- **状态**:核心 R1-R5 已落地(技能 → 能力中心 3 Tab 化、MCP 增删改查 + 模板 + i18n、覆盖语义、连接竞态/SSE/SSRF/原型污染等 10 项修复)。
+  **R6 (2026-07-18) 超出本设计范围**:在 AgentsPage ConfigTab 新增 MCP server 多选 UI,Agent 可在 UI 配置引用哪些 MCP server,
+  运行时通过 `getMcpToolsForAgent` 合并到工具集。撤销下方 §7 的 YAGNI 决策。详见 `MCP_INTEGRATION_PLAN.md` R6 状态条。
 - **作者**：brainstorming 流程产出
 - **关联**：`MCP_INTEGRATION_PLAN.md`（MCP 阶段性计划的最终落地 UI）
 
@@ -324,7 +326,7 @@ export const MCP_PRESETS: McpPreset[] = [
 - ❌ 不做 MCP 工具的实际调用 UI（工具调用由 Agent 运行时触发，`mcp-tools.ts` 已处理）
 - ❌ 不做「插件」Tab 的实际功能（只占位）
 - ❌ 不做技能级 `mcpServers` 的 frontmatter 可视化编辑（`Skill.mcpServers` 字段已存在，但本次不动 SkillsTab）
-- ❌ 不做 Agent 级 `mcpServers` 启用 UI（`AgentConfig.mcpServers` 字段已存在，本次不动 AgentsPage）
+- ~~❌ 不做 Agent 级 `mcpServers` 启用 UI（`AgentConfig.mcpServers` 字段已存在，本次不动 AgentsPage）~~ **R6 已撤销**:AgentsPage ConfigTab 加了多选 UI(`src/renderer/pages/Agents/AgentsPage.tsx` + `agent-service.updateAgent` 接受 mcpServers,持久化到 `agents.user.yaml`)
 - ❌ 不做 Tab 入 URL（保持与其他页面 Tab 惯例一致）
 - ❌ 不做配置导入导出（YAGNI，等用户提出）
 - ❌ 不做 MCP server 市场/远程拉取（YAGNI）
