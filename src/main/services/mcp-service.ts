@@ -189,6 +189,9 @@ class McpService {
     return this.serializeWrite(async () => {
       // 断开所有现有连接
       await this.disconnectAll()
+      // R5-1 / 泄漏 #3 修复: 清理进行中的连接锁,避免 inflight doConnect 在
+      // disconnectAll 后又把 stale client 插回 this.clients(用旧 config)。
+      this.connecting.clear()
       this.config = []
       this.initialized = false
       await this.init()
@@ -660,7 +663,21 @@ ${yaml.stringify({ servers })}
       pending: new Map(),
     }
 
-    await this.connectTransport(client, server)
+    // R5-1 / 泄漏 #2 修复: connectTransport 可能在 spawn/ws.open 之后再失败
+    // (initialize 握手超时/错误/transport closed)。此时 client.childProcess/ws 已存在,
+    // 但 client 还没进 this.clients,disconnectAll 看不到 → 子进程/ws 泄漏。
+    // 这里用 try/catch 包裹,失败时主动 disconnectClient 清理已持有的 transport 资源。
+    try {
+      await this.connectTransport(client, server)
+    } catch (err) {
+      // 清理已 spawn 的子进程 / 已打开的 ws,避免泄漏
+      try {
+        await this.disconnectClient(client)
+      } catch {
+        // 清理失败不掩盖原始连接错误
+      }
+      throw err
+    }
     this.clients.set(server.id, client)
 
     // 连接成功后列出工具
@@ -697,16 +714,23 @@ ${yaml.stringify({ servers })}
       }
     })()
 
-    // 连接超时
-    await Promise.race([
-      connectPromise,
-      new Promise<never>((_, reject) => {
-        setTimeout(
-          () => reject(new Error(`Connect timeout after ${CONNECT_TIMEOUT_MS}ms`)),
-          CONNECT_TIMEOUT_MS,
-        )
-      }),
-    ])
+    // 连接超时。
+    // R5-1 / 泄漏 #1 修复: 成功连接后主动 clearTimeout,避免 timer 持有 reject 闭包
+    // 长达 CONNECT_TIMEOUT_MS(此前每次成功 connect 都会泄漏一个 30s timer)。
+    let connectTimer: NodeJS.Timeout | undefined
+    try {
+      await Promise.race([
+        connectPromise,
+        new Promise<never>((_, reject) => {
+          connectTimer = setTimeout(
+            () => reject(new Error(`Connect timeout after ${CONNECT_TIMEOUT_MS}ms`)),
+            CONNECT_TIMEOUT_MS,
+          )
+        }),
+      ])
+    } finally {
+      if (connectTimer) clearTimeout(connectTimer)
+    }
 
     client.connected = true
   }
