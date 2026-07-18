@@ -153,12 +153,18 @@ class CronService {
         expr = intervalRaw
       } else {
         // 视为分钟数，转换为 cron 表达式
+        // R8 / 1B 修复: 之前 ≥24h 的 interval 被 Math.min(23, hours) 静默截断到 23h,
+        // 导致用户配 5 天实际变成 23h,且无任何信号。改用"每 N 天"语法 0 0 */N * *
         const minutes = typeof intervalRaw === 'number' ? intervalRaw : Number(intervalRaw) || 360
         if (minutes < 60) {
           expr = `*/${Math.max(1, Math.round(minutes))} * * * *`
-        } else {
+        } else if (minutes < 24 * 60) {
           const hours = Math.max(1, Math.round(minutes / 60))
-          expr = `0 */${Math.min(23, hours)} * * *`
+          expr = `0 */${hours} * * *`
+        } else {
+          // 1 天以上:用 day-of-month 语法,Node-cron 支持的最小间隔是 1 天
+          const days = Math.max(1, Math.round(minutes / (24 * 60)))
+          expr = `0 0 */${days} * *`
         }
       }
       const taskId = 'feishu-bitable-sync'

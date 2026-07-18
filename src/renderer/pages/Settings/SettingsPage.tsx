@@ -514,10 +514,28 @@ export function SettingsPage() {
           description="GitHub 仓库地址，用于检查更新（如 https://github.com/owner/repo）"
         >
           <input
-            type="text"
+            type="url"
             value={settings.general.updateUrl}
             placeholder="https://github.com/owner/repo"
-            onChange={(e) => handleSave('general.updateUrl', e.target.value)}
+            // R8 / 4C 修复: 校验 URL 格式 + 仅允许 http(s),防止用户误填 javascript:/file:
+            // 等危险 scheme 被 update-service 当作请求目标。
+            onChange={(e) => {
+              const v = e.target.value.trim()
+              if (v === '') {
+                handleSave('general.updateUrl', v)
+                return
+              }
+              try {
+                const u = new URL(v)
+                if (u.protocol === 'http:' || u.protocol === 'https:') {
+                  handleSave('general.updateUrl', v)
+                } else {
+                  toast.error(`不支持的协议: ${u.protocol} (仅允许 http/https)`)
+                }
+              } catch {
+                toast.error('URL 格式不正确')
+              }
+            }}
             className="bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-2.5 py-1.5 text-xs text-gray-700 dark:text-gray-200 w-56 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
           />
         </SettingRow>
