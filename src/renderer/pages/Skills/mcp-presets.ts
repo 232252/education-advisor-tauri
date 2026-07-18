@@ -19,8 +19,11 @@ export const MCP_PRESETS: McpPreset[] = [
     i18nSuffix: 'filesystem',
     config: {
       id: 'filesystem',
-      name: '本地文件系统',
-      description: '让 Agent 读写本地文档目录',
+      // R4-1: name/description 改为英文默认落盘值(用户保存的 server 名应是具体文字)。
+      // UI 展示在 PresetTemplates 用 i18n key(page.mcp.preset.<suffix> / .desc),
+      // 落盘到 mcp.user.yaml 用这里的具体值。
+      name: 'Local Filesystem',
+      description: 'Let the Agent read/write your local documents folder',
       enabled: true,
       transport: 'stdio',
       command: 'npx',
@@ -34,8 +37,8 @@ export const MCP_PRESETS: McpPreset[] = [
     i18nSuffix: 'websearch',
     config: {
       id: 'web-search',
-      name: '网页搜索',
-      description: '让 Agent 搜索互联网(需要 API key)',
+      name: 'Web Search',
+      description: 'Let the Agent search the web (requires API key)',
       enabled: true,
       transport: 'sse',
       url: 'https://mcpsearch.example.com/sse',
@@ -48,8 +51,8 @@ export const MCP_PRESETS: McpPreset[] = [
     i18nSuffix: 'sqlite',
     config: {
       id: 'sqlite',
-      name: 'SQLite 数据库',
-      description: '查询本地 SQLite 数据库',
+      name: 'SQLite Database',
+      description: 'Query a local SQLite database',
       enabled: true,
       transport: 'stdio',
       command: 'uvx',

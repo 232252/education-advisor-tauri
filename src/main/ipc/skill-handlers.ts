@@ -5,19 +5,16 @@
 
 import { type BrowserWindow, ipcMain } from 'electron'
 import * as IPC from '../../shared/ipc-channels'
-import { skillService } from '../services/skill-service'
+import { isValidSkillName, skillService } from '../services/skill-service'
 
-/** C-2 修复: 验证技能名称(文件名安全) */
+/**
+ * C-2 修复: 验证技能名称(文件名安全)。
+ * R4-4 修复: 复用 skill-service 的 isValidSkillName(单点真相),
+ * 消除此前 handler/service 两套不一致的 regex。
+ */
 function validateSkillName(name: unknown): string {
-  if (typeof name !== 'string' || name.length === 0) {
-    throw new Error('name must be a non-empty string')
-  }
-  if (name.length > 128) {
-    throw new Error('name too long (max 128 chars)')
-  }
-  // 拒绝路径分隔符和危险字符
-  if (/[/\\]|\.\.|\0/.test(name)) {
-    throw new Error('name contains invalid characters')
+  if (!isValidSkillName(name)) {
+    throw new Error('name must be a valid skill name (non-empty, ≤128 chars, no path/reserved chars)')
   }
   return name
 }

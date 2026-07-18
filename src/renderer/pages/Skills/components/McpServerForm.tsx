@@ -143,7 +143,7 @@ export function McpServerForm({ initial, mode, onSubmit, onCancel }: McpServerFo
         </h2>
 
         <div className="space-y-3">
-          <FormField label={t('page.mcp.field.id')} error={errors.id} required>
+          <FormField label={t('page.mcp.field.id')} error={errors.id ? t(errors.id) : undefined} required>
             <input
               type="text"
               value={draft.id}
@@ -153,7 +153,7 @@ export function McpServerForm({ initial, mode, onSubmit, onCancel }: McpServerFo
             />
           </FormField>
 
-          <FormField label={t('page.mcp.field.name')} error={errors.name} required>
+          <FormField label={t('page.mcp.field.name')} error={errors.name ? t(errors.name) : undefined} required>
             <input
               type="text"
               value={draft.name}
@@ -185,7 +185,7 @@ export function McpServerForm({ initial, mode, onSubmit, onCancel }: McpServerFo
 
           {draft.transport === 'stdio' ? (
             <>
-              <FormField label={t('page.mcp.field.command')} error={errors.command} required>
+              <FormField label={t('page.mcp.field.command')} error={errors.command ? t(errors.command) : undefined} required>
                 <input
                   type="text"
                   value={draft.command}
@@ -216,7 +216,7 @@ export function McpServerForm({ initial, mode, onSubmit, onCancel }: McpServerFo
             </>
           ) : (
             <>
-              <FormField label={t('page.mcp.field.url')} error={errors.url} required>
+              <FormField label={t('page.mcp.field.url')} error={errors.url ? t(errors.url) : undefined} required>
                 <input
                   type="text"
                   value={draft.url}

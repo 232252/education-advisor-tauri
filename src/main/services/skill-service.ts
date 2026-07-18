@@ -13,7 +13,23 @@ import fs from 'node:fs'
 import fsp from 'node:fs/promises'
 import path from 'node:path'
 import { app } from 'electron'
+import yaml from 'yaml'
 import type { Skill } from '../../shared/types'
+
+/**
+ * 技能名(文件名)安全校验:单点真相,handler 和 service 共用。
+ * R4-4 修复:此前 handler 用 /[/\\]|\.\.|\0/,service 用 /[/\\:*?"<>|]/,
+ * 两处各漏一部分(handler 漏 Windows 保留字符,service 漏 .. 和 \0)。
+ * 这里合并为完整集合。
+ */
+const SKILL_NAME_INVALID_RE = /[/\\:*?"<>|]|\.\.|\0/
+
+/** 校验技能名是否合法(非空、长度合理、无路径/保留字符)。合法返回 true。 */
+export function isValidSkillName(name: unknown): boolean {
+  if (typeof name !== 'string' || name.length === 0 || name.length > 128) return false
+  if (SKILL_NAME_INVALID_RE.test(name)) return false
+  return true
+}
 
 class SkillService {
   private userSkillsDir: string
@@ -62,8 +78,20 @@ class SkillService {
       )
     }
 
-    console.log(`[SkillService] Total: ${skills.length} skills`)
-    return skills
+    // R4-4 修复: 同名 user/project skill 去重(user 优先),避免列表出现两条同名项困扰用户
+    const seen = new Map<string, Skill>()
+    for (const s of skills) {
+      if (!seen.has(s.name)) seen.set(s.name, s) // 先入为主:user 在前,优先保留
+    }
+    const deduped = Array.from(seen.values())
+    if (deduped.length !== skills.length) {
+      console.log(
+        `[SkillService] Deduped ${skills.length - deduped.length} same-name skills (user wins)`,
+      )
+    }
+
+    console.log(`[SkillService] Total: ${deduped.length} skills`)
+    return deduped
   }
 
   /** 读取指定技能内容 */
@@ -80,7 +108,8 @@ class SkillService {
   /** 保存技能（写入用户级目录） */
   async saveSkill(name: string, content: string): Promise<{ success: boolean; error?: string }> {
     try {
-      if (!name || typeof name !== 'string' || /[/\\:*?"<>|]/.test(name)) {
+      // R4-4: 用共享 isValidSkillName(单点真相),与 handler 一致
+      if (!isValidSkillName(name)) {
         return { success: false, error: 'Invalid skill name (contains reserved characters)' }
       }
       if (typeof content !== 'string') {
@@ -196,17 +225,31 @@ class SkillService {
     }
   }
 
-  /** 从 Markdown 内容中提取描述（YAML frontmatter 或首段文字） */
+  /**
+   * 从 Markdown 内容中提取描述（YAML frontmatter 或首段文字）。
+   *
+   * R4-3 修复: 旧实现用正则 /description:\s*(.+)/ 提取,对 YAML block scalar(|,>)、
+   * 嵌套对象、引号字符串都会返回垃圾(如 "|"、"description:" 字面量)。
+   * 改用 yaml 库正确解析 frontmatter,降级时回退到首段文字。
+   */
   private extractDescription(content: string): string {
     if (typeof content !== 'string' || content.length === 0) {
       return 'No description'
     }
 
-    // 尝试 YAML frontmatter
-    const fmMatch = content.match(/^---\n([\s\S]*?)\n---/)
+    // 尝试 YAML frontmatter(用 yaml 库正确解析,处理 block scalar/嵌套/引号)
+    const fmMatch = content.match(/^---\r?\n([\s\S]*?)\r?\n---/)
     if (fmMatch) {
-      const descMatch = fmMatch[1].match(/description:\s*(.+)/)
-      if (descMatch) return descMatch[1].trim()
+      try {
+        const parsed = yaml.parse(fmMatch[1]) as Record<string, unknown> | null
+        const desc = parsed?.description
+        if (typeof desc === 'string' && desc.trim()) {
+          return desc.trim().slice(0, 500)
+        }
+        // description 不是字符串(可能是对象/数组),跳过走回退
+      } catch {
+        // frontmatter 不是合法 YAML,走回退
+      }
     }
 
     // 回退：取第一行非空非标题文字
