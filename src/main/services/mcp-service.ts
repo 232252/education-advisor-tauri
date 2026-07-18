@@ -32,6 +32,7 @@ import { atomicWrite } from '../utils/atomic-write'
 import {
   deepInterpolate,
   isSafeMcpUrl,
+  sanitizeObject,
   validateCommandSafe,
   validateServerConfig,
 } from './mcp-helpers'
@@ -99,6 +100,12 @@ class McpService {
   private initialized = false
   /** 写操作串行队列(防止 add/update/remove 并发竞态) */
   private writeQueue: Promise<unknown> = Promise.resolve()
+  /**
+   * 每个 serverId 的"正在连接"互斥锁(R1-3 / B1 修复)。
+   * 并发 ensureConnected 同一 server 时,后续调用方复用同一个进行中的连接 Promise,
+   * 避免产生重复子进程 / 孤儿进程。
+   */
+  private connecting: Map<string, Promise<MCPClient>> = new Map()
 
   constructor() {
     const devConfigDir = path.join(__dirname, '..', '..', 'config')
@@ -159,10 +166,12 @@ class McpService {
       const parsed = yaml.parse(content)
       const servers = parsed?.servers
       if (!Array.isArray(servers)) return []
+      // R1-10 / B6 修复: 这里不再 .filter((s) => s.enabled) —— 否则 addServer 写入的
+      // enabled:false server 在下次 reloadConfig/loadConfig 时会被静默丢弃,造成
+      // 内存与磁盘不一致。enabled 由 UI 层展示开关,listServers 仍列出全部以便用户重新启用。
       return servers
         .filter(validateServerConfig)
-        .map((s) => deepInterpolate({ ...s, source }))
-        .filter((s) => s.enabled)
+        .map((s) => deepInterpolate(sanitizeObject({ ...s, source })))
     } catch (err) {
       if ((err as NodeJS.ErrnoException).code === 'ENOENT') return []
       console.warn(`[McpService] Failed to load ${filePath}:`, err)
@@ -171,14 +180,22 @@ class McpService {
   }
 
   /**
-   * 重新加载配置(配置文件变更时调用)
+   * 重新加载配置(配置文件变更时调用)。
+   *
+   * R1-10 / B7 修复: 走 serializeWrite,避免与并发 add/update/remove 竞态
+   * (reloadConfig 直接 loadConfig 会用磁盘旧状态覆盖内存新状态)。
    */
   async reloadConfig(): Promise<void> {
-    // 断开所有现有连接
-    await this.disconnectAll()
-    this.config = []
-    this.initialized = false
-    await this.init()
+    return this.serializeWrite(async () => {
+      // 断开所有现有连接
+      await this.disconnectAll()
+      // R5-1 / 泄漏 #3 修复: 清理进行中的连接锁,避免 inflight doConnect 在
+      // disconnectAll 后又把 stale client 插回 this.clients(用旧 config)。
+      this.connecting.clear()
+      this.config = []
+      this.initialized = false
+      await this.init()
+    })
   }
 
   /**
@@ -233,7 +250,8 @@ class McpService {
     }
     // 读取现有 user 配置 + 追加
     const userServers = await this.readUserConfig()
-    const newServer: McpServerConfig = { ...config, source: 'user' }
+    // R1-5 / B5 修复: 净化原型污染 key 后再落盘/合并,防止 __proto__ 等注入
+    const newServer: McpServerConfig = sanitizeObject({ ...config, source: 'user' })
     userServers.push(newServer)
     await this.writeUserConfig(userServers)
     // 更新内存
@@ -293,32 +311,54 @@ class McpService {
       throw new Error(`Server ${id} url failed SSRF check`)
     }
 
-    // 若正在连接,先断开(新配置下次连接生效)
+    // 若正在连接,先断开(新配置下次连接生效)。
+    // 注意: 这里直接调 disconnectClient 而非 disconnectServer,因为本方法已运行在
+    // serializeWrite 队列内,若再调 disconnectServer(也入队)会造成队列自等待死锁。
     if (this.clients.has(id)) {
-      await this.disconnectServer(id)
+      const inflight = this.connecting.get(id)
+      if (inflight) {
+        try {
+          await inflight
+        } catch {
+          // 忽略连接失败,继续清理
+        }
+      }
+      const client = this.clients.get(id)
+      if (client) {
+        await this.disconnectClient(client)
+        this.clients.delete(id)
+      }
     }
 
     const userServers = await this.readUserConfig()
     const userIdx = userServers.findIndex((s) => s.id === id)
 
+    // R1-5 / B5 修复: 净化 patch 的原型污染 key,再 spread 合并
+    const safePatch = sanitizeObject({ ...patch })
     if (existing.source === 'user' || userIdx >= 0) {
       // 已是用户级(或覆盖过),直接 patch user 配置中的对应条目
       if (userIdx >= 0) {
-        userServers[userIdx] = { ...userServers[userIdx], ...patch, source: 'user' }
+        userServers[userIdx] = sanitizeObject({
+          ...userServers[userIdx],
+          ...safePatch,
+          source: 'user',
+        })
       } else {
         // 内存中是 user 但文件里没有(异常情况),追加
-        userServers.push({ ...existing, ...patch, source: 'user' })
+        userServers.push(sanitizeObject({ ...existing, ...safePatch, source: 'user' }))
       }
     } else {
       // 全局项首次覆盖:复制到 user 级 + 应用 patch + 标记 overrides
-      userServers.push({ ...existing, ...patch, source: 'user', overrides: 'global' })
+      userServers.push(
+        sanitizeObject({ ...existing, ...safePatch, source: 'user', overrides: 'global' }),
+      )
     }
     await this.writeUserConfig(userServers)
 
     // 更新内存 config
     const idx = this.config.findIndex((s) => s.id === id)
     if (idx >= 0) {
-      this.config[idx] = { ...this.config[idx], ...patch, source: 'user' }
+      this.config[idx] = sanitizeObject({ ...this.config[idx], ...safePatch, source: 'user' })
     }
     console.log(`[McpService] Updated server ${id}`)
   }
@@ -338,9 +378,22 @@ class McpService {
     const existing = this.config.find((s) => s.id === id)
     if (!existing) throw new Error(`Server ${id} not found`)
 
-    // 断开连接
+    // 断开连接。
+    // 同 updateServerInternal: 不调 disconnectServer(避免队列自等待),直接清理。
     if (this.clients.has(id)) {
-      await this.disconnectServer(id)
+      const inflight = this.connecting.get(id)
+      if (inflight) {
+        try {
+          await inflight
+        } catch {
+          // 忽略连接失败,继续清理
+        }
+      }
+      const client = this.clients.get(id)
+      if (client) {
+        await this.disconnectClient(client)
+        this.clients.delete(id)
+      }
     }
 
     const userServers = await this.readUserConfig()
@@ -445,6 +498,13 @@ ${yaml.stringify({ servers })}
     }
 
     // 2. 技能级临时 server(优先级高,覆盖同名全局 server)
+    // ⚠️ 未接线(NOT WIRED): 此分支目前是死代码。
+    //   - skill-service.ts 不解析 SKILL.md frontmatter 的 mcp_servers 字段
+    //   - agent-service.ts:699 调 getMcpToolsForAgent 时只传 2 个参数,第三参恒为 undefined
+    //   设计文档(specs/2026-07-17-skills-mcp-hub-design.md §7)明确本次不做技能级 MCP。
+    //   保留此分支是为了未来接线时三层合并逻辑已就绪。若要启用,需:
+    //   1) skill-service.ts 解析 frontmatter mcp_servers → Skill.mcpServers
+    //   2) agent-service.ts 把激活技能的 mcpServers 传给 getMcpToolsForAgent 第三参
     if (skillMcpServers && skillMcpServers.length > 0) {
       for (const skillServer of skillMcpServers) {
         // 移除同名的全局 server
@@ -472,39 +532,69 @@ ${yaml.stringify({ servers })}
   }
 
   /**
-   * 调用 MCP 工具
+   * 调用 MCP 工具。
+   *
+   * R2-2 修复: 若 client 存在但已断开(child exit / ws close),尝试惰性重连一次,
+   * 而非直接抛 "not connected" 让调用方永久失败直到重启。
+   * 重连失败才抛错。这覆盖了 stdio 子进程崩溃后 Agent 下次调用自动恢复的场景。
    */
   async callTool(
     serverId: string,
     toolName: string,
     args: Record<string, unknown>,
   ): Promise<McpCallResult> {
-    const client = this.clients.get(serverId)
+    let client = this.clients.get(serverId)
     if (!client?.connected) {
-      throw new Error(`MCP server ${serverId} not connected`)
+      // 惰性重连: 找到配置则重连,无配置才抛错
+      const serverConfig = this.config.find((s) => s.id === serverId)
+      if (!serverConfig) {
+        throw new Error(`MCP server ${serverId} not connected and no config to reconnect`)
+      }
+      try {
+        client = await this.ensureConnected(serverConfig)
+      } catch (err) {
+        throw new Error(`MCP server ${serverId} reconnect failed: ${(err as Error).message}`)
+      }
     }
     return this.callToolInternal(client, toolName, args)
   }
 
   /**
-   * 连接指定 server(手动连接,IPC 调用)
+   * 连接指定 server(手动连接,IPC 调用)。
+   *
+   * R1-10 / B8 修复: 走 serializeWrite,避免与 update 的"先断开再合并"竞态
+   * (否则 update 写新配置→断开旧连接之间,connect 可能读新配置连上,随后被 update 的断开杀掉)。
    */
   async connectServer(serverId: string): Promise<void> {
-    const serverConfig = this.config.find((s) => s.id === serverId)
-    if (!serverConfig) {
-      throw new Error(`MCP server ${serverId} not found in config`)
-    }
-    await this.ensureConnected(serverConfig)
+    return this.serializeWrite(async () => {
+      const serverConfig = this.config.find((s) => s.id === serverId)
+      if (!serverConfig) {
+        throw new Error(`MCP server ${serverId} not found in config`)
+      }
+      await this.ensureConnected(serverConfig)
+    })
   }
 
   /**
-   * 断开指定 server
+   * 断开指定 server。
+   * 同样走 serializeWrite,与 connect/update 的断开顺序保持一致。
    */
   async disconnectServer(serverId: string): Promise<void> {
-    const client = this.clients.get(serverId)
-    if (!client) return
-    await this.disconnectClient(client)
-    this.clients.delete(serverId)
+    return this.serializeWrite(async () => {
+      // 若该 server 正在连接中,先等连接结束再断开,避免留下半连接
+      const inflight = this.connecting.get(serverId)
+      if (inflight) {
+        try {
+          await inflight
+        } catch {
+          // 连接失败也无所谓,下面正常清理
+        }
+      }
+      const client = this.clients.get(serverId)
+      if (!client) return
+      await this.disconnectClient(client)
+      this.clients.delete(serverId)
+    })
   }
 
   /**
@@ -535,9 +625,31 @@ ${yaml.stringify({ servers })}
   }
 
   /**
-   * 确保 server 已连接(惰性连接)
+   * 确保 server 已连接(惰性连接)。
+   *
+   * R1-3 / B1 修复: 用 per-serverId 互斥锁串行化连接。
+   * 并发调用同一 server 时,第二个调用方会 await 同一个进行中的连接 Promise,
+   * 而不是各自走 check→disconnect→connect 流程(否则会产生重复子进程、孤儿进程)。
    */
   private async ensureConnected(server: McpServerConfig): Promise<MCPClient> {
+    // 已连接:直接复用
+    const existing = this.clients.get(server.id)
+    if (existing?.connected) return existing
+
+    // 已有进行中的连接:复用同一 Promise(关键: 防并发重复 spawn)
+    const inflight = this.connecting.get(server.id)
+    if (inflight) return inflight
+
+    // 发起新连接,把 Promise 缓存,无论成功失败都清理
+    const p = this.doConnect(server).finally(() => {
+      this.connecting.delete(server.id)
+    })
+    this.connecting.set(server.id, p)
+    return p
+  }
+
+  /** ensureConnected 的实际连接实现(由 ensureConnected 保证单线程进入) */
+  private async doConnect(server: McpServerConfig): Promise<MCPClient> {
     const existing = this.clients.get(server.id)
     if (existing?.connected) return existing
     if (existing) await this.disconnectClient(existing)
@@ -551,7 +663,21 @@ ${yaml.stringify({ servers })}
       pending: new Map(),
     }
 
-    await this.connectTransport(client, server)
+    // R5-1 / 泄漏 #2 修复: connectTransport 可能在 spawn/ws.open 之后再失败
+    // (initialize 握手超时/错误/transport closed)。此时 client.childProcess/ws 已存在,
+    // 但 client 还没进 this.clients,disconnectAll 看不到 → 子进程/ws 泄漏。
+    // 这里用 try/catch 包裹,失败时主动 disconnectClient 清理已持有的 transport 资源。
+    try {
+      await this.connectTransport(client, server)
+    } catch (err) {
+      // 清理已 spawn 的子进程 / 已打开的 ws,避免泄漏
+      try {
+        await this.disconnectClient(client)
+      } catch {
+        // 清理失败不掩盖原始连接错误
+      }
+      throw err
+    }
     this.clients.set(server.id, client)
 
     // 连接成功后列出工具
@@ -588,16 +714,23 @@ ${yaml.stringify({ servers })}
       }
     })()
 
-    // 连接超时
-    await Promise.race([
-      connectPromise,
-      new Promise<never>((_, reject) => {
-        setTimeout(
-          () => reject(new Error(`Connect timeout after ${CONNECT_TIMEOUT_MS}ms`)),
-          CONNECT_TIMEOUT_MS,
-        )
-      }),
-    ])
+    // 连接超时。
+    // R5-1 / 泄漏 #1 修复: 成功连接后主动 clearTimeout,避免 timer 持有 reject 闭包
+    // 长达 CONNECT_TIMEOUT_MS(此前每次成功 connect 都会泄漏一个 30s timer)。
+    let connectTimer: NodeJS.Timeout | undefined
+    try {
+      await Promise.race([
+        connectPromise,
+        new Promise<never>((_, reject) => {
+          connectTimer = setTimeout(
+            () => reject(new Error(`Connect timeout after ${CONNECT_TIMEOUT_MS}ms`)),
+            CONNECT_TIMEOUT_MS,
+          )
+        }),
+      ])
+    } finally {
+      if (connectTimer) clearTimeout(connectTimer)
+    }
 
     client.connected = true
   }
@@ -855,19 +988,66 @@ ${yaml.stringify({ servers })}
   }
 
   /**
-   * 请求工具列表
+   * 请求工具列表。
+   *
+   * R1-2 / B3 修复: SSE 传输没有 stdin/ws 通道,sendJsonRpc 对 SSE 会直接 reject
+   * "transport closed",导致 SSE server 静默显示"已连接 0 工具"。
+   * 这里对 SSE 单独走 HTTP POST(与 callToolSse 同一通道)。
    */
   private async requestListTools(client: MCPClient): Promise<McpTool[]> {
-    const result = (await this.sendJsonRpc(client, 'tools/list', {})) as {
+    const result = await this.requestListToolsInternal(client)
+    const typed = result as {
       tools?: Array<{ name: string; description?: string; inputSchema?: object }>
     }
-    if (!result?.tools) return []
-    return result.tools.map((t) => ({
+    if (!typed?.tools) return []
+    return typed.tools.map((t) => ({
       serverId: client.serverId,
       name: t.name,
       description: t.description || '',
       inputSchema: t.inputSchema || {},
     }))
+  }
+
+  /** requestListTools 的分派实现: SSE 走 HTTP,stdio/websocket 走 JSON-RPC */
+  private async requestListToolsInternal(client: MCPClient): Promise<unknown> {
+    if (client.config.transport === 'sse') {
+      return this.requestSse(client, 'tools/list', {})
+    }
+    return this.sendJsonRpc(client, 'tools/list', {})
+  }
+
+  /**
+   * SSE 通用 JSON-RPC 请求(HTTP POST)。
+   * R1-2 / B3: 让 listTools 与 callTool 共用同一 SSE 通道。
+   */
+  private async requestSse(
+    client: MCPClient,
+    method: string,
+    params: unknown,
+  ): Promise<unknown> {
+    if (!client.config.url) {
+      throw new Error(`sse server ${client.serverId} missing url`)
+    }
+    const response = await fetch(client.config.url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...client.config.headers,
+      },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: client.requestId++,
+        method,
+        params,
+      }),
+      signal: AbortSignal.timeout(CALL_TIMEOUT_MS),
+    })
+    if (!response.ok) {
+      throw new Error(`SSE ${method} failed: ${response.status} ${response.statusText}`)
+    }
+    const msg = (await response.json()) as { result?: unknown; error?: { message: string } }
+    if (msg.error) throw new Error(msg.error.message)
+    return msg.result
   }
 
   /**
@@ -971,6 +1151,9 @@ ${yaml.stringify({ servers })}
             cp.kill('SIGKILL')
           }
         }, 1000)
+        // R1-10 / B10 修复: unref 让该 timer 不阻止进程优雅退出
+        // (SIGTERM 成功但子进程不 emit exit 的极端情况下,避免事件循环多挂 1s)
+        killTimer.unref?.()
         // 子进程已退出则清理 timer,避免内存泄漏
         cp.once('exit', () => clearTimeout(killTimer))
       } catch {
@@ -1008,6 +1191,8 @@ ${yaml.stringify({ servers })}
   async destroy(): Promise<void> {
     console.log(`[McpService] destroy() — disconnecting ${this.clients.size} servers`)
     await this.disconnectAll()
+    // R1-3: 清理可能残留的连接锁(正常情况 finally 已清,这里兜底防止 reloadConfig 循环累积)
+    this.connecting.clear()
     this.config = []
     this.initialized = false
   }

@@ -42,7 +42,7 @@ export function PresetTemplates({ onSelect, onCancel }: PresetTemplatesProps) {
                     {t(`page.mcp.preset.${preset.i18nSuffix}`)}
                   </div>
                   <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                    {config.description}
+                    {t(`page.mcp.preset.${preset.i18nSuffix}.desc`)}
                   </div>
                   <div className="text-xs text-gray-400 mt-1 font-mono">
                     {config.transport === 'stdio'

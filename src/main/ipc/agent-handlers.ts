@@ -168,13 +168,15 @@ export function registerAgentHandlers(win: BrowserWindow) {
       // P4-1 修复: 校验 patch 字段类型 + 长度 + null byte
       const p = patch as Record<string, unknown>
       const safePatch: Partial<
-        Pick<AgentConfig, 'name' | 'description' | 'modelTier' | 'capabilities'>
+        Pick<AgentConfig, 'name' | 'description' | 'modelTier' | 'capabilities' | 'mcpServers'>
       > = {}
       if (p.name !== undefined) safePatch.name = validateOptionalAgentString(p.name, 'name', 256)
       if (p.description !== undefined)
         safePatch.description = validateOptionalAgentString(p.description, 'description', 2000)
       if (p.modelTier !== undefined) safePatch.modelTier = validateModelTier(p.modelTier)
       if (p.capabilities !== undefined) safePatch.capabilities = p.capabilities as string[]
+      // R6-1: 接受 mcpServers(agent 级 MCP server 引用),透传给 updateAgent 做数组校验
+      if (p.mcpServers !== undefined) safePatch.mcpServers = p.mcpServers as string[]
       return agentService.updateAgent(id, safePatch)
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
@@ -288,6 +290,12 @@ export function registerAgentHandlers(win: BrowserWindow) {
         const exists = agentService.listAgents().some((a) => a.id === id)
         if (!exists) {
           return { success: false, message: `Agent not found: ${id}` }
+        }
+        // R13-2 修复:同步校验 agent 是否启用(disabled agent 不应返回 success:true
+        // 再异步报 error,会让前端收到矛盾信号)
+        const agent = agentService.listAgents().find((a) => a.id === id)
+        if (agent && !agent.enabled) {
+          return { success: false, message: `Agent is disabled: ${id}` }
         }
         // 不 await:手动触发是 fire-and-forget,通过 stream 推送状态
         // 但同步 try/catch 同步参数错误,异步错误由 runAgent 内部 sendStatus 推送

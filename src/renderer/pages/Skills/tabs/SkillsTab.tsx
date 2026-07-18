@@ -69,6 +69,19 @@ export function SkillsTab() {
     loadSkills()
   }, [loadSkills])
 
+  // R1-8 / UI-3 修复: 有未保存编辑时,关闭窗口/刷新页面前提示,防止静默丢数据。
+  // beforeunload 在 Tauri WebView 里同样生效(主窗口关闭触发)。
+  useEffect(() => {
+    if (!dirty) return
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault()
+      // 现代浏览器忽略自定义文案,但 returnValue 非空即触发原生提示
+      e.returnValue = ''
+    }
+    window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
+  }, [dirty])
+
   // 右键菜单事件处理: 技能删除
   // P1 修复: 用 ref 持有最新的 handleDelete,避免空依赖 useEffect 闭包过期
   // (旧代码捕获首次渲染的 handleDelete,其中 selected===null,导致删除选中技能后编辑器面板不清空)
@@ -91,7 +104,7 @@ export function SkillsTab() {
     if (dirty) {
       setConfirmState({
         open: true,
-        message: '有未保存的更改，确定要切换吗？',
+        message: t('page.skills.switchConfirm'),
         onConfirm: () => {
           setSelected(skill)
           setEditContent(skill.content)
@@ -129,10 +142,14 @@ export function SkillsTab() {
     loadSkills()
   }
 
+  // R1-8 / UI-2 修复: 删除"当前选中且有未保存编辑"的技能时,提示未保存内容会丢失。
   const handleDelete = async (name: string) => {
+    const isCurrentDirty = dirty && selected?.name === name
     setConfirmState({
       open: true,
-      message: `确定要删除技能"${name}" 吗？此操作不可恢复。`,
+      message: isCurrentDirty
+        ? t('page.skills.deleteConfirmDirty').replace('{name}', name)
+        : t('page.skills.deleteConfirm').replace('{name}', name),
       variant: 'danger',
       onConfirm: async () => {
         setConfirmState((s) => ({ ...s, open: false }))
@@ -142,7 +159,7 @@ export function SkillsTab() {
             toast.error(result.error || t('toast.common.deleteFailed'))
             return
           }
-          toast.success(`已删除 "${name}"`)
+          toast.success(t('page.skills.deleted').replace('{name}', name))
           if (selected?.name === name) {
             setSelected(null)
             setDirty(false)
@@ -166,14 +183,16 @@ export function SkillsTab() {
     }
     const content =
       newContent.trim() ||
-      `---\ndescription: ${newDesc.trim() || `${name} 技能`}\n---\n\n# ${name}\n\n在此编写技能内容...\n`
+      `---\ndescription: ${
+        newDesc.trim() || t('page.skills.defaultContentDesc').replace('{name}', name)
+      }\n---\n\n# ${name}\n\n${t('page.skills.defaultContentBody')}\n`
     try {
       await getAPI().skill.save(name, content)
       setShowNewForm(false)
       setNewName('')
       setNewDesc('')
       setNewContent('')
-      toast.success(`技能 "${name}" 创建成功`)
+      toast.success(t('page.skills.created').replace('{name}', name))
       await loadSkills()
       const created = await getAPI().skill.get(name)
       if (created) {
@@ -199,7 +218,7 @@ export function SkillsTab() {
       const name = file.name.replace(/.md$/i, '')
       // 尝试从 frontmatter 提取描述（暂不持久化，前端不展示）
       await getAPI().skill.save(name, text)
-      toast.success(`已导入技能 "${name}"`)
+      toast.success(t('page.skills.imported').replace('{name}', name))
       await loadSkills()
     } catch (_err) {
       toast.error(t('toast.skills.importFailed'))
@@ -219,19 +238,21 @@ export function SkillsTab() {
   }
 
   return (
-    <section className="h-full flex" aria-label="技能列表" onKeyDown={handleKeyDown}>
+    <section className="h-full flex" aria-label={t('page.skills.listTitle')} onKeyDown={handleKeyDown}>
       <h1 style={SR_ONLY_STYLE}>{t('page.skills.title')}</h1>
       {/* 左侧技能列表 */}
       <div className="w-72 flex-shrink-0 border-r border-gray-200 dark:border-gray-700 flex flex-col bg-gray-50/30 dark:bg-gray-800/30">
         <div className="p-3 border-b border-gray-200 dark:border-gray-700 space-y-2">
           <div className="flex items-center justify-between">
-            <h2 className="font-semibold text-sm text-gray-700 dark:text-gray-200">技能列表</h2>
+            <h2 className="font-semibold text-sm text-gray-700 dark:text-gray-200">
+              {t('page.skills.listTitle')}
+            </h2>
             <div className="flex gap-1">
               <button
                 type="button"
                 onClick={loadSkills}
                 className="text-xs text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 px-2 py-1 rounded transition-colors"
-                title="刷新"
+                title={t('common.refresh')}
               >
                 🔄
               </button>
@@ -239,7 +260,7 @@ export function SkillsTab() {
                 type="button"
                 onClick={handleImport}
                 className="text-xs text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 px-2 py-1 rounded transition-colors"
-                title="从 .md 文件导入"
+                title={t('page.skills.importHint')}
               >
                 📥
               </button>
@@ -269,7 +290,7 @@ export function SkillsTab() {
                 : 'bg-blue-600 hover:bg-blue-700 text-white shadow-sm'
             }`}
           >
-            {showNewForm ? '取消' : '+ 新建技能'}
+            {showNewForm ? t('page.skills.cancel') : `+ ${t('page.skills.new')}`}
           </button>
 
           {/* 新建技能表单 */}
@@ -281,19 +302,19 @@ export function SkillsTab() {
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') handleCreate()
                 }}
-                placeholder="技能名称（必填）"
+                placeholder={t('page.skills.namePlaceholder')}
                 className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-600 rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow"
               />
               <input
                 value={newDesc}
                 onChange={(e) => setNewDesc(e.target.value)}
-                placeholder="技能描述（可选）"
+                placeholder={t('page.skills.descPlaceholder')}
                 className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-600 rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow"
               />
               <textarea
                 value={newContent}
                 onChange={(e) => setNewContent(e.target.value)}
-                placeholder="技能内容（可选，支持 Markdown）"
+                placeholder={t('page.skills.contentPlaceholder')}
                 rows={4}
                 className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-600 rounded px-2 py-1.5 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow resize-none"
               />
@@ -303,7 +324,7 @@ export function SkillsTab() {
                 disabled={!newName.trim()}
                 className="w-full bg-green-600 hover:bg-green-700 disabled:opacity-40 text-white px-3 py-1.5 rounded text-xs transition-colors"
               >
-                创建技能
+                {t('page.skills.createBtn')}
               </button>
             </div>
           )}
@@ -313,19 +334,21 @@ export function SkillsTab() {
         <div className="flex-1 overflow-y-auto p-2 space-y-1">
           {loading ? (
             <div className="text-gray-400 dark:text-gray-500 text-sm text-center py-8">
-              <div className="animate-pulse">加载中...</div>
+              <div className="animate-pulse">{t('page.skills.loading')}</div>
             </div>
           ) : skills.length === 0 ? (
             <div className="text-gray-400 dark:text-gray-500 text-xs text-center py-8">
               <div className="text-3xl mb-2">📝</div>
-              暂无技能
+              {t('page.skills.emptyList')}
               <br />
-              <span className="text-gray-400 dark:text-gray-600">点击"新建技能"创建第一个</span>
+              <span className="text-gray-400 dark:text-gray-600">
+                {t('page.skills.emptyListHint')}
+              </span>
             </div>
           ) : (
             skills.map((s) => (
               <div
-                key={`${s.source}-${s.name}`}
+                key={s.filePath ?? `${s.source}-${s.name}`}
                 data-ctx-menu={s.source === 'user' ? userMenuJson : EMPTY_MENU_JSON}
                 data-ctx-skill-name={s.name}
                 data-ctx-skill-source={s.source}
@@ -353,7 +376,7 @@ export function SkillsTab() {
                     </span>
                   </div>
                   <div className="text-[11px] text-gray-400 dark:text-gray-500 truncate mt-1 ml-6">
-                    {s.description || '暂无描述'}
+                    {s.description || t('page.skills.noDesc')}
                   </div>
                   <div className="flex items-center gap-2 mt-1.5 ml-6">
                     <span
@@ -364,7 +387,9 @@ export function SkillsTab() {
                           : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400'
                       }`}
                     >
-                      {s.source === 'user' ? '用户' : '项目'}
+                      {s.source === 'user'
+                        ? t('page.skills.badge.user')
+                        : t('page.skills.badge.project')}
                     </span>
                   </div>
                 </button>
@@ -380,7 +405,7 @@ export function SkillsTab() {
                     className="absolute top-2 right-2 opacity-0 group-hover:opacity-100
                       text-gray-300 dark:text-gray-600 hover:text-red-500 dark:hover:text-red-400 transition-all text-xs
                       w-5 h-5 flex items-center justify-center rounded hover:bg-red-50 dark:hover:bg-red-900/20"
-                    title="删除技能"
+                    title={t('page.skills.deleteBtn')}
                   >
                     ×
                   </button>
@@ -436,7 +461,11 @@ export function SkillsTab() {
                         setEditingName(true)
                       }
                     }}
-                    title={selected.source === 'user' ? '点击重命名' : '项目技能不可重命名'}
+                    title={
+                      selected.source === 'user'
+                        ? t('page.skills.renameHint')
+                        : t('page.skills.projectReadonly')
+                    }
                   >
                     {selected.name}
                   </button>
@@ -449,11 +478,13 @@ export function SkillsTab() {
                       : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400'
                   }`}
                 >
-                  {selected.source === 'user' ? '用户技能' : '项目技能'}
+                  {selected.source === 'user'
+                    ? t('page.skills.userSkill')
+                    : t('page.skills.projectSkill')}
                 </span>
                 {dirty && (
                   <span className="text-[10px] text-amber-500 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 px-1.5 py-0.5 rounded-full">
-                    未保存
+                    {t('page.skills.unsaved')}
                   </span>
                 )}
               </div>
@@ -464,7 +495,7 @@ export function SkillsTab() {
                     onClick={() => handleDelete(selected.name)}
                     className="text-xs bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 hover:bg-red-50 hover:text-red-600 hover:border-red-300 dark:hover:bg-red-900/30 dark:hover:text-red-400 dark:hover:border-red-700 px-3 py-1.5 rounded-lg transition-colors"
                   >
-                    🗑 删除
+                    {t('page.skills.deleteWithIcon')}
                   </button>
                 )}
                 <button
@@ -477,7 +508,11 @@ export function SkillsTab() {
                       : 'bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed'
                   }`}
                 >
-                  {saving ? '保存中...' : dirty ? '💾 保存 (Ctrl+S)' : '已保存'}
+                  {saving
+                    ? t('page.skills.saving')
+                    : dirty
+                      ? t('page.skills.saveBtn')
+                      : t('page.skills.saved')}
                 </button>
               </div>
             </div>
@@ -492,25 +527,31 @@ export function SkillsTab() {
               className="flex-1 bg-white text-gray-700 dark:bg-gray-900 dark:text-gray-300 p-5 text-sm font-mono resize-none
                 focus:outline-none placeholder:text-gray-400 dark:placeholder:text-gray-600 leading-relaxed"
               spellCheck={false}
-              placeholder="在此编辑技能内容..."
+              placeholder={t('page.skills.editorPlaceholder')}
               disabled={selected.source !== 'user'}
             />
 
             {/* 底部状态栏 */}
             <div className="px-4 py-1.5 border-t border-gray-100 dark:border-gray-800 text-[10px] text-gray-400 dark:text-gray-600 flex items-center justify-between bg-gray-50/50 dark:bg-gray-800/50">
               <span>
-                {editContent.split('\n').length} 行 · {editContent.length} 字符
+                {t('page.skills.statusLines')
+                  .replace('{lines}', String(editContent.split('\n').length))
+                  .replace('{chars}', String(editContent.length))}
               </span>
-              <span>{selected.source === 'user' ? '可编辑' : '只读'}</span>
+              <span>
+                {selected.source === 'user'
+                  ? t('page.skills.editable')
+                  : t('page.skills.readonly')}
+              </span>
             </div>
           </>
         ) : (
           <div className="flex-1 flex items-center justify-center">
             <div className="text-center text-gray-400 dark:text-gray-500">
               <div className="text-5xl mb-4">📝</div>
-              <div className="text-sm">选择左侧技能开始编辑</div>
+              <div className="text-sm">{t('page.skills.empty')}</div>
               <div className="text-xs mt-2 text-gray-400 dark:text-gray-600">
-                或点击 "+ 新建技能" 创建新技能
+                {t('page.skills.empty.hint')}
               </div>
             </div>
           </div>

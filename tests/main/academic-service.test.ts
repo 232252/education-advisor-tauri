@@ -452,3 +452,77 @@ describe('academicService.batchSetGrades 输入校验 (R9-5)', () => {
     expect(count).toBe(3)
   })
 })
+
+// =============================================================
+// R10-7 修复: 并发安全测试
+// 验证 withGradeLock 防止 setGrade/batchSetGrades 的读-改-写 lost update。
+// 核心症状: 两个并发 setGrade 同一学生不同科目,后写覆盖先写导致先写丢失;
+//          同一科目多次更新,只有最后一次生效但其他科目不丢。
+// =============================================================
+
+describe('academicService 并发安全 (R10-7 修复)', () => {
+  it('并发 setGrade 同一学生不同科目,全部保留', async () => {
+    const student = uniqStudent()
+    const examId = await seedExam(['math', 'english', 'chinese', 'physics'])
+    const records = ['math', 'english', 'chinese', 'physics'].map((subjectId, i) => ({
+      studentName: student,
+      examId,
+      subjectId,
+      score: 60 + i * 10,
+      fullMark: 100,
+    }))
+    await Promise.all(records.map((r) => academicService.setGrade(r)))
+    const grades = await academicService.getGrades(student)
+    expect(grades).toHaveLength(4)
+    const subjects = grades.map((g) => g.subjectId).sort()
+    expect(subjects).toEqual(['chinese', 'english', 'math', 'physics'])
+  })
+
+  it('并发 setGrade 同一学生同一科目(更新),最后写入获胜且不丢失其他科目', async () => {
+    const student = uniqStudent()
+    const examId = await seedExam(['math', 'english'])
+    // 先写 math
+    await academicService.setGrade({
+      studentName: student,
+      examId,
+      subjectId: 'math',
+      score: 50,
+      fullMark: 100,
+    })
+    // 并发: 更新 math(3次) + 新增 english(1次)
+    await Promise.all([
+      academicService.setGrade({ studentName: student, examId, subjectId: 'math', score: 60, fullMark: 100 }),
+      academicService.setGrade({ studentName: student, examId, subjectId: 'math', score: 70, fullMark: 100 }),
+      academicService.setGrade({ studentName: student, examId, subjectId: 'math', score: 80, fullMark: 100 }),
+      academicService.setGrade({ studentName: student, examId, subjectId: 'english', score: 90, fullMark: 100 }),
+    ])
+    const grades = await academicService.getGrades(student)
+    expect(grades).toHaveLength(2) // math + english,不是1个(math没被english覆盖)
+    const math = grades.find((g) => g.subjectId === 'math')
+    const english = grades.find((g) => g.subjectId === 'english')
+    expect(math).toBeDefined()
+    expect(math?.score).toBe(80) // 最后一次更新获胜
+    expect(english).toBeDefined()
+    expect(english?.score).toBe(90)
+  })
+
+  it('并发 batchSetGrades 不同学生,各自独立不互斥', async () => {
+    const examId = await seedExam(['math'])
+    const student1 = uniqStudent()
+    const student2 = uniqStudent()
+    await Promise.all([
+      academicService.batchSetGrades([
+        { studentName: student1, examId, subjectId: 'math', score: 70, fullMark: 100 },
+      ]),
+      academicService.batchSetGrades([
+        { studentName: student2, examId, subjectId: 'math', score: 80, fullMark: 100 },
+      ]),
+    ])
+    const g1 = await academicService.getGrades(student1)
+    const g2 = await academicService.getGrades(student2)
+    expect(g1).toHaveLength(1)
+    expect(g1[0].score).toBe(70)
+    expect(g2).toHaveLength(1)
+    expect(g2[0].score).toBe(80)
+  })
+})

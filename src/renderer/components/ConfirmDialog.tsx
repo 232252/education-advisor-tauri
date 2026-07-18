@@ -5,6 +5,7 @@
 // =============================================================
 
 import { useEffect, useRef } from 'react'
+import { useT } from '../i18n'
 
 interface ConfirmDialogProps {
   /** 是否显示对话框 */
@@ -13,9 +14,9 @@ interface ConfirmDialogProps {
   title?: string
   /** 对话框内容/消息 */
   message: string
-  /** 确认按钮文字 */
+  /** 确认按钮文字(不传则用 i18n common.confirm) */
   confirmText?: string
-  /** 取消按钮文字 */
+  /** 取消按钮文字(不传则用 i18n common.cancel) */
   cancelText?: string
   /** 确认按钮颜色变体：'danger' 为红色，默认为蓝色 */
   variant?: 'default' | 'danger'
@@ -29,12 +30,17 @@ export function ConfirmDialog({
   open,
   title,
   message,
-  confirmText = '确认',
-  cancelText = '取消',
+  confirmText,
+  cancelText,
   variant = 'default',
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
+  const { t } = useT()
+  // R1-6 / UI-1 修复: 默认按钮文案走 i18n,英文环境下不再显示中文。
+  // 调用方仍可显式覆盖 confirmText/cancelText。
+  const resolvedConfirm = confirmText ?? t('common.confirm')
+  const resolvedCancel = cancelText ?? t('common.cancel')
   const confirmRef = useRef<HTMLButtonElement>(null)
 
   // 键盘事件：Enter 确认，Escape 取消
@@ -96,7 +102,7 @@ export function ConfirmDialog({
             onClick={onCancel}
             className="px-3 py-1.5 text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
           >
-            {cancelText}
+            {resolvedCancel}
           </button>
           <button
             ref={confirmRef}
@@ -104,7 +110,7 @@ export function ConfirmDialog({
             onClick={onConfirm}
             className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${confirmBtnClass}`}
           >
-            {confirmText}
+            {resolvedConfirm}
           </button>
         </div>
       </div>

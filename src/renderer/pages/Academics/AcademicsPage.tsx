@@ -297,7 +297,7 @@ export function AcademicsPage() {
       }
     } catch (err) {
       console.error('[Academics] Failed to load initial data:', err)
-      toast.error(t('error.unknown', '未知错误'))
+      toast.error(t('error.unknown'))
     } finally {
       setLoading(false)
     }
@@ -576,6 +576,7 @@ interface CompareTabProps {
 }
 
 function CompareTab({ students, classList, subjects, exams, themeProps }: CompareTabProps) {
+  const { t } = useT()
   const { axisColor, gridColor } = themeProps
   const [classFilter, setClassFilter] = useState<string>('__ALL__')
   const [examAId, setExamAId] = useState<string>('')
@@ -656,7 +657,7 @@ function CompareTab({ students, classList, subjects, exams, themeProps }: Compar
       }
     } catch (err) {
       console.warn('[CompareTab] load failed:', err)
-      toast.error(getErrorMessage({ success: false } as never, '加载对比数据失败'))
+      toast.error(getErrorMessage({ success: false } as never, t('page.academics.toast.compareLoadFailed')))
     } finally {
       setLoading(false)
     }
@@ -1282,6 +1283,7 @@ interface ExamManagementTabProps {
 }
 
 function ExamManagementTab({ subjects, examTypes, exams, onRefresh }: ExamManagementTabProps) {
+  const { t } = useT()
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [creating, setCreating] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; exam: ExamDef | null }>({
@@ -1327,11 +1329,11 @@ function ExamManagementTab({ subjects, examTypes, exams, onRefresh }: ExamManage
 
   const handleCreate = useCallback(async () => {
     if (!formName.trim()) {
-      toast.error('请输入考试名称')
+      toast.error(t('page.academics.toast.examNameRequired'))
       return
     }
     if (formSubjects.size === 0) {
-      toast.error('请至少选择一个科目')
+      toast.error(t('page.academics.toast.atLeastOneSubject'))
       return
     }
     setCreating(true)
@@ -1345,19 +1347,19 @@ function ExamManagementTab({ subjects, examTypes, exams, onRefresh }: ExamManage
         subjects: Array.from(formSubjects),
       })
       if (res.success) {
-        toast.success('考试创建成功')
+        toast.success(t('page.academics.toast.examCreated'))
         resetForm()
         setShowCreateForm(false)
         onRefresh()
       } else {
-        toast.error(getErrorMessage(res, '创建失败'))
+        toast.error(getErrorMessage(res, t('page.academics.toast.createFailed')))
       }
     } catch (err) {
-      toast.error(`创建失败: ${err instanceof Error ? err.message : String(err)}`)
+      toast.error(t('page.academics.toast.createFailedWithError').replace('{error}', err instanceof Error ? err.message : String(err)))
     } finally {
       setCreating(false)
     }
-  }, [formName, formType, formDate, formSemester, formScope, formSubjects, resetForm, onRefresh])
+  }, [formName, formType, formDate, formSemester, formScope, formSubjects, resetForm, onRefresh, t])
 
   const handleDelete = useCallback((exam: ExamDef) => {
     setDeleteConfirm({ open: true, exam })
@@ -1370,15 +1372,15 @@ function ExamManagementTab({ subjects, examTypes, exams, onRefresh }: ExamManage
     try {
       const res = await getAPI().academic.deleteExam(exam.id)
       if (res.success) {
-        toast.success('考试已删除')
+        toast.success(t('page.academics.toast.examDeleted'))
         onRefresh()
       } else {
-        toast.error(res.error ?? '删除失败')
+        toast.error(res.error ?? t('toast.common.deleteFailed'))
       }
     } catch (err) {
-      toast.error(`删除失败: ${err instanceof Error ? err.message : String(err)}`)
+      toast.error(t('page.academics.toast.deleteFailedWithError').replace('{error}', err instanceof Error ? err.message : String(err)))
     }
-  }, [deleteConfirm.exam, onRefresh])
+  }, [deleteConfirm.exam, onRefresh, t])
 
   return (
     <div className="space-y-4">
@@ -1623,6 +1625,7 @@ function GradeEntryTab({
   onSaved,
   onExamCreated,
 }: GradeEntryTabProps) {
+  const { t } = useT()
   const [mode, setMode] = useState<GradeEntryMode>('single-subject')
   const [selectedExamId, setSelectedExamId] = useState<string>('')
   const [examNameInput, setExamNameInput] = useState<string>('')
@@ -1747,7 +1750,7 @@ function GradeEntryTab({
   const handleQuickCreate = useCallback(async () => {
     const name = quickName.trim()
     if (!name) {
-      toast.error('请输入考试名称')
+      toast.error(t('page.academics.toast.examNameRequired'))
       return
     }
     setQuickCreating(true)
@@ -1762,21 +1765,21 @@ function GradeEntryTab({
         subjects: subjects.map((s) => s.id),
       })
       if (res.success && res.data) {
-        toast.success(`考试「${name}」已创建`)
+        toast.success(t('page.academics.toast.examQuickCreated').replace('{name}', name))
         onExamCreated()
         setSelectedExamId(res.data.id)
         setShowQuickCreate(false)
         setQuickName('')
         setQuickDate('')
       } else {
-        toast.error(getErrorMessage(res, '创建失败'))
+        toast.error(getErrorMessage(res, t('page.academics.toast.createFailed')))
       }
     } catch (err) {
-      toast.error(`创建失败: ${err instanceof Error ? err.message : String(err)}`)
+      toast.error(t('page.academics.toast.createFailedWithError').replace('{error}', err instanceof Error ? err.message : String(err)))
     } finally {
       setQuickCreating(false)
     }
-  }, [quickName, quickType, quickDate, subjects, onExamCreated])
+  }, [quickName, quickType, quickDate, subjects, onExamCreated, t])
 
   /**
    * 解析当前考试: 优先用 selectedExamId; 否则按 examNameInput 查找已有考试;
@@ -1811,27 +1814,27 @@ function GradeEntryTab({
         subjects: subjects.map((s) => s.id),
       })
       if (res.success && res.data) {
-        toast.success(`已自动创建考试「${name}」`)
+        toast.success(t('page.academics.toast.examAutoCreated').replace('{name}', name))
         onExamCreated()
         setSelectedExamId(res.data.id)
         return res.data.id
       }
-      toast.error(getErrorMessage(res, '创建考试失败'))
+      toast.error(getErrorMessage(res, t('page.academics.toast.createExamFailed')))
       return null
     } catch (err) {
-      toast.error(`创建考试失败: ${err instanceof Error ? err.message : String(err)}`)
+      toast.error(t('page.academics.toast.createExamFailedWithError').replace('{error}', err instanceof Error ? err.message : String(err)))
       return null
     }
-  }, [selectedExamId, examNameInput, exams, subjects, onExamCreated])
+  }, [selectedExamId, examNameInput, exams, subjects, onExamCreated, t])
 
   /** AI 智能解析成绩文本,自动填充分数表 */
   const handleAIParse = useCallback(async () => {
     if (!aiInputText.trim()) {
-      toast.error('请粘贴成绩文本')
+      toast.error(t('page.academics.toast.pasteRequired'))
       return
     }
     if (!currentProvider || !currentModel) {
-      toast.error('请先在"模型"页面配置 AI 模型')
+      toast.error(t('page.academics.toast.aiModelRequired'))
       return
     }
     setAiParsing(true)
@@ -1884,21 +1887,21 @@ function GradeEntryTab({
               }
               setSingleScores((prev) => ({ ...prev, ...newScores }))
               setAiProgress(`解析完成: 匹配 ${matched} 名学生`)
-              toast.success(`AI 已填充 ${matched} 名学生成绩`)
+              toast.success(t('page.academics.toast.aiFilled').replace('{count}', String(matched)))
             } else {
               setAiProgress('解析失败: AI 返回格式异常')
-              toast.error('AI 返回格式异常,请检查文本')
+              toast.error(t('page.academics.toast.aiFormatError'))
             }
           } catch {
             setAiProgress('解析失败: JSON 解析错误')
-            toast.error('解析 AI 响应失败')
+            toast.error(t('page.academics.toast.aiParseFailed'))
           }
           setAiParsing(false)
         } else if (event.type === 'error') {
           streamDone = true
           setAiParsing(false)
           setAiProgress(`错误: ${event.message ?? '未知错误'}`)
-          toast.error(`AI 错误: ${event.message ?? '未知'}`)
+          toast.error(t('page.academics.toast.aiErrorWithMessage').replace('{message}', event.message ?? t('error.unknown')))
         }
       },
     )
@@ -1914,7 +1917,7 @@ function GradeEntryTab({
     } catch (err) {
       setAiParsing(false)
       setAiProgress(`调用失败: ${err instanceof Error ? err.message : String(err)}`)
-      toast.error(`AI 调用失败: ${err instanceof Error ? err.message : String(err)}`)
+      toast.error(t('page.academics.toast.aiCallFailed').replace('{error}', err instanceof Error ? err.message : String(err)))
     } finally {
       // 延迟取消订阅,确保所有流事件都已接收
       setTimeout(() => {
@@ -1925,7 +1928,7 @@ function GradeEntryTab({
         unsub()
       }, 30000)
     }
-  }, [aiInputText, currentProvider, currentModel, students])
+  }, [aiInputText, currentProvider, currentModel, students, t])
 
   /** 单科模式: 更新学生分数 */
   const updateSingleScore = useCallback((name: string, field: 'score' | 'rank', value: string) => {
@@ -1957,7 +1960,7 @@ function GradeEntryTab({
   /** 保存单科成绩 (批量) — 考试未选时自动解析/创建 */
   const handleSaveSingle = useCallback(async () => {
     if (!selectedSubjectId) {
-      toast.error('请先选择科目')
+      toast.error(t('page.academics.toast.selectSubject'))
       return
     }
     const subject = subjectMap[selectedSubjectId]
@@ -1975,7 +1978,7 @@ function GradeEntryTab({
       }))
 
     if (records.length === 0) {
-      toast.error('没有可保存的成绩')
+      toast.error(t('page.academics.toast.noGradesToSave'))
       return
     }
 
@@ -1989,22 +1992,22 @@ function GradeEntryTab({
       const finalRecords = records.map((r) => ({ ...r, examId }))
       const res = await getAPI().academic.batchSetGrades(finalRecords)
       if (res.success) {
-        toast.success(`已保存 ${finalRecords.length} 条成绩`)
+        toast.success(t('page.academics.toast.savedNGrades').replace('{count}', String(finalRecords.length)))
         onSaved()
       } else {
-        toast.error(getErrorMessage(res, '保存失败'))
+        toast.error(getErrorMessage(res, t('toast.common.saveFailed')))
       }
     } catch (err) {
-      toast.error(`保存失败: ${err instanceof Error ? err.message : String(err)}`)
+      toast.error(t('page.academics.toast.saveFailedWithError').replace('{error}', err instanceof Error ? err.message : String(err)))
     } finally {
       setSaving(false)
     }
-  }, [selectedSubjectId, subjectMap, singleScores, resolveExamForSave, onSaved])
+  }, [selectedSubjectId, subjectMap, singleScores, resolveExamForSave, onSaved, t])
 
   /** 保存全科成绩 — 考试未选时自动解析/创建 */
   const handleSaveAll = useCallback(async () => {
     if (!entryStudentName) {
-      toast.error('请先选择学生')
+      toast.error(t('page.academics.toast.selectStudent'))
       return
     }
 
@@ -2023,7 +2026,7 @@ function GradeEntryTab({
       })
 
     if (records.length === 0) {
-      toast.error('没有可保存的成绩')
+      toast.error(t('page.academics.toast.noGradesToSave'))
       return
     }
 
@@ -2037,17 +2040,17 @@ function GradeEntryTab({
       const finalRecords = records.map((r) => ({ ...r, examId }))
       const res = await getAPI().academic.batchSetGrades(finalRecords)
       if (res.success) {
-        toast.success(`已保存 ${finalRecords.length} 个科目成绩`)
+        toast.success(t('page.academics.toast.savedNSubjects').replace('{count}', String(finalRecords.length)))
         onSaved()
       } else {
-        toast.error(getErrorMessage(res, '保存失败'))
+        toast.error(getErrorMessage(res, t('toast.common.saveFailed')))
       }
     } catch (err) {
-      toast.error(`保存失败: ${err instanceof Error ? err.message : String(err)}`)
+      toast.error(t('page.academics.toast.saveFailedWithError').replace('{error}', err instanceof Error ? err.message : String(err)))
     } finally {
       setSaving(false)
     }
-  }, [entryStudentName, subjectMap, allScores, resolveExamForSave, onSaved])
+  }, [entryStudentName, subjectMap, allScores, resolveExamForSave, onSaved, t])
 
   if (showQuickCreate) {
     return (

@@ -114,7 +114,13 @@ export function registerMcpHandlers(_win: BrowserWindow) {
   ipcMain.handle(IPC.IPC_MCP_UPDATE, async (_e, id: unknown, patch: unknown) => {
     try {
       const safeId = validateServerId(id)
-      await mcpService.updateServer(safeId, (patch as Partial<McpServerConfig>) || {})
+      // R5-2 / 边界 Case 9 修复: 拒绝 null/非对象 patch。
+      // 旧实现 (patch || {}) 把 null 静默转成 {} 做 no-op update 并返回 success,
+      // 调用方无法区分"传错"与"真的无变化"。这里显式校验。
+      if (!patch || typeof patch !== 'object' || Array.isArray(patch)) {
+        throw new Error('patch must be a non-null object')
+      }
+      await mcpService.updateServer(safeId, patch as Partial<McpServerConfig>)
       return { success: true }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)

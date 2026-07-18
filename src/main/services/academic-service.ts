@@ -44,6 +44,12 @@ class AcademicService {
   private configPath: string
   private examsPath: string
   private gradesDir: string
+  /**
+   * 按学生串行化的写操作队列(防止并发 setGrade lost update,R10-7 修复)。
+   * 同一学生的读-改-写串行执行;不同学生不互斥(各自独立队列)。
+   * 模式参照 mcp-service.ts 的 serializeWrite。
+   */
+  private gradeWriteQueues: Map<string, Promise<unknown>> = new Map()
 
   constructor() {
     this.baseDir = path.join(app.getPath('userData'), 'eaa-data', 'academics')
@@ -178,6 +184,26 @@ class AcademicService {
     await atomicWrite(this.gradePath(studentName), JSON.stringify(grades, null, 2))
   }
 
+  /**
+   * 按学生串行化执行"读-改-写"操作,防止并发 setGrade/batchSetGrades 的 lost update。
+   * 不同学生不互斥(各自独立队列),同一学生串行(避免读-改-写竞态)。
+   * 关键:run 用 then(fn, fn) 双 handler,即使前一个 fn reject 本操作也能开始;
+   *       gradeWriteQueues.set 用 then(_, _) 吞掉 reject,后续操作不被阻塞。
+   * R10-7 修复。
+   */
+  private async withGradeLock<T>(studentName: string, fn: () => Promise<T>): Promise<T> {
+    const prev = this.gradeWriteQueues.get(studentName) ?? Promise.resolve()
+    const run = prev.then(fn, fn)
+    this.gradeWriteQueues.set(
+      studentName,
+      run.then(
+        () => undefined,
+        () => undefined,
+      ),
+    )
+    return run
+  }
+
   /** 设置单条成绩(upsert by examId + subjectId) */
   async setGrade(record: Omit<GradeRecord, 'updatedAt'>): Promise<GradeRecord> {
     // R9-1/2/3/4 修复: setGrade 输入校验(之前完全无校验,可写入幽灵成绩/孤儿数据/越界分数)
@@ -214,18 +240,21 @@ class AcademicService {
         `setGrade: 科目 ${record.subjectId} 不属于考试 ${record.examId}(${exam.name})`,
       )
     }
-    const existing = await this.getGrades(record.studentName)
-    const idx = existing.findIndex(
-      (g) => g.examId === record.examId && g.subjectId === record.subjectId,
-    )
-    const full: GradeRecord = { ...record, updatedAt: new Date().toISOString() }
-    if (idx >= 0) {
-      existing[idx] = full
-    } else {
-      existing.push(full)
-    }
-    await this.writeGrades(record.studentName, existing)
-    return full
+    // R10-7 修复: 读-改-写三步按学生串行化,防止并发 lost update
+    return this.withGradeLock(record.studentName, async () => {
+      const existing = await this.getGrades(record.studentName)
+      const idx = existing.findIndex(
+        (g) => g.examId === record.examId && g.subjectId === record.subjectId,
+      )
+      const full: GradeRecord = { ...record, updatedAt: new Date().toISOString() }
+      if (idx >= 0) {
+        existing[idx] = full
+      } else {
+        existing.push(full)
+      }
+      await this.writeGrades(record.studentName, existing)
+      return full
+    })
   }
 
   /** 批量设置成绩(按学生分组,每个学生文件只读写一次) */
@@ -273,20 +302,32 @@ class AcademicService {
 
     let count = 0
     const now = new Date().toISOString()
-    for (const [studentName, recs] of byStudent) {
-      const existing = await this.getGrades(studentName)
-      for (const r of recs) {
-        const idx = existing.findIndex((g) => g.examId === r.examId && g.subjectId === r.subjectId)
-        const full: GradeRecord = { ...r, updatedAt: now }
-        if (idx >= 0) {
-          existing[idx] = full
-        } else {
-          existing.push(full)
-        }
-        count++
-      }
-      await this.writeGrades(studentName, existing)
-    }
+    // R10-7 修复: 每个学生的读-改-写用 withGradeLock 串行化(同学生),
+    // 但不同学生通过 Promise.all 并行(不互斥,保留原 batch 性能)。
+    // 用返回值求和避免 count++ 在 Promise.all 回调里的潜在顺序假设。
+    const counts = await Promise.all(
+      Array.from(byStudent.entries()).map(([studentName, recs]) =>
+        this.withGradeLock(studentName, async () => {
+          const existing = await this.getGrades(studentName)
+          let n = 0
+          for (const r of recs) {
+            const idx = existing.findIndex(
+              (g) => g.examId === r.examId && g.subjectId === r.subjectId,
+            )
+            const full: GradeRecord = { ...r, updatedAt: now }
+            if (idx >= 0) {
+              existing[idx] = full
+            } else {
+              existing.push(full)
+            }
+            n++
+          }
+          await this.writeGrades(studentName, existing)
+          return n
+        }),
+      ),
+    )
+    count = counts.reduce((a, b) => a + b, 0)
     log('info', 'academic', `batch set grades: ${count} records across ${byStudent.size} students`)
     return count
   }
