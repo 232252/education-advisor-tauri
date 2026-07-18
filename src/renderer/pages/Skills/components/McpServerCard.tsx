@@ -15,6 +15,10 @@ interface McpServerCardProps {
   server: McpServerStatus
   tools: McpTool[]
   toolsLoading: boolean
+  /** 工具列表加载错误(若有),用于区分"真无工具"与"加载失败" */
+  toolsError?: string
+  /** 重新加载工具列表(失败后用户可重试) */
+  onReloadTools?: () => void
   onTest: () => void
   onConnect: () => void
   onDisconnect: () => void
@@ -27,6 +31,8 @@ export function McpServerCard({
   server,
   tools,
   toolsLoading,
+  toolsError,
+  onReloadTools,
   onTest,
   onConnect,
   onDisconnect,
@@ -105,19 +111,38 @@ export function McpServerCard({
             {showTools ? '▼' : '▶'} {t('page.mcp.tools')} ({toolsLoading ? '...' : tools.length})
           </button>
           {showTools && (
-            <ul className="mt-2 ml-4 text-xs space-y-1 text-gray-600 dark:text-gray-400">
-              {tools.map((tool) => (
-                <li key={tool.name} className="font-mono">
-                  <span className="text-blue-500">{tool.name}</span>
-                  {tool.description && (
-                    <span className="text-gray-400 ml-2">— {tool.description}</span>
+            <div className="mt-2 ml-4 text-xs space-y-1 text-gray-600 dark:text-gray-400">
+              {/* R1-7 / UI-4: 加载失败时显式提示 + 重试,而非静默显示"无工具" */}
+              {toolsError && !toolsLoading ? (
+                <div className="text-red-500">
+                  <span>{t('page.mcp.tools.loadFailed')}</span>
+                  {onReloadTools && (
+                    <button
+                      type="button"
+                      onClick={onReloadTools}
+                      className="ml-2 underline hover:text-red-600"
+                    >
+                      {t('page.mcp.tools.retry')}
+                    </button>
                   )}
-                </li>
-              ))}
-              {tools.length === 0 && !toolsLoading && (
-                <li className="text-gray-400 italic">{t('page.mcp.tools.empty')}</li>
+                  <span className="block text-gray-400 mt-1">{toolsError}</span>
+                </div>
+              ) : (
+                <ul className="space-y-1">
+                  {tools.map((tool) => (
+                    <li key={tool.name} className="font-mono">
+                      <span className="text-blue-500">{tool.name}</span>
+                      {tool.description && (
+                        <span className="text-gray-400 ml-2">— {tool.description}</span>
+                      )}
+                    </li>
+                  ))}
+                  {tools.length === 0 && !toolsLoading && (
+                    <li className="text-gray-400 italic">{t('page.mcp.tools.empty')}</li>
+                  )}
+                </ul>
               )}
-            </ul>
+            </div>
           )}
         </div>
       )}

@@ -26,6 +26,8 @@ export function McpTab() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [toolsCache, setToolsCache] = useState<Record<string, McpTool[]>>({})
   const [toolsLoadingId, setToolsLoadingId] = useState<string | null>(null)
+  // R1-7 / UI-4 修复: 记录每个 server 的 listTools 错误,失败时显式提示而非静默显示"无工具"
+  const [toolsErrorMap, setToolsErrorMap] = useState<Record<string, string>>({})
   const [showForm, setShowForm] = useState(false)
   const [editingServer, setEditingServer] = useState<McpServerConfig | null>(null)
   const [showPresets, setShowPresets] = useState(false)
@@ -112,20 +114,37 @@ export function McpTab() {
 
   const selected = servers.find((s) => s.id === selectedId) ?? null
 
-  // 拉取某 server 的工具列表(选中且已连接时)
-  const loadTools = useCallback(async (serverId: string) => {
-    setToolsLoadingId(serverId)
-    try {
-      const result = await getAPI().mcp.listTools(serverId)
-      if (result.success) {
-        setToolsCache((prev) => ({ ...prev, [serverId]: result.tools }))
+  // 拉取某 server 的工具列表(选中且已连接时)。
+  // R1-7 / UI-4 修复: 失败时记录错误并 toast 提示,不再静默吞错让用户误以为"无工具"。
+  const loadTools = useCallback(
+    async (serverId: string) => {
+      setToolsLoadingId(serverId)
+      try {
+        const result = await getAPI().mcp.listTools(serverId)
+        if (result.success) {
+          setToolsCache((prev) => ({ ...prev, [serverId]: result.tools }))
+          // 成功则清除该 server 的历史错误
+          setToolsErrorMap((prev) => {
+            if (!prev[serverId]) return prev
+            const next = { ...prev }
+            delete next[serverId]
+            return next
+          })
+        } else {
+          const msg = result.error || t('toast.mcp.loadToolsFailed')
+          setToolsErrorMap((prev) => ({ ...prev, [serverId]: msg }))
+          console.error('[MCP] listTools returned failure:', msg)
+        }
+      } catch (err) {
+        const msg = (err as Error).message
+        setToolsErrorMap((prev) => ({ ...prev, [serverId]: msg }))
+        console.error('[MCP] listTools failed:', err)
+      } finally {
+        setToolsLoadingId(null)
       }
-    } catch (err) {
-      console.error('[MCP] listTools failed:', err)
-    } finally {
-      setToolsLoadingId(null)
-    }
-  }, [])
+    },
+    [t],
+  )
 
   useEffect(() => {
     if (selected?.connected && selectedId && !toolsCache[selectedId]) {
@@ -163,15 +182,25 @@ export function McpTab() {
     }
   }
 
+  // R1-7 / UI-5 修复: 检查 result.success,失败时不清理缓存/不刷新,避免假性成功。
   const handleDisconnect = async (id: string) => {
     try {
-      await getAPI().mcp.disconnect(id)
-      setToolsCache((prev) => {
-        const next = { ...prev }
-        delete next[id]
-        return next
-      })
-      await loadServers()
+      const result = await getAPI().mcp.disconnect(id)
+      if (result.success) {
+        setToolsCache((prev) => {
+          const next = { ...prev }
+          delete next[id]
+          return next
+        })
+        setToolsErrorMap((prev) => {
+          const next = { ...prev }
+          delete next[id]
+          return next
+        })
+        await loadServers()
+      } else {
+        toast.error(result.error || t('toast.mcp.disconnectFailed'))
+      }
     } catch (err) {
       toast.error((err as Error).message)
     }
@@ -371,6 +400,8 @@ export function McpTab() {
                 server={selected}
                 tools={toolsCache[selected.id] ?? []}
                 toolsLoading={toolsLoadingId === selected.id}
+                toolsError={toolsErrorMap[selected.id]}
+                onReloadTools={() => loadTools(selected.id)}
                 onTest={() => handleTest(selected.id)}
                 onConnect={() => handleConnect(selected.id)}
                 onDisconnect={() => handleDisconnect(selected.id)}

@@ -24,6 +24,7 @@ import {
   deepInterpolate,
   interpolateEnv,
   isSafeMcpUrl,
+  sanitizeObject,
   validateCommandSafe,
   validateServerConfig,
 } from '../../src/main/services/mcp-helpers'
@@ -386,3 +387,56 @@ describe('isSafeMcpUrl (SSRF 防护)', () => {
     expect(isSafeMcpUrl('http://0/sse')).toBe(false)
   })
 })
+
+// =============================================================
+// sanitizeObject — 原型污染防护
+//
+// mcp-service 的 add/update 会把 IPC 传入的 config/patch 经 spread
+// 合并到 user yaml 和内存对象。若攻击者通过 IPC 传入 __proto__/
+// constructor/prototype 字段,会污染运行时 Object.prototype。
+// sanitizeObject 是 spread 合并前的净化屏障,必须稳定过滤这三个 key。
+// =============================================================
+describe('mcp-helpers: sanitizeObject (原型污染防护)', () => {
+  it('过滤 __proto__ key', () => {
+    // 注意: 对象字面量 { __proto__: {...} } 会真正设置原型,这里用 JSON 构造
+    // 模拟 IPC 传入的恶意 payload(经 JSON.parse 的对象,__proto__ 是 own 属性)
+    const input = JSON.parse('{"id":"x","__proto__":{"polluted":"evil"}}')
+    const result = sanitizeObject(input)
+    expect(result.id).toBe('x')
+    // own 属性 __proto__ 应被移除(用 hasOwnProperty 而非点访问,点访问走原型链)
+    expect(Object.prototype.hasOwnProperty.call(result, '__proto__')).toBe(false)
+    // 关键: 全局 Object.prototype 未被污染
+    expect(({} as Record<string, unknown>).polluted).toBeUndefined()
+  })
+
+  it('过滤 constructor 和 prototype key', () => {
+    const input = JSON.parse('{"a":"1","constructor":{"x":"y"},"prototype":{"z":"w"}}')
+    const result = sanitizeObject(input)
+    expect(result.a).toBe('1')
+    expect(Object.prototype.hasOwnProperty.call(result, 'constructor')).toBe(false)
+    expect(Object.prototype.hasOwnProperty.call(result, 'prototype')).toBe(false)
+  })
+
+  it('保留所有正常 key(含嵌套对象引用,不做深拷贝)', () => {
+    const nested = { foo: 'bar' }
+    const input = { id: 'srv', name: 'S', args: ['a', 'b'], env: nested }
+    const result = sanitizeObject(input)
+    expect(result.id).toBe('srv')
+    expect(result.name).toBe('S')
+    expect(result.args).toEqual(['a', 'b'])
+    expect(result.env).toBe(nested) // 浅拷贝: 同一引用
+  })
+
+  it('空对象返回空对象', () => {
+    expect(sanitizeObject({})).toEqual({})
+  })
+
+  it('大小写敏感: Proto/PROTO 不被过滤(只过滤精确匹配)', () => {
+    const input = { Proto: 1, PROTO: 2, __Proto__: 3 }
+    const result = sanitizeObject(input)
+    expect(result.Proto).toBe(1)
+    expect(result.PROTO).toBe(2)
+    expect(result.__Proto__).toBe(3)
+  })
+})
+
