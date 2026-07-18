@@ -197,3 +197,6 @@ test-round*/
 test-agent-tools-report.json
 sidecar/test-round*/
 sidecar/test-round*.mjs
+# cycle11 测试脚本
+sidecar/test-mcp-full-chain.mjs
+sidecar/test-r13-edges.mjs
