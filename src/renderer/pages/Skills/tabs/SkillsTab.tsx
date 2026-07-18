@@ -348,7 +348,7 @@ export function SkillsTab() {
           ) : (
             skills.map((s) => (
               <div
-                key={`${s.source}-${s.name}`}
+                key={s.filePath ?? `${s.source}-${s.name}`}
                 data-ctx-menu={s.source === 'user' ? userMenuJson : EMPTY_MENU_JSON}
                 data-ctx-skill-name={s.name}
                 data-ctx-skill-source={s.source}

@@ -51,10 +51,15 @@ export function McpTab() {
         toast.success(enabled ? t('toast.mcp.enabled') : t('toast.mcp.disabled'))
         if (enabled) {
           setLoading(true)
-          setTimeout(() => loadServers(), 500)
+          // R3-4: 直接调用 loadServers(原 setTimeout 500ms 在快速切 tab 时可能命中已卸载组件)
+          loadServers()
         } else {
           setServers([])
           setSelectedId(null)
+          // R3-4: 禁用 MCP 时清空所有工具缓存/错误/代际,避免重新启用时显示陈旧数据
+          setToolsCache({})
+          setToolsErrorMap({})
+          toolsGenRef.current = {}
         }
       } else {
         toast.error(result.error || t('toast.mcp.toggleFailed'))
@@ -113,17 +118,41 @@ export function McpTab() {
   useInterval(loadServers, mcpEnabled ? 5000 : null)
 
   const selected = servers.find((s) => s.id === selectedId) ?? null
+  // R3-4 修复: per-server 请求代际,防止并发/过期 loadTools 的旧响应覆盖新结果。
+  // 每次发起 loadTools 递增该 server 的代际;响应回来时若代际已变(被更新的请求取代),丢弃。
+  const toolsGenRef = useRef<Record<string, number>>({})
+
+  // 清理指定 server 的工具缓存 + 错误 + 代际(disconnect/delete/disable 时调用)
+  const clearToolsState = useCallback((serverId: string) => {
+    setToolsCache((prev) => {
+      if (!prev[serverId]) return prev
+      const next = { ...prev }
+      delete next[serverId]
+      return next
+    })
+    setToolsErrorMap((prev) => {
+      if (!prev[serverId]) return prev
+      const next = { ...prev }
+      delete next[serverId]
+      return next
+    })
+    delete toolsGenRef.current[serverId]
+  }, [])
 
   // 拉取某 server 的工具列表(选中且已连接时)。
   // R1-7 / UI-4 修复: 失败时记录错误并 toast 提示,不再静默吞错让用户误以为"无工具"。
+  // R3-4 修复: 代际防护,旧响应不覆盖新结果。
   const loadTools = useCallback(
     async (serverId: string) => {
+      const gen = (toolsGenRef.current[serverId] ?? 0) + 1
+      toolsGenRef.current[serverId] = gen
       setToolsLoadingId(serverId)
       try {
         const result = await getAPI().mcp.listTools(serverId)
+        // 代际过期: 已被更新的请求/清理取代,丢弃本次响应
+        if (toolsGenRef.current[serverId] !== gen) return
         if (result.success) {
           setToolsCache((prev) => ({ ...prev, [serverId]: result.tools }))
-          // 成功则清除该 server 的历史错误
           setToolsErrorMap((prev) => {
             if (!prev[serverId]) return prev
             const next = { ...prev }
@@ -136,11 +165,14 @@ export function McpTab() {
           console.error('[MCP] listTools returned failure:', msg)
         }
       } catch (err) {
+        if (toolsGenRef.current[serverId] !== gen) return
         const msg = (err as Error).message
         setToolsErrorMap((prev) => ({ ...prev, [serverId]: msg }))
         console.error('[MCP] listTools failed:', err)
       } finally {
-        setToolsLoadingId(null)
+        if (toolsGenRef.current[serverId] === gen) {
+          setToolsLoadingId(null)
+        }
       }
     },
     [t],
@@ -183,20 +215,12 @@ export function McpTab() {
   }
 
   // R1-7 / UI-5 修复: 检查 result.success,失败时不清理缓存/不刷新,避免假性成功。
+  // R3-4: 用 clearToolsState 统一清理(含代际),防止 disconnect 后 effect 重新触发 loadTools 还原错误。
   const handleDisconnect = async (id: string) => {
     try {
       const result = await getAPI().mcp.disconnect(id)
       if (result.success) {
-        setToolsCache((prev) => {
-          const next = { ...prev }
-          delete next[id]
-          return next
-        })
-        setToolsErrorMap((prev) => {
-          const next = { ...prev }
-          delete next[id]
-          return next
-        })
+        clearToolsState(id)
         await loadServers()
       } else {
         toast.error(result.error || t('toast.mcp.disconnectFailed'))
@@ -211,6 +235,8 @@ export function McpTab() {
       const result = await getAPI().mcp.update(id, { enabled })
       if (result.success) {
         toast.success(t('toast.mcp.updated'))
+        // R3-4: 禁用时清理工具缓存(断开的 server 不应保留旧工具列表)
+        if (!enabled) clearToolsState(id)
         await loadServers()
       } else {
         // R5-I18N-1 修复: 失败 fallback 不再用 "已更新" 文案,改用 toggleFailed
@@ -227,6 +253,8 @@ export function McpTab() {
       if (result.success) {
         toast.success(t('toast.mcp.removed'))
         if (selectedId === id) setSelectedId(null)
+        // R3-4: 删除时清理该 server 的工具缓存/错误/代际
+        clearToolsState(id)
         await loadServers()
       } else {
         toast.error(result.error || t('toast.mcp.removed'))
@@ -424,6 +452,7 @@ export function McpTab() {
       {showForm && (
         <McpServerForm
           initial={editingServer ?? presetDraft}
+          mode={editingServer ? 'edit' : 'add'}
           onSubmit={handleFormSubmit}
           onCancel={() => {
             setShowForm(false)

@@ -5,6 +5,14 @@ import { validateMcpConfig } from '../mcp-validate'
 
 interface McpServerFormProps {
   initial: Partial<McpServerConfig> | null
+  /**
+   * 表单模式(R3-2 / UI-R8 修复):
+   *   - 'add'   新增(含从模板添加):标题"新增",id 可编辑
+   *   - 'edit'  编辑现有 server:标题"编辑",id 只读
+   * 旧实现用 !!initial 判断模式,导致"从模板添加"(presetDraft 非空)被误判为编辑,
+   * id 被禁用、标题显示"编辑"。显式 mode 消除歧义。
+   */
+  mode?: 'add' | 'edit'
   onSubmit: (config: McpServerConfig) => Promise<void> | void
   onCancel: () => void
 }
@@ -42,13 +50,15 @@ function toDraft(initial: Partial<McpServerConfig> | null): DraftState {
   }
 }
 
-export function McpServerForm({ initial, onSubmit, onCancel }: McpServerFormProps) {
+export function McpServerForm({ initial, mode, onSubmit, onCancel }: McpServerFormProps) {
   const { t } = useT()
   const [draft, setDraft] = useState<DraftState>(() => toDraft(initial))
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [submitted, setSubmitted] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const titleId = useId()
+  // R3-2: 显式模式优先;未传则回退到旧的 !!initial 推断(向后兼容)
+  const isEdit = mode ? mode === 'edit' : !!initial
 
   // validateMcpConfig 入参为 Partial<McpServerConfig>;draft 字段已是合法子集
   const draftAsConfig = useMemo<Partial<McpServerConfig>>(
@@ -129,7 +139,7 @@ export function McpServerForm({ initial, onSubmit, onCancel }: McpServerFormProp
         className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-lg max-h-[90vh] overflow-auto"
       >
         <h2 id={titleId} className="text-lg font-medium mb-4 text-gray-900 dark:text-gray-100">
-          {initial ? t('page.mcp.edit') : t('page.mcp.add')}
+          {isEdit ? t('page.mcp.edit') : t('page.mcp.add')}
         </h2>
 
         <div className="space-y-3">
@@ -138,7 +148,7 @@ export function McpServerForm({ initial, onSubmit, onCancel }: McpServerFormProp
               type="text"
               value={draft.id}
               onChange={(e) => update({ id: e.target.value })}
-              disabled={!!initial}
+              disabled={isEdit}
               className="w-full px-2 py-1 border rounded dark:bg-gray-700 dark:border-gray-600 disabled:opacity-50"
             />
           </FormField>
