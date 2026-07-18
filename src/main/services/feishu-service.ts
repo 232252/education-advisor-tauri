@@ -37,18 +37,25 @@ interface MessageResponse {
   data?: { message_id?: string }
 }
 
-let cachedToken: { token: string; expireAt: number } | null = null
+/**
+ * R8 / 2A 修复: tenant_access_token 缓存按 appId 分桶。
+ * 旧实现是模块级单变量 cachedToken,无 key —— 切换 app (appId/secret) 后,
+ * 第二个 app 的 token 会覆盖第一个 app 的缓存,导致多租户串味
+ * (用 app A 凭证换 app B 后,A 的后续 API 调用会拿 B 的 token)。
+ */
+const cachedTokens = new Map<string, { token: string; expireAt: number }>()
 
 /** 内部:获取 tenant_access_token,自动缓存到过期前 5 分钟 */
 async function getTenantToken(
   appId: string,
   appSecret: string,
 ): Promise<{ token: string; expireSec: number }> {
-  // 命中缓存
-  if (cachedToken && cachedToken.expireAt > Date.now() + 5 * 60 * 1000) {
+  // 命中缓存(按 appId 隔离)
+  const cached = cachedTokens.get(appId)
+  if (cached && cached.expireAt > Date.now() + 5 * 60 * 1000) {
     return {
-      token: cachedToken.token,
-      expireSec: Math.floor((cachedToken.expireAt - Date.now()) / 1000),
+      token: cached.token,
+      expireSec: Math.floor((cached.expireAt - Date.now()) / 1000),
     }
   }
   const res = await fetch(`${FEISHU_API_BASE}/auth/v3/tenant_access_token/internal`, {
@@ -61,10 +68,11 @@ async function getTenantToken(
   if (data.code !== 0 || !data.tenant_access_token) {
     throw new Error(`Feishu auth failed: code=${data.code} msg=${data.msg}`)
   }
-  cachedToken = {
+  const entry = {
     token: data.tenant_access_token,
     expireAt: Date.now() + (data.expire ?? 7200) * 1000,
   }
+  cachedTokens.set(appId, entry)
   return { token: data.tenant_access_token, expireSec: data.expire ?? 7200 }
 }
 
@@ -74,7 +82,8 @@ export async function testConnection(
   appSecret: string,
 ): Promise<{ success: boolean; token?: string; expireSec?: number; error?: string }> {
   try {
-    cachedToken = null // 强制刷新
+    // R8 / 2A: 强制刷新当前 appId 的缓存,而不是清空所有(其他 app 的缓存保持)
+    cachedTokens.delete(appId)
     const { token, expireSec } = await getTenantToken(appId, appSecret)
     return { success: true, token: `${token.slice(0, 8)}...`, expireSec }
   } catch (err) {
@@ -150,11 +159,14 @@ export async function sendTextMessage(
   }
 }
 
-/** 内部诊断日志 */
+/** 内部诊断日志:R8 / 2A 后改用按 appId 分桶的 cachedTokens Map */
 export function feishuInfo(): string {
-  return cachedToken
-    ? `token cached, expires in ${Math.floor((cachedToken.expireAt - Date.now()) / 1000)}s`
-    : 'no cached token'
+  if (cachedTokens.size === 0) return 'no cached token'
+  // 多租户场景下报告每个 appId 各自的剩余时间(对运维更清晰)
+  const entries = Array.from(cachedTokens.entries()).map(
+    ([appId, c]) => `${appId}: expires in ${Math.floor((c.expireAt - Date.now()) / 1000)}s`,
+  )
+  return `token cached (${cachedTokens.size}): ${entries.join(', ')}`
 }
 
 /** T4: 往 bitable 写一条记录 */

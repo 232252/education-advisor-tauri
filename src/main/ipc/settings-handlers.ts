@@ -116,8 +116,14 @@ export function registerSettingsHandlers(win: BrowserWindow) {
         return { success: false, error: '[IPC] invalid path: contains null byte' }
       }
       // 飞书 appSecret:存入 keystore 加密存储，不写入 settings.json
-      if (path === 'feishu.appSecret' && typeof value === 'string' && value.length > 0) {
-        // 如果是 keystore 占位符，说明用户没修改，跳过
+      if (path === 'feishu.appSecret') {
+        // R8 / 4A 修复: 显式处理空字符串/null/非字符串,而不是让空值悄无声息落空
+        // (旧逻辑只在 value.length > 0 时走 keystore 分支,空值会落到 settingsService.update
+        // 抛 'dotPath not found',用户想清空密钥却拿不到任何反馈,旧 secret 仍在 keystore)。
+        if (typeof value !== 'string') {
+          return { success: false, error: '[IPC] feishu.appSecret must be a string' }
+        }
+        // 如果是 keystore 占位符,说明用户没修改,跳过
         if (value === '__keystore__') {
           return { success: true }
         }
@@ -130,6 +136,15 @@ export function registerSettingsHandlers(win: BrowserWindow) {
         }
         if (value.includes('\0')) {
           return { success: false, error: '[IPC] feishu.appSecret contains null byte' }
+        }
+        if (value.length === 0) {
+          // R8: 用户明确清空密钥——从 keystore 删除并停掉飞书长连接
+          keystoreService.deleteSecret('feishu-app-secret')
+          log('info', 'settings', 'feishu.appSecret cleared from keystore')
+          await feishuBotService.stop().catch((err) => {
+            log('warn', 'settings', `feishu bot stop after secret clear failed: ${err}`)
+          })
+          return { success: true }
         }
         keystoreService.setSecret('feishu-app-secret', value)
         log('info', 'settings', 'feishu.appSecret saved to keystore (encrypted)')

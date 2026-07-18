@@ -105,6 +105,10 @@ impl Default for PrivacyEngine {
 
 impl PrivacyEngine {
     /// 初始化新引擎
+    ///
+    /// R8 / 3A 修复: 若 mapping.enc 已存在则拒绝(返回 AlreadyInitialized),
+    /// 防止静默覆盖已有的真名↔别名映射导致不可逆数据丢失。
+    /// 调用方需要显式调用 reset 才能清空。
     pub fn init(&mut self, data_dir: &PathBuf, password: &str) -> Result<(), PrivacyError> {
         let key = derive_key(password);
         self.cipher = Some(
@@ -113,6 +117,13 @@ impl PrivacyEngine {
         );
         self.mapping_path = data_dir.join("privacy").join("mapping.enc");
         std::fs::create_dir_all(self.mapping_path.parent().unwrap())?;
+        // R8 / 3A 防护: 已存在则拒绝,避免静默覆盖真实映射数据
+        if self.mapping_path.exists() {
+            return Err(PrivacyError::AlreadyInitialized(format!(
+                "privacy mapping already exists at {}; use reset() explicitly to wipe",
+                self.mapping_path.display()
+            )));
+        }
         // 清空映射
         self.forward.clear();
         self.reverse.clear();
@@ -388,6 +399,10 @@ pub enum PrivacyError {
     NotInitialized,
     #[error("IO错误: {0}")]
     Io(String),
+    /// R8 / 3A: 隐私引擎已初始化(mapping.enc 已存在),init 拒绝静默覆盖
+    /// 调用方需显式 reset() 才能清空已有映射
+    #[error("隐私引擎已初始化: {0}")]
+    AlreadyInitialized(String),
 }
 
 impl From<std::io::Error> for PrivacyError {
