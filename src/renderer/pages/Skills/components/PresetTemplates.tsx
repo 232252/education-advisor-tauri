@@ -22,7 +22,7 @@ export function PresetTemplates({ onSelect, onCancel }: PresetTemplatesProps) {
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md"
+        className="bg-white dark:bg-[#1a1e28] rounded-lg p-6 w-full max-w-md"
       >
         <h2 id={titleId} className="text-lg font-medium mb-4 text-gray-900 dark:text-gray-100">
           {t('page.mcp.preset.title')}
@@ -36,7 +36,7 @@ export function PresetTemplates({ onSelect, onCancel }: PresetTemplatesProps) {
                 <button
                   type="button"
                   onClick={() => onSelect(config)}
-                  className="w-full text-left p-3 border border-gray-200 dark:border-gray-700 rounded hover:bg-gray-50 dark:hover:bg-gray-700/50"
+                  className="w-full text-left p-3 border border-gray-200 dark:border-white/[0.06] rounded hover:bg-gray-50 dark:hover:bg-white/[0.04]"
                 >
                   <div className="font-medium text-gray-900 dark:text-gray-100">
                     {t(`page.mcp.preset.${preset.i18nSuffix}`)}
@@ -58,7 +58,7 @@ export function PresetTemplates({ onSelect, onCancel }: PresetTemplatesProps) {
           <button
             type="button"
             onClick={onCancel}
-            className="px-4 py-1.5 text-sm rounded border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700"
+            className="px-4 py-1.5 text-sm rounded border border-gray-300 dark:border-white/[0.08] hover:bg-gray-100 dark:hover:bg-white/[0.06]"
           >
             {t('common.cancel')}
           </button>

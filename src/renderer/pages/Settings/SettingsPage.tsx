@@ -105,12 +105,12 @@ function Section({
 }) {
   const [open, setOpen] = useState(defaultOpen)
   return (
-    <div className="bg-white dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700/80 rounded-xl overflow-hidden">
+    <div className="bg-white dark:bg-[#1a1e28]/80 border border-gray-200 dark:border-white/[0.05] rounded-xl overflow-hidden">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
-        className="w-full px-5 py-3.5 border-b border-gray-200 dark:border-gray-700/80 bg-gray-50 dark:bg-gray-800/40 flex items-center justify-between hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors"
+        className="w-full px-5 py-3.5 border-b border-gray-200 dark:border-white/[0.05] bg-gray-50 dark:bg-[#1a1e28]/40 flex items-center justify-between hover:bg-gray-100 dark:hover:bg-white/[0.04] transition-colors"
       >
         <h2 className="text-sm font-semibold text-gray-800 dark:text-gray-100">{title}</h2>
         <svg
@@ -125,7 +125,7 @@ function Section({
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
       </button>
-      {open && <div className="divide-y divide-gray-200 dark:divide-gray-700/60">{children}</div>}
+      {open && <div className="divide-y divide-gray-200 dark:divide-white/[0.06]/60">{children}</div>}
     </div>
   )
 }
@@ -207,7 +207,7 @@ function SecretInput({
         placeholder={placeholder ?? '未设置'}
         onChange={(e) => onChange(e.target.value)}
         onBlur={onBlur}
-        className="bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-2.5 py-1.5 text-xs text-gray-700 dark:text-gray-200 w-44 focus:border-transparent focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+        className="bg-gray-50 dark:bg-[#1a1e28] border border-gray-300 dark:border-white/[0.08] rounded-lg px-2.5 py-1.5 text-xs text-gray-700 dark:text-gray-200 w-44 focus:border-transparent focus:ring-2 focus:ring-blue-500 outline-none transition-all"
       />
       {value && (
         <button
@@ -379,7 +379,7 @@ export function SettingsPage() {
               const settingsLang = newLang === 'zh' ? 'zh-CN' : 'en-US'
               handleSave('general.language', settingsLang)
             }}
-            className="bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-1.5 py-0.5 text-[10px] text-gray-500 dark:text-gray-400"
+            className="bg-gray-50 dark:bg-[#1a1e28] border border-gray-300 dark:border-white/[0.08] rounded-lg px-1.5 py-0.5 text-[10px] text-gray-500 dark:text-gray-400"
             title="UI Language"
           >
             <option value="zh">中文</option>
@@ -390,7 +390,7 @@ export function SettingsPage() {
           type="button"
           onClick={handleReset}
           disabled={saving}
-          className="text-xs text-gray-500 dark:text-gray-400 hover:text-rose-500 dark:hover:text-rose-400 border border-gray-300 dark:border-gray-600 hover:border-rose-500/50 dark:hover:border-rose-500/50 px-3 py-1.5 rounded-lg disabled:opacity-50 transition-colors"
+          className="text-xs text-gray-500 dark:text-gray-400 hover:text-rose-500 dark:hover:text-rose-400 border border-gray-300 dark:border-white/[0.08] hover:border-rose-500/50 dark:hover:border-rose-500/50 px-3 py-1.5 rounded-lg disabled:opacity-50 transition-colors"
         >
           {t('settings.reset')}
         </button>
@@ -411,7 +411,7 @@ export function SettingsPage() {
               // 通知 useTheme hook 立即应用新主题
               window.dispatchEvent(new CustomEvent('theme-changed', { detail: v }))
             }}
-            className="bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-2.5 py-1.5 text-xs text-gray-700 dark:text-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+            className="bg-gray-50 dark:bg-[#1a1e28] border border-gray-300 dark:border-white/[0.08] rounded-lg px-2.5 py-1.5 text-xs text-gray-700 dark:text-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
           >
             <option value="dark">{t('settings.theme.dark')}</option>
             <option value="light">{t('settings.theme.light')}</option>
@@ -432,7 +432,7 @@ export function SettingsPage() {
               // 同步触发 i18n 切换（settings 值 zh-CN/en-US → i18n 值 zh/en）
               setLang(v === 'zh-CN' ? 'zh' : 'en')
             }}
-            className="bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-2.5 py-1.5 text-xs text-gray-700 dark:text-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+            className="bg-gray-50 dark:bg-[#1a1e28] border border-gray-300 dark:border-white/[0.08] rounded-lg px-2.5 py-1.5 text-xs text-gray-700 dark:text-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
           >
             <option value="zh-CN">中文</option>
             <option value="en-US">English</option>
@@ -475,7 +475,7 @@ export function SettingsPage() {
           <select
             value={settings.general.closeBehavior}
             onChange={(e) => handleSave('general.closeBehavior', e.target.value)}
-            className="bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-2.5 py-1.5 text-xs text-gray-700 dark:text-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+            className="bg-gray-50 dark:bg-[#1a1e28] border border-gray-300 dark:border-white/[0.08] rounded-lg px-2.5 py-1.5 text-xs text-gray-700 dark:text-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
           >
             <option value="ask">每次询问</option>
             <option value="tray">最小化到托盘</option>
@@ -491,7 +491,7 @@ export function SettingsPage() {
           <select
             value={settings.general.logLevel}
             onChange={(e) => handleSave('general.logLevel', e.target.value)}
-            className="bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-2.5 py-1.5 text-xs text-gray-700 dark:text-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+            className="bg-gray-50 dark:bg-[#1a1e28] border border-gray-300 dark:border-white/[0.08] rounded-lg px-2.5 py-1.5 text-xs text-gray-700 dark:text-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
           >
             <option value="debug">Debug (全日志)</option>
             <option value="info">Info (重要事件)</option>
@@ -536,7 +536,7 @@ export function SettingsPage() {
                 toast.error('URL 格式不正确')
               }
             }}
-            className="bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-2.5 py-1.5 text-xs text-gray-700 dark:text-gray-200 w-56 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+            className="bg-gray-50 dark:bg-[#1a1e28] border border-gray-300 dark:border-white/[0.08] rounded-lg px-2.5 py-1.5 text-xs text-gray-700 dark:text-gray-200 w-56 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
           />
         </SettingRow>
 
@@ -582,7 +582,7 @@ export function SettingsPage() {
             step={512}
             value={settings.chat.maxTokens}
             onChange={(e) => handleSave('chat.maxTokens', Number(e.target.value))}
-            className="bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-2.5 py-1.5 text-xs text-gray-700 dark:text-gray-200 w-28 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+            className="bg-gray-50 dark:bg-[#1a1e28] border border-gray-300 dark:border-white/[0.08] rounded-lg px-2.5 py-1.5 text-xs text-gray-700 dark:text-gray-200 w-28 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
           />
         </SettingRow>
 
@@ -609,7 +609,7 @@ export function SettingsPage() {
             step={256}
             value={settings.chat.compaction.reserveTokens}
             onChange={(e) => handleSave('chat.compaction.reserveTokens', Number(e.target.value))}
-            className="bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-2.5 py-1.5 text-xs text-gray-700 dark:text-gray-200 w-28 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+            className="bg-gray-50 dark:bg-[#1a1e28] border border-gray-300 dark:border-white/[0.08] rounded-lg px-2.5 py-1.5 text-xs text-gray-700 dark:text-gray-200 w-28 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
             disabled={!settings.chat.compaction.enabled}
           />
         </SettingRow>
@@ -626,7 +626,7 @@ export function SettingsPage() {
             step={256}
             value={settings.chat.compaction.keepRecentTokens}
             onChange={(e) => handleSave('chat.compaction.keepRecentTokens', Number(e.target.value))}
-            className="bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-2.5 py-1.5 text-xs text-gray-700 dark:text-gray-200 w-28 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+            className="bg-gray-50 dark:bg-[#1a1e28] border border-gray-300 dark:border-white/[0.08] rounded-lg px-2.5 py-1.5 text-xs text-gray-700 dark:text-gray-200 w-28 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
             disabled={!settings.chat.compaction.enabled}
           />
         </SettingRow>
@@ -639,7 +639,7 @@ export function SettingsPage() {
           <select
             value={settings.chat.steeringMode}
             onChange={(e) => handleSave('chat.steeringMode', e.target.value)}
-            className="bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-2.5 py-1.5 text-xs text-gray-700 dark:text-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+            className="bg-gray-50 dark:bg-[#1a1e28] border border-gray-300 dark:border-white/[0.08] rounded-lg px-2.5 py-1.5 text-xs text-gray-700 dark:text-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
           >
             <option value="all">全部</option>
             <option value="one-at-a-time">一次一个</option>
@@ -654,7 +654,7 @@ export function SettingsPage() {
           <select
             value={settings.chat.followUpMode}
             onChange={(e) => handleSave('chat.followUpMode', e.target.value)}
-            className="bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-2.5 py-1.5 text-xs text-gray-700 dark:text-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+            className="bg-gray-50 dark:bg-[#1a1e28] border border-gray-300 dark:border-white/[0.08] rounded-lg px-2.5 py-1.5 text-xs text-gray-700 dark:text-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
           >
             <option value="all">全部</option>
             <option value="one-at-a-time">一次一个</option>
@@ -687,7 +687,7 @@ export function SettingsPage() {
       {/* ===== 飞书 ===== */}
       <Section title={t('settings.section.feishu')}>
         {/* 连接状态徽章:实时反映长连接机器人状态 */}
-        <div className="px-5 py-3 flex items-center gap-2 bg-gray-50 dark:bg-gray-800/40 border-b border-gray-200 dark:border-gray-700/60">
+        <div className="px-5 py-3 flex items-center gap-2 bg-gray-50 dark:bg-[#1a1e28]/40 border-b border-gray-200 dark:border-white/[0.06]/60">
           <span
             className={`w-2 h-2 rounded-full ${
               botStatus?.status === 'connected'
@@ -720,7 +720,7 @@ export function SettingsPage() {
             <button
               type="button"
               onClick={() => getAPI().feishu.botStop()}
-              className="text-[10px] px-2 py-1 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors"
+              className="text-[10px] px-2 py-1 rounded-lg border border-gray-300 dark:border-white/[0.08] text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/[0.04] transition-colors"
             >
               断开
             </button>
@@ -746,10 +746,10 @@ export function SettingsPage() {
             value={settings.feishu.appId}
             placeholder="cli_xxxxxxxx"
             onChange={(e) => handleSave('feishu.appId', e.target.value)}
-            className={`bg-gray-50 dark:bg-gray-800 border rounded-lg px-2.5 py-1.5 text-xs text-gray-700 dark:text-gray-200 w-48 outline-none transition-all focus:ring-2 focus:border-transparent ${
+            className={`bg-gray-50 dark:bg-[#1a1e28] border rounded-lg px-2.5 py-1.5 text-xs text-gray-700 dark:text-gray-200 w-48 outline-none transition-all focus:ring-2 focus:border-transparent ${
               settings.feishu.appId && !settings.feishu.appId.startsWith('cli_')
                 ? 'border-rose-400 focus:ring-rose-500/50'
-                : 'border-gray-300 dark:border-gray-600 focus:ring-blue-500'
+                : 'border-gray-300 dark:border-white/[0.08] focus:ring-blue-500'
             }`}
           />
         </SettingRow>
@@ -811,7 +811,7 @@ export function SettingsPage() {
         </SettingRow>
 
         {/* 配置指引:首次使用必读,告知飞书后台需开启的权限与事件 */}
-        <div className="px-5 py-3 text-[11px] leading-relaxed text-gray-500 dark:text-gray-400 bg-blue-50/50 dark:bg-blue-900/10 border-t border-gray-200 dark:border-gray-700/60">
+        <div className="px-5 py-3 text-[11px] leading-relaxed text-gray-500 dark:text-gray-400 bg-blue-50/50 dark:bg-blue-900/10 border-t border-gray-200 dark:border-white/[0.06]/60">
           <div className="font-medium text-blue-600 dark:text-blue-400 mb-1">首次使用飞书对话</div>
           填好 App ID 和 App Secret 后,还需在
           <a
@@ -832,11 +832,11 @@ export function SettingsPage() {
         </div>
 
         {/* 高级:Bitable 同步等不常用配置,默认收起 */}
-        <details className="border-t border-gray-200 dark:border-gray-700/60">
-          <summary className="px-5 py-2.5 text-xs text-gray-400 dark:text-gray-500 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/30 select-none">
+        <details className="border-t border-gray-200 dark:border-white/[0.06]/60">
+          <summary className="px-5 py-2.5 text-xs text-gray-400 dark:text-gray-500 cursor-pointer hover:bg-gray-50 dark:hover:bg-white/[0.04]/30 select-none">
             高级(Bitable 多维表格同步)
           </summary>
-          <div className="divide-y divide-gray-200 dark:divide-gray-700/60">
+          <div className="divide-y divide-gray-200 dark:divide-white/[0.06]/60">
             <SettingRow
               label="Bitable App Token"
               path="feishu.bitableAppToken"
@@ -852,7 +852,7 @@ export function SettingsPage() {
                   // C-4 修复: 同步持久化到 settings,之前只更新本地 state 导致重启丢失
                   handleSave('feishu.bitableAppToken', v)
                 }}
-                className="bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-2.5 py-1.5 text-xs text-gray-700 dark:text-gray-200 w-48 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+                className="bg-gray-50 dark:bg-[#1a1e28] border border-gray-300 dark:border-white/[0.08] rounded-lg px-2.5 py-1.5 text-xs text-gray-700 dark:text-gray-200 w-48 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
               />
             </SettingRow>
 
@@ -927,7 +927,7 @@ export function SettingsPage() {
                 value={settings.feishu.bitableSync.syncInterval}
                 placeholder="0 */6 * * *"
                 onChange={(e) => handleSave('feishu.bitableSync.syncInterval', e.target.value)}
-                className="bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-2.5 py-1.5 text-xs text-gray-700 dark:text-gray-200 w-40 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+                className="bg-gray-50 dark:bg-[#1a1e28] border border-gray-300 dark:border-white/[0.08] rounded-lg px-2.5 py-1.5 text-xs text-gray-700 dark:text-gray-200 w-40 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
                 disabled={!settings.feishu.bitableSync.enabled}
               />
             </SettingRow>
@@ -1106,7 +1106,7 @@ export function SettingsPage() {
                     toast.error(t('toast.settings.refreshLogsFailed'))
                   }
                 }}
-                className="text-[10px] px-2.5 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors"
+                className="text-[10px] px-2.5 py-1.5 rounded-lg border border-gray-300 dark:border-white/[0.08] text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/[0.04] transition-colors"
               >
                 刷新列表
               </button>
@@ -1138,7 +1138,7 @@ export function SettingsPage() {
                     setLogContent(content)
                   }
                 }}
-                className="bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-1.5 py-1 text-[10px] text-gray-700 dark:text-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+                className="bg-gray-50 dark:bg-[#1a1e28] border border-gray-300 dark:border-white/[0.08] rounded-lg px-1.5 py-1 text-[10px] text-gray-700 dark:text-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
               >
                 <option value="all">全部</option>
                 <option value="debug">Debug</option>
@@ -1175,7 +1175,7 @@ export function SettingsPage() {
                   }
                 }, 300)
               }}
-              className="flex-1 min-w-[120px] bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-2.5 py-1 text-[10px] text-gray-700 dark:text-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+              className="flex-1 min-w-[120px] bg-gray-50 dark:bg-[#1a1e28] border border-gray-300 dark:border-white/[0.08] rounded-lg px-2.5 py-1 text-[10px] text-gray-700 dark:text-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
             />
 
             <button
@@ -1230,7 +1230,7 @@ export function SettingsPage() {
                   className={`text-[10px] px-2 py-1 rounded-lg border ${
                     selectedLog === f.name
                       ? 'bg-blue-500/20 border-blue-500/50 text-blue-600 dark:text-blue-200'
-                      : 'border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700/30'
+                      : 'border-gray-300 dark:border-white/[0.08] text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/[0.03]'
                   }`}
                 >
                   {f.stream}/{f.date} ({Math.round(f.sizeBytes / 1024)}KB)
@@ -1240,7 +1240,7 @@ export function SettingsPage() {
           )}
 
           {logContent && (
-            <pre className="bg-gray-50 dark:bg-gray-900/60 border border-gray-200 dark:border-gray-700/80 rounded-lg p-3 text-[10px] text-gray-700 dark:text-gray-300 max-h-64 overflow-y-auto font-mono whitespace-pre-wrap leading-relaxed">
+            <pre className="bg-gray-50 dark:bg-[#0f1117]/60 border border-gray-200 dark:border-white/[0.05] rounded-lg p-3 text-[10px] text-gray-700 dark:text-gray-300 max-h-64 overflow-y-auto font-mono whitespace-pre-wrap leading-relaxed">
               {logContent}
             </pre>
           )}
@@ -1269,7 +1269,7 @@ export function SettingsPage() {
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-            <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-3">
+            <div className="bg-gray-50 dark:bg-[#1a1e28]/50 rounded-lg p-3">
               <div className="text-[10px] text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2 font-medium">
                 底层核心
               </div>
@@ -1328,7 +1328,7 @@ export function SettingsPage() {
               </div>
             </div>
 
-            <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-3">
+            <div className="bg-gray-50 dark:bg-[#1a1e28]/50 rounded-lg p-3">
               <div className="text-[10px] text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2 font-medium">
                 关键依赖
               </div>
@@ -1347,7 +1347,7 @@ export function SettingsPage() {
             架构)。
           </p>
 
-          <div className="pt-3 border-t border-gray-200 dark:border-gray-700/60">
+          <div className="pt-3 border-t border-gray-200 dark:border-white/[0.06]/60">
             <div className="text-[10px] text-gray-400 dark:text-gray-500 italic leading-relaxed">
               本项目已从 Electron 33 迁移至 Tauri 2 桌面框架 (Rust shell + Node sidecar +
               electron-shim), 原有 Electron 入口保留以供兼容。EAA Core 已升级至 v3.2.2 (27 子命令,

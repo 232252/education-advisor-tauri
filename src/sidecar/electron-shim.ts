@@ -148,6 +148,11 @@ function makeWebContents() {
       const data = args.length === 0 ? null : args.length === 1 ? args[0] : args
       _emitEvent(channel, data)
     },
+    // R57 修复: handler 里有 `if (!e.sender.isDestroyed()) e.sender.send(...)`,
+    // 必须提供 isDestroyed 否则抛 TypeError 被 catch 吞掉,send 永不执行。
+    isDestroyed() {
+      return false
+    },
     once() {
       /* no-op */
     },
@@ -166,8 +171,18 @@ function makeWebContents() {
   }
 }
 
+// R57 修复: 共享的 mainWebContents 单例。
+// sidecar-entry 在调 ipcMain.handle 注册的 handler 时,需要传一个带 send 方法的 event.sender,
+// 这样 handler 内部 e.sender.send(channel, data) 才能转发到 _emitEvent → Rust → renderer。
+// 之前 sidecar-entry 传 {} 作为 event,e.sender 是 undefined,e.sender.send() 会 throw TypeError,
+// 被 handler 的 catch {} 静默吞掉,导致所有 webContents.send 事件推送(class:assign-progress /
+// ai:chat-stream / agent:status-update 等)在 sidecar 模式下完全不工作。
+export const mainWebContents = makeWebContents()
+
 class BrowserWindowMock {
-  webContents = makeWebContents()
+  // R57: 复用共享的 mainWebContents,确保 BrowserWindow.webContents.send
+  // 和 sidecar handler 的 e.sender.send 走同一个出口 (_emitEvent)
+  webContents = mainWebContents
   isDestroyed() {
     return false
   }

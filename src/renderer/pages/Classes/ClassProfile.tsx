@@ -66,9 +66,9 @@ export function ClassProfile({
   const createdStr = `${created.getFullYear()}-${String(created.getMonth() + 1).padStart(2, '0')}-${String(created.getDate()).padStart(2, '0')}`
 
   return (
-    <div className="h-full flex flex-col bg-white dark:bg-gray-900">
+    <div className="h-full flex flex-col bg-white dark:bg-[#0f1117]">
       {/* 头部 */}
-      <div className="flex-shrink-0 px-5 py-4 border-b border-gray-200 dark:border-gray-700">
+      <div className="flex-shrink-0 px-5 py-4 border-b border-gray-200 dark:border-white/[0.06]">
         <div className="flex items-start justify-between">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
@@ -102,7 +102,7 @@ export function ClassProfile({
       </div>
 
       {/* Tab 导航 */}
-      <div className="flex-shrink-0 flex border-b border-gray-200 dark:border-gray-700 px-3 gap-1">
+      <div className="flex-shrink-0 flex border-b border-gray-200 dark:border-white/[0.06] px-3 gap-1">
         {tabs.map((tb) => (
           <button
             key={tb.id}
@@ -256,8 +256,8 @@ function StudentsTab({
         </div>
       )}
       <table className="w-full text-sm">
-        <thead className="sticky top-0 bg-white dark:bg-gray-900">
-          <tr className="text-left text-xs text-gray-400 dark:text-gray-500 border-b border-gray-200 dark:border-gray-700">
+        <thead className="sticky top-0 bg-white dark:bg-[#0f1117]">
+          <tr className="text-left text-xs text-gray-400 dark:text-gray-500 border-b border-gray-200 dark:border-white/[0.06]">
             <th className="py-2 px-2 font-medium">{t('page.classes.profile.col.name')}</th>
             <th className="py-2 px-2 font-medium">{t('page.classes.profile.col.risk')}</th>
             <th className="py-2 px-2 font-medium text-center">
@@ -292,7 +292,7 @@ function StudentsTab({
                       setTransferTarget((prev) => ({ ...prev, [s.name]: e.target.value }))
                     }
                     disabled={otherClasses.length === 0}
-                    className="text-xs border border-gray-200 dark:border-gray-600 rounded px-1 py-0.5 bg-white dark:bg-gray-900 disabled:opacity-40"
+                    className="text-xs border border-gray-200 dark:border-white/[0.08] rounded px-1 py-0.5 bg-white dark:bg-[#0f1117] disabled:opacity-40"
                   >
                     <option value="">目标班</option>
                     {otherClasses.map((c) => (
@@ -446,7 +446,7 @@ function AssignTab({
         </div>
       ) : (
         <>
-          <div className="flex items-center justify-between mb-2 pb-2 border-b border-gray-200 dark:border-gray-700">
+          <div className="flex items-center justify-between mb-2 pb-2 border-b border-gray-200 dark:border-white/[0.06]">
             <label className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400 cursor-pointer">
               <input
                 type="checkbox"
@@ -461,7 +461,7 @@ function AssignTab({
             {assignable.map((s) => (
               <label
                 key={s.entity_id}
-                className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-gray-50 dark:hover:bg-gray-800/50 cursor-pointer"
+                className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-gray-50 dark:hover:bg-white/[0.03] cursor-pointer"
               >
                 <input
                   type="checkbox"

@@ -500,13 +500,13 @@ export function DashboardPage() {
   const s = stats?.summary
 
   return (
-    <div className="h-full overflow-y-auto p-6 bg-gradient-to-br from-gray-50 to-white dark:from-gray-900 dark:to-gray-800">
+    <div className="h-full overflow-y-auto p-6 bg-gray-50/50 dark:bg-[#0f1117]">
       <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+          <h1 className="text-xl font-bold text-gray-900 dark:text-white tracking-tight">
             {t('page.dashboard.title')}
           </h1>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+          <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
             {t('page.dashboard.subtitle')}
           </p>
         </div>
@@ -515,8 +515,9 @@ export function DashboardPage() {
           <select
             value={classFilter}
             onChange={(e) => setClassFilter(e.target.value)}
-            className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow"
+            className="bg-white dark:bg-[#1e222c] border border-gray-200/80 dark:border-white/[0.08] rounded-lg px-3 py-2 text-sm text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-transparent transition-all duration-200"
             title="按班级筛选数据"
+            aria-label="按班级筛选数据"
           >
             <option value="__ALL__">全部班级</option>
             <option value="__NONE__">未分班</option>
@@ -531,31 +532,31 @@ export function DashboardPage() {
             type="button"
             onClick={() => setCompareMode(!compareMode)}
             className={cn(
-              'px-3 py-2 rounded-lg text-sm border transition-all duration-150',
+              'px-3 py-2 rounded-lg text-sm border transition-all duration-200',
               compareMode
-                ? 'bg-purple-600 text-white border-purple-600 shadow-sm shadow-purple-500/20'
-                : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700',
+                ? 'bg-violet-600 text-white border-violet-600 shadow-sm shadow-violet-500/20'
+                : 'bg-white dark:bg-[#1e222c] text-gray-600 dark:text-gray-300 border-gray-200/80 dark:border-white/[0.08] hover:bg-gray-50 dark:hover:bg-white/[0.06]',
             )}
             title="班级对比模式"
           >
-            📊 班级对比
+            班级对比
           </button>
           <button
             type="button"
             onClick={handleRefresh}
-            className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700
-                       px-4 py-2 rounded-lg text-sm transition-all duration-200 shadow-sm hover:shadow-md"
+            className="bg-white dark:bg-[#1e222c] border border-gray-200/80 dark:border-white/[0.08] hover:bg-gray-50 dark:hover:bg-white/[0.06]
+                       px-4 py-2 rounded-lg text-sm text-gray-600 dark:text-gray-300 transition-all duration-200 shadow-card hover:shadow-card-hover"
           >
-            🔄 {t('page.dashboard.refresh')}
+            {t('page.dashboard.refresh')}
           </button>
         </div>
       </div>
 
       {/* 班级对比模式: 显示对比表格 */}
       {compareMode && (
-        <div className="mb-6 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5 shadow-card animate-slide-up overflow-x-auto">
+        <div className="mb-6 bg-white dark:bg-[#1a1e28] rounded-xl border border-gray-200/70 dark:border-white/[0.06] p-5 shadow-card animate-slide-up overflow-x-auto">
           <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-4 flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-purple-500"></span>
+            <span className="w-1.5 h-1.5 rounded-full bg-violet-500"></span>
             班级对比总览
           </h3>
           {classComparison.length === 0 ? (
@@ -565,7 +566,7 @@ export function DashboardPage() {
           ) : (
             <table className="w-full text-sm min-w-[600px]">
               <thead>
-                <tr className="text-left text-xs text-gray-400 dark:text-gray-500 border-b border-gray-200 dark:border-gray-700">
+                <tr className="text-left text-xs text-gray-400 dark:text-gray-500 border-b border-gray-100 dark:border-white/[0.06]">
                   <th className="py-2 px-3 font-medium">班级</th>
                   <th className="py-2 px-3 font-medium">年级</th>
                   <th className="py-2 px-3 font-medium">班主任</th>
@@ -582,7 +583,7 @@ export function DashboardPage() {
                 {classComparison.map((c) => (
                   <tr
                     key={c.classId}
-                    className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50"
+                    className="border-b border-gray-50 dark:border-white/[0.04] hover:bg-gray-50/80 dark:hover:bg-white/[0.03] transition-colors"
                   >
                     <td className="py-2 px-3 font-medium">{c.className}</td>
                     <td className="py-2 px-3 text-gray-500 dark:text-gray-400">{c.grade}</td>
@@ -613,7 +614,7 @@ export function DashboardPage() {
           )}
 
           {/* 双班级对比选择器 */}
-          <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+          <div className="mt-4 pt-4 border-t border-gray-100 dark:border-white/[0.06]">
             <h4 className="text-xs font-semibold text-gray-600 dark:text-gray-300 mb-2">
               双班级详细对比
             </h4>
@@ -621,7 +622,8 @@ export function DashboardPage() {
               <select
                 value={compareClassA}
                 onChange={(e) => setCompareClassA(e.target.value)}
-                className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-1.5 text-sm"
+                className="bg-white dark:bg-[#1e222c] border border-gray-200/80 dark:border-white/[0.08] rounded-lg px-3 py-1.5 text-sm text-gray-700 dark:text-gray-300"
+                aria-label="选择对比班级 A"
               >
                 <option value="">选择班级 A...</option>
                 {activeClassList.map((c) => (
@@ -630,11 +632,12 @@ export function DashboardPage() {
                   </option>
                 ))}
               </select>
-              <span className="text-gray-400">VS</span>
+              <span className="text-gray-400 dark:text-gray-500 text-xs font-medium">VS</span>
               <select
                 value={compareClassB}
                 onChange={(e) => setCompareClassB(e.target.value)}
-                className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-1.5 text-sm"
+                className="bg-white dark:bg-[#1e222c] border border-gray-200/80 dark:border-white/[0.08] rounded-lg px-3 py-1.5 text-sm text-gray-700 dark:text-gray-300"
+                aria-label="选择对比班级 B"
               >
                 <option value="">选择班级 B...</option>
                 {activeClassList.map((c) => (
@@ -649,7 +652,7 @@ export function DashboardPage() {
                 {[compareDataA, compareDataB].map((d) => (
                   <div
                     key={d.className}
-                    className="bg-gray-50 dark:bg-gray-800/50 rounded-xl p-4 border border-gray-200 dark:border-gray-700"
+                    className="bg-gray-50/80 dark:bg-white/[0.03] rounded-xl p-4 border border-gray-100 dark:border-white/[0.06]"
                   >
                     <h5 className="font-semibold text-sm mb-2">{d.className}</h5>
                     <div className="space-y-1 text-xs text-gray-500 dark:text-gray-400">
@@ -735,18 +738,18 @@ export function DashboardPage() {
       {/* 图表区 */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         {/* 分数分布柱状图 */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5 shadow-card hover:shadow-card-hover transition-shadow duration-300">
+        <div className="bg-white dark:bg-[#1a1e28] rounded-xl border border-gray-200/70 dark:border-white/[0.06] p-5 shadow-card hover:shadow-card-hover transition-shadow duration-300">
           <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-4 flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+            <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
             {t('page.dashboard.chart.scoreDist')}
           </h3>
           <ReactEChartsCore echarts={echarts} style={{ height: 260 }} option={scoreChartOption} />
         </div>
 
         {/* 风险等级饼图 */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5 shadow-card hover:shadow-card-hover transition-shadow duration-300">
+        <div className="bg-white dark:bg-[#1a1e28] rounded-xl border border-gray-200/70 dark:border-white/[0.06] p-5 shadow-card hover:shadow-card-hover transition-shadow duration-300">
           <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-4 flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-purple-500"></span>
+            <span className="w-1.5 h-1.5 rounded-full bg-purple-500"></span>
             {t('page.dashboard.chart.riskDist')}
           </h3>
           {classStats.riskDistribution ? (
@@ -762,9 +765,9 @@ export function DashboardPage() {
       {/* 下半部分 */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
         {/* 原因码分布 */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5 shadow-card hover:shadow-card-hover transition-shadow duration-300">
+        <div className="bg-white dark:bg-[#1a1e28] rounded-xl border border-gray-200/70 dark:border-white/[0.06] p-5 shadow-card hover:shadow-card-hover transition-shadow duration-300">
           <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-4 flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-green-500"></span>
+            <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
             {t('page.dashboard.chart.eventReason')}
           </h3>
           <div className="space-y-2">
@@ -798,9 +801,9 @@ export function DashboardPage() {
         </div>
 
         {/* 排行榜 */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5 shadow-card hover:shadow-card-hover transition-shadow duration-300">
+        <div className="bg-white dark:bg-[#1a1e28] rounded-xl border border-gray-200/70 dark:border-white/[0.06] p-5 shadow-card hover:shadow-card-hover transition-shadow duration-300">
           <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-4 flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-yellow-500"></span>
+            <span className="w-1.5 h-1.5 rounded-full bg-yellow-500"></span>
             {t('page.dashboard.chart.top10')}
           </h3>
           <div className="space-y-2">
@@ -846,9 +849,9 @@ export function DashboardPage() {
         </div>
 
         {/* 周期摘要 */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5 shadow-card hover:shadow-card-hover transition-shadow duration-300">
+        <div className="bg-white dark:bg-[#1a1e28] rounded-xl border border-gray-200/70 dark:border-white/[0.06] p-5 shadow-card hover:shadow-card-hover transition-shadow duration-300">
           <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-4 flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-pink-500"></span>
+            <span className="w-1.5 h-1.5 rounded-full bg-pink-500"></span>
             周期摘要
             {summary?.period?.since && (
               <span className="text-[10px] text-gray-400 dark:text-gray-500 font-normal ml-1">
@@ -890,7 +893,7 @@ export function DashboardPage() {
                   {classPeriodSummary.top_gainers.slice(0, 3).map((g) => (
                     <div
                       key={g.name}
-                      className="flex justify-between gap-2 py-1 border-b border-gray-100 dark:border-gray-700/50 last:border-0 min-w-0"
+                      className="flex justify-between gap-2 py-1 border-b border-gray-100 dark:border-white/[0.04] last:border-0 min-w-0"
                     >
                       <span className="text-gray-600 dark:text-gray-300 truncate min-w-0 flex-1">
                         {g.name}
@@ -910,7 +913,7 @@ export function DashboardPage() {
                   {classPeriodSummary.top_losers.slice(0, 3).map((l) => (
                     <div
                       key={l.name}
-                      className="flex justify-between gap-2 py-1 border-b border-gray-100 dark:border-gray-700/50 last:border-0 min-w-0"
+                      className="flex justify-between gap-2 py-1 border-b border-gray-100 dark:border-white/[0.04] last:border-0 min-w-0"
                     >
                       <span className="text-gray-600 dark:text-gray-300 truncate min-w-0 flex-1">
                         {l.name}
@@ -934,17 +937,17 @@ export function DashboardPage() {
       {/* 系统管理 & 诊断 */}
       <div className="mb-6">
         <div className="flex items-center gap-2 mb-4">
-          <span className="w-2 h-2 rounded-full bg-cyan-500"></span>
-          <h2 className="text-lg font-bold text-gray-700 dark:text-gray-200">
+          <span className="w-1.5 h-1.5 rounded-full bg-cyan-500"></span>
+          <h2 className="text-base font-semibold text-gray-800 dark:text-gray-100 tracking-tight">
             {t('page.dashboard.sysmgmt.title')}
           </h2>
         </div>
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
         {/* EAA 系统信息 */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5 shadow-card">
+        <div className="bg-white dark:bg-[#1a1e28] rounded-xl border border-gray-200/70 dark:border-white/[0.06] p-5 shadow-card">
           <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-3 flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+            <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
             {t('page.dashboard.sysmgmt.info')}
           </h3>
           {eaaInfo ? (
@@ -983,9 +986,9 @@ export function DashboardPage() {
         </div>
 
         {/* 健康检查 */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5 shadow-card">
+        <div className="bg-white dark:bg-[#1a1e28] rounded-xl border border-gray-200/70 dark:border-white/[0.06] p-5 shadow-card">
           <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-3 flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-green-500"></span>
+            <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
             {t('page.dashboard.sysmgmt.doctor')}
           </h3>
           <div className="mb-3">
@@ -1065,9 +1068,9 @@ export function DashboardPage() {
         </div>
 
         {/* 数据验证 */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5 shadow-card">
+        <div className="bg-white dark:bg-[#1a1e28] rounded-xl border border-gray-200/70 dark:border-white/[0.06] p-5 shadow-card">
           <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-3 flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-yellow-500"></span>
+            <span className="w-1.5 h-1.5 rounded-full bg-yellow-500"></span>
             {t('page.dashboard.sysmgmt.validate')}
           </h3>
           <div className="mb-3">
@@ -1154,9 +1157,9 @@ export function DashboardPage() {
       {/* 标签概览 + 操作按钮区 */}
       <div className="grid grid-cols-3 gap-6 mt-6">
         {/* 标签概览 */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5 shadow-card">
+        <div className="bg-white dark:bg-[#1a1e28] rounded-xl border border-gray-200/70 dark:border-white/[0.06] p-5 shadow-card">
           <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-3 flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-purple-500"></span>
+            <span className="w-1.5 h-1.5 rounded-full bg-purple-500"></span>
             {t('page.dashboard.sysmgmt.tags')}
           </h3>
           {tagData && tagData.tags.length > 0 ? (
@@ -1178,9 +1181,9 @@ export function DashboardPage() {
         </div>
 
         {/* 操作按钮区 */}
-        <div className="col-span-2 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5 shadow-card">
+        <div className="col-span-2 bg-white dark:bg-[#1a1e28] rounded-xl border border-gray-200/70 dark:border-white/[0.06] p-5 shadow-card">
           <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-3 flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-cyan-500"></span>
+            <span className="w-1.5 h-1.5 rounded-full bg-cyan-500"></span>
             {t('common.action', '维护工具')}
           </h3>
           <div className="space-y-3">
@@ -1247,22 +1250,22 @@ const StatCard = memo(function StatCard({
   return (
     <div
       className={`relative overflow-hidden rounded-xl border ${c.border} bg-gradient-to-br ${c.bg}
-                  p-5 shadow-card ${c.shadow} hover:shadow-card-hover hover:-translate-y-0.5
+                  p-4 shadow-card hover:shadow-card-hover hover:-translate-y-0.5
                   transition-all duration-200 cursor-default group`}
     >
       {/* 装饰性渐变圆 */}
       <div
-        className="absolute -top-4 -right-4 w-20 h-20 rounded-full opacity-20 group-hover:opacity-30 transition-opacity"
+        className="absolute -top-6 -right-6 w-16 h-16 rounded-full opacity-[0.12] group-hover:opacity-[0.2] transition-opacity duration-300"
         style={{ background: `linear-gradient(135deg, ${c.from}, ${c.to})` }}
       />
       <div className="relative z-10">
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">{title}</span>
-          <span className="text-lg">{icon}</span>
+        <div className="flex items-center justify-between mb-1.5">
+          <span className="text-[11px] text-gray-500 dark:text-gray-400 font-medium uppercase tracking-wide">{title}</span>
+          <span className="text-base opacity-80">{icon}</span>
         </div>
-        <div className={`text-3xl font-bold ${c.text}`}>{value}</div>
+        <div className={`text-2xl font-bold tracking-tight ${c.text}`}>{value}</div>
         <div
-          className="mt-2 h-1 rounded-full w-0 group-hover:w-full transition-all duration-500"
+          className="mt-2 h-[3px] rounded-full w-0 group-hover:w-full transition-all duration-500 ease-out"
           style={{ background: `linear-gradient(90deg, ${c.from}, ${c.to})` }}
         />
       </div>

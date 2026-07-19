@@ -69,7 +69,7 @@ const StudentRow = memo(function StudentRow({
             ? 'bg-blue-600/10 border-l-2 border-l-blue-400'
             : isSelected
               ? 'bg-blue-600/20 border-l-2 border-l-blue-400'
-              : 'hover:bg-gray-100 dark:hover:bg-gray-800/50'
+              : 'hover:bg-gray-100 dark:hover:bg-white/[0.04]'
         }`}
     >
       {isSelectMode && (
@@ -576,7 +576,7 @@ export function StudentsPage() {
       <div
         className={`flex flex-col transition-all duration-300 ${selectedStudent ? 'w-[45%]' : 'w-full'}`}
       >
-        <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700 flex-wrap gap-2">
+        <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-white/[0.06] flex-wrap gap-2">
           <h1 className="text-xl font-bold">
             学生管理{' '}
             <span className="text-gray-400 dark:text-gray-500 font-normal text-base">
@@ -593,7 +593,7 @@ export function StudentsPage() {
             <select
               value={classFilter}
               onChange={(e) => setClassFilter(e.target.value)}
-              className="bg-white border border-gray-300 dark:bg-gray-800 dark:border-gray-600 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-blue-500"
+              className="bg-white border border-gray-300 dark:bg-[#1e222c] dark:border-white/[0.08] rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-blue-500"
               title="按班级筛选"
             >
               <option value="__ALL__">全部班级</option>
@@ -609,7 +609,7 @@ export function StudentsPage() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="搜索姓名/分组/角色..."
-              className="bg-white border border-gray-300 dark:bg-gray-800 dark:border-gray-600 rounded-lg px-3 py-1.5 text-sm w-48
+              className="bg-white border border-gray-300 dark:bg-[#1e222c] dark:border-white/[0.08] rounded-lg px-3 py-1.5 text-sm w-48
                          focus:outline-none focus:border-blue-500"
             />
             {archivedHiddenCount > 0 && (
@@ -632,7 +632,7 @@ export function StudentsPage() {
                 <select
                   value={batchAssignTarget}
                   onChange={(e) => setBatchAssignTarget(e.target.value)}
-                  className="bg-white border border-gray-300 dark:bg-gray-800 dark:border-gray-600 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-blue-500"
+                  className="bg-white border border-gray-300 dark:bg-[#1e222c] dark:border-white/[0.08] rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-blue-500"
                   title="选择目标班级"
                 >
                   <option value="">调入班级...</option>
@@ -700,13 +700,13 @@ export function StudentsPage() {
                 📤 导出
               </button>
               {exportMenuOpen && (
-                <div className="absolute right-0 top-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50 min-w-[120px] animate-scale-in overflow-hidden">
+                <div className="absolute right-0 top-full mt-1 bg-white dark:bg-[#1a1e28] border border-gray-200 dark:border-white/[0.06] rounded-lg shadow-lg z-50 min-w-[120px] animate-scale-in overflow-hidden">
                   {exportFormats.map((fmt) => (
                     <button
                       type="button"
                       key={fmt}
                       onClick={() => handleExport(fmt)}
-                      className="block w-full text-left px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors first:rounded-t-lg last:rounded-b-lg"
+                      className="block w-full text-left px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-white/[0.06] transition-colors first:rounded-t-lg last:rounded-b-lg"
                     >
                       {fmt.toUpperCase()}
                     </button>
@@ -732,7 +732,7 @@ export function StudentsPage() {
 
         {/* 添加学生表单 (班级必填) */}
         {addingStudent && (
-          <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 flex gap-2 items-center animate-slide-up">
+          <div className="px-4 py-3 border-b border-gray-200 dark:border-white/[0.06] bg-gray-50 dark:bg-[#1a1e28]/50 flex gap-2 items-center animate-slide-up">
             {activeClassList.length === 0 ? (
               <div className="flex-1 text-sm text-amber-600 dark:text-amber-400 py-1">
                 ⚠ 请先在「班级」页面创建班级，学生必须归属于某个班级
@@ -747,13 +747,13 @@ export function StudentsPage() {
                     if (e.key === 'Enter') handleAddStudent()
                   }}
                   placeholder={`${t('page.students.col.name')}...`}
-                  className="flex-1 bg-white border border-gray-200 dark:bg-gray-900 dark:border-gray-600 rounded-lg px-3 py-1.5 text-sm
+                  className="flex-1 bg-white border border-gray-200 dark:bg-[#0f1117] dark:border-white/[0.08] rounded-lg px-3 py-1.5 text-sm
                              focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow"
                 />
                 <select
                   value={newStudentClassId}
                   onChange={(e) => setNewStudentClassId(e.target.value)}
-                  className="bg-white border border-gray-200 dark:bg-gray-900 dark:border-gray-600 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow"
+                  className="bg-white border border-gray-200 dark:bg-[#0f1117] dark:border-white/[0.08] rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow"
                 >
                   <option value="">选择班级 *</option>
                   {activeClassList.map((c) => (
@@ -796,8 +796,8 @@ export function StudentsPage() {
             />
           ) : (
             <table className="w-full text-sm">
-              <thead className="sticky top-0 bg-white dark:bg-gray-900">
-                <tr className="border-b border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 text-xs">
+              <thead className="sticky top-0 bg-white dark:bg-[#0f1117]">
+                <tr className="border-b border-gray-200 dark:border-white/[0.06] text-gray-500 dark:text-gray-400 text-xs">
                   {selectMode && (
                     <th className="py-2 px-4 w-10">
                       <input
@@ -842,7 +842,7 @@ export function StudentsPage() {
 
       {/* 右侧：学生档案（多选项卡详情） */}
       {selectedStudent && (
-        <div className="w-[55%] border-l border-gray-200 dark:border-gray-700 flex flex-col overflow-hidden animate-slide-in-right">
+        <div className="w-[55%] border-l border-gray-200 dark:border-white/[0.06] flex flex-col overflow-hidden animate-slide-in-right">
           <StudentProfile
             key={selectedStudent.entity_id}
             student={selectedStudent}

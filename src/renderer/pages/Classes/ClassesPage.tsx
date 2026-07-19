@@ -348,7 +348,7 @@ export function ClassesPage() {
   return (
     <div className="h-full flex flex-col overflow-hidden">
       {/* 顶部标题栏 */}
-      <header className="flex-shrink-0 h-14 border-b border-gray-200 dark:border-gray-700 px-6 flex items-center justify-between">
+      <header className="flex-shrink-0 h-14 border-b border-gray-200 dark:border-white/[0.06] px-6 flex items-center justify-between">
         <div>
           <h1 className="text-base font-semibold">{t('page.classes.title')}</h1>
           <p className="text-xs text-gray-400 dark:text-gray-500">{t('page.classes.subtitle')}</p>
@@ -393,7 +393,7 @@ export function ClassesPage() {
       {/* 内容区：左侧班级列表 + 右侧班级详情（点击行打开） */}
       <div className="flex-1 flex overflow-hidden">
         <div
-          className={`overflow-auto px-6 py-4 transition-all duration-300 ${selectedClass ? 'w-[45%] border-r border-gray-200 dark:border-gray-700' : 'w-full'}`}
+          className={`overflow-auto px-6 py-4 transition-all duration-300 ${selectedClass ? 'w-[45%] border-r border-gray-200 dark:border-white/[0.06]' : 'w-full'}`}
         >
           {loading ? (
             <div className="text-center text-sm text-gray-400 py-12">{t('common.loading')}</div>
@@ -401,8 +401,8 @@ export function ClassesPage() {
             <div className="text-center text-sm text-gray-400 py-12">{t('page.classes.empty')}</div>
           ) : (
             <table className="w-full text-sm">
-              <thead className="sticky top-0 bg-white dark:bg-gray-900 z-10">
-                <tr className="text-left text-xs text-gray-400 dark:text-gray-500 border-b border-gray-200 dark:border-gray-700">
+              <thead className="sticky top-0 bg-white dark:bg-[#0f1117] z-10">
+                <tr className="text-left text-xs text-gray-400 dark:text-gray-500 border-b border-gray-200 dark:border-white/[0.06]">
                   <th className="py-2 px-3 font-medium">{t('page.classes.col.classId')}</th>
                   <th className="py-2 px-3 font-medium">{t('page.classes.col.name')}</th>
                   <th className="py-2 px-3 font-medium">{t('page.classes.col.grade')}</th>
@@ -423,7 +423,7 @@ export function ClassesPage() {
                     data-ctx-menu={buildClassCtxMenu(c.archived)}
                     data-ctx-class-id={c.id}
                     onClick={() => setSelectedClass(c)}
-                    className={`border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors cursor-pointer ${
+                    className={`border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-white/[0.03] transition-colors cursor-pointer ${
                       c.archived ? 'opacity-60' : ''
                     } ${selectedClass?.id === c.id ? 'bg-blue-600/10 border-l-2 border-l-blue-400' : ''}`}
                   >
@@ -516,7 +516,7 @@ export function ClassesPage() {
             if (e.target === e.currentTarget) closeForm()
           }}
         >
-          <div className="bg-white dark:bg-gray-800 rounded-xl animate-scale-in shadow-xl w-96 p-5">
+          <div className="bg-white dark:bg-[#1a1e28] rounded-xl animate-scale-in shadow-xl w-96 p-5">
             <h2 className="text-sm font-semibold mb-4">
               {editingId ? t('page.classes.edit') : t('page.classes.add')}
             </h2>
@@ -530,7 +530,7 @@ export function ClassesPage() {
                   <select
                     value={templateId}
                     onChange={(e) => applyTemplate(e.target.value)}
-                    className="w-full px-3 py-1.5 text-sm rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    className="w-full px-3 py-1.5 text-sm rounded border border-gray-300 dark:border-white/[0.08] bg-white dark:bg-[#0f1117] focus:outline-none focus:ring-1 focus:ring-blue-500"
                   >
                     <option value="">{t('page.classes.form.template.none')}</option>
                     {classes.map((c) => (
@@ -551,7 +551,7 @@ export function ClassesPage() {
                   onChange={(e) => onClassIdChange(e.target.value)}
                   disabled={!!editingId}
                   placeholder="G7-3"
-                  className="w-full px-3 py-1.5 text-sm rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full px-3 py-1.5 text-sm rounded border border-gray-300 dark:border-white/[0.08] bg-white dark:bg-[#0f1117] focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
                 />
                 <span className="block text-xs text-gray-400 mt-0.5">
                   {autoClassId && !editingId
@@ -592,7 +592,7 @@ export function ClassesPage() {
                   value={form.teacher ?? ''}
                   onChange={(e) => setForm((f) => ({ ...f, teacher: e.target.value }))}
                   placeholder={t('page.classes.form.teacher.ph')}
-                  className="w-full px-3 py-1.5 text-sm rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  className="w-full px-3 py-1.5 text-sm rounded border border-gray-300 dark:border-white/[0.08] bg-white dark:bg-[#0f1117] focus:outline-none focus:ring-1 focus:ring-blue-500"
                 />
               </label>
               <label className="block">
@@ -604,7 +604,7 @@ export function ClassesPage() {
                   value={form.note}
                   onChange={(e) => setForm((f) => ({ ...f, note: e.target.value }))}
                   placeholder={t('page.classes.form.note.ph')}
-                  className="w-full px-3 py-1.5 text-sm rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  className="w-full px-3 py-1.5 text-sm rounded border border-gray-300 dark:border-white/[0.08] bg-white dark:bg-[#0f1117] focus:outline-none focus:ring-1 focus:ring-blue-500"
                 />
               </label>
             </div>

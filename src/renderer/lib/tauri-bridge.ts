@@ -79,6 +79,7 @@ const CH = {
   EAA_SUMMARY: 'eaa:summary',
   EAA_DASHBOARD: 'eaa:dashboard',
   EAA_EXPORT_FORMATS: 'eaa:export-formats',
+  EAA_INVALIDATE_CACHE: 'eaa:invalidate-cache',
   // Privacy
   PRIVACY_INIT: 'privacy:init',
   PRIVACY_LOAD: 'privacy:load',
@@ -92,6 +93,7 @@ const CH = {
   PRIVACY_DRYRUN: 'privacy:dryrun',
   PRIVACY_BACKUP: 'privacy:backup',
   PRIVACY_LOCK: 'privacy:lock',
+  PRIVACY_UNLOCK: 'privacy:unlock',
   PRIVACY_STATUS: 'privacy:status',
   // Cron
   CRON_LIST: 'cron:list',
@@ -141,6 +143,7 @@ const CH = {
   CLASS_DELETE: 'class:delete',
   CLASS_ASSIGN: 'class:assign',
   CLASS_REMOVE: 'class:remove',
+  CLASS_ASSIGN_PROGRESS: 'class:assign-progress',
   // Academic
   ACADEMIC_GET_CONFIG: 'academic:get-config',
   ACADEMIC_SET_CONFIG: 'academic:set-config',
@@ -174,8 +177,8 @@ const CH = {
   FEISHU_SYNC_NOW: 'feishu:sync-now',
   FEISHU_BOT_START: 'feishu:bot-start',
   FEISHU_BOT_STOP: 'feishu:bot-stop',
-  FEISHU_BOT_STATUS: 'feishu:bot-status',
-  FEISHU_BOT_STATUS_UPDATE: 'feishu:bot-status-update',
+  FEISHU_BOT_STATUS: 'feishu:bot:status',
+  FEISHU_BOT_STATUS_UPDATE: 'feishu:bot:status-update',
 } as const
 
 // 通用 invoke: 转发到 Rust sidecar.rs 的 ipc_invoke 命令
@@ -309,6 +312,7 @@ function buildAPI() {
       summary: (since?: string, until?: string) => call(CH.EAA_SUMMARY, since, until),
       dashboard: (outputDir?: string) => call(CH.EAA_DASHBOARD, outputDir),
       exportFormats: () => call(CH.EAA_EXPORT_FORMATS),
+      invalidateCache: () => call(CH.EAA_INVALIDATE_CACHE),
     },
 
     // ---------- 隐私引擎 ----------
@@ -325,6 +329,7 @@ function buildAPI() {
       dryrun: (text: string) => call(CH.PRIVACY_DRYRUN, text),
       backup: (destPath: string) => call(CH.PRIVACY_BACKUP, destPath),
       lock: () => call(CH.PRIVACY_LOCK),
+      unlock: (password: string) => call(CH.PRIVACY_UNLOCK, password),
       status: () => call(CH.PRIVACY_STATUS),
     },
 
@@ -408,6 +413,22 @@ function buildAPI() {
       delete: (id: string) => call(CH.CLASS_DELETE, id),
       assign: (params: unknown) => call(CH.CLASS_ASSIGN, params),
       removeStudent: (params: unknown) => call(CH.CLASS_REMOVE, params),
+      onAssignProgress: (callback: (data: unknown) => void) => {
+        let unlisten: UnlistenFn | null = null
+        let cancelled = false
+        subscribe(CH.CLASS_ASSIGN_PROGRESS, callback)
+          .then((fn) => {
+            if (cancelled) fn()
+            else unlisten = fn
+          })
+          .catch((err) =>
+            console.warn('[tauri-bridge] subscribe CLASS_ASSIGN_PROGRESS failed:', err),
+          )
+        return () => {
+          cancelled = true
+          unlisten?.()
+        }
+      },
     },
 
     // ---------- 学业管理 ----------

@@ -35,8 +35,8 @@ export function AgentsPage() {
   return (
     <div className="h-full flex">
       {/* 左侧：Agent 列表 */}
-      <div className="w-80 border-r border-gray-200 dark:border-gray-700 flex flex-col">
-        <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+      <div className="w-80 border-r border-gray-200 dark:border-white/[0.06] flex flex-col">
+        <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-white/[0.06]">
           <h1 className="text-lg font-bold">{t('page.agents.title')}</h1>
           <button
             type="button"
@@ -75,7 +75,7 @@ export function AgentsPage() {
                   ${
                     selectedAgentId === agent.id
                       ? 'bg-blue-600/10 dark:bg-blue-600/10 border-blue-500'
-                      : 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+                      : 'bg-gray-50 dark:bg-[#1a1e28] border-gray-200 dark:border-white/[0.06] hover:border-gray-300 dark:hover:border-gray-600'
                   }`}
               >
                 <div className="flex items-center justify-between mb-1">
@@ -204,7 +204,7 @@ const AgentDetailPanel = memo(function AgentDetailPanel({
   return (
     <>
       {/* 头部 */}
-      <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+      <div className="p-4 border-b border-gray-200 dark:border-white/[0.06]">
         <div className="flex items-center gap-3">
           <h2 className="text-xl font-bold">{detail.name}</h2>
           <span
@@ -243,7 +243,7 @@ const AgentDetailPanel = memo(function AgentDetailPanel({
       </div>
 
       {/* Tab 栏 */}
-      <div className="flex border-b border-gray-200 dark:border-gray-700">
+      <div className="flex border-b border-gray-200 dark:border-white/[0.06]">
         {tabs.map((t) => (
           <button
             type="button"
@@ -338,7 +338,7 @@ function RunTab({
   return (
     <div className="h-full flex flex-col">
       {/* 输入区 */}
-      <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+      <div className="p-4 border-b border-gray-200 dark:border-white/[0.06]">
         <div className="flex gap-2">
           <input
             type="text"
@@ -352,7 +352,7 @@ function RunTab({
             }}
             disabled={isRunning || !enabled}
             placeholder={enabled ? '输入指令或问题...' : 'Agent 已禁用'}
-            className="flex-1 bg-white border border-gray-300 dark:bg-gray-800 dark:border-gray-600 rounded-lg px-4 py-2 text-sm
+            className="flex-1 bg-white border border-gray-300 dark:bg-[#1a1e28] dark:border-white/[0.08] rounded-lg px-4 py-2 text-sm
               focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow disabled:opacity-50"
           />
           {isRunning ? (
@@ -385,7 +385,7 @@ function RunTab({
               // 用 tool name + args hash 组合 stable key, 避免 index 重建
               <div
                 key={`${tc.name}-${tc.time}-${JSON.stringify(tc.args).slice(0, 32)}`}
-                className="text-xs bg-gray-50 border border-gray-200 dark:bg-gray-800 dark:border-gray-700 rounded px-3 py-1.5 font-mono"
+                className="text-xs bg-gray-50 border border-gray-200 dark:bg-[#1a1e28] dark:border-white/[0.06] rounded px-3 py-1.5 font-mono"
               >
                 <span className="text-blue-500 dark:text-blue-400">{tc.name}</span>
                 <span className="text-gray-400 dark:text-gray-500 ml-2">
@@ -455,7 +455,7 @@ function EditorTab({ content, placeholder, onSave }: EditorTabProps) {
 
   return (
     <div className="h-full flex flex-col">
-      <div className="flex items-center justify-between px-4 py-2 border-b border-gray-200 dark:border-gray-700">
+      <div className="flex items-center justify-between px-4 py-2 border-b border-gray-200 dark:border-white/[0.06]">
         <span className="text-xs text-gray-400 dark:text-gray-500">
           {dirty ? '未保存' : '已保存'}
         </span>
@@ -476,7 +476,7 @@ function EditorTab({ content, placeholder, onSave }: EditorTabProps) {
           setDirty(true)
         }}
         placeholder={placeholder}
-        className="flex-1 w-full bg-white text-gray-700 dark:bg-gray-900 dark:text-gray-300 p-4 text-sm font-mono resize-none
+        className="flex-1 w-full bg-white text-gray-700 dark:bg-[#0f1117] dark:text-gray-300 p-4 text-sm font-mono resize-none
           focus:outline-none placeholder:text-gray-400 dark:placeholder:text-gray-600"
       />
     </div>
@@ -506,7 +506,7 @@ function HistoryTab({ executions }: { executions: AgentExecution[] }) {
     <div className="h-full overflow-y-auto">
       <table className="w-full text-sm">
         <thead>
-          <tr className="text-xs text-gray-400 dark:text-gray-500 border-b border-gray-200 dark:border-gray-700">
+          <tr className="text-xs text-gray-400 dark:text-gray-500 border-b border-gray-200 dark:border-white/[0.06]">
             <th className="text-left p-3 font-normal">时间</th>
             <th className="text-left p-3 font-normal">状态</th>
             <th className="text-left p-3 font-normal">指令</th>
@@ -534,7 +534,7 @@ const HistoryRow = memo(function HistoryRow({ exec }: { exec: AgentExecution }) 
     <>
       <tr
         onClick={() => setExpanded(!expanded)}
-        className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-100 dark:hover:bg-gray-800/50 cursor-pointer transition-colors"
+        className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-100 dark:hover:bg-white/[0.03] cursor-pointer transition-colors"
       >
         <td className="p-3 text-gray-500 dark:text-gray-400 whitespace-nowrap">{timeStr}</td>
         <td className="p-3">
@@ -564,7 +564,7 @@ const HistoryRow = memo(function HistoryRow({ exec }: { exec: AgentExecution }) 
         </td>
       </tr>
       {expanded && (
-        <tr className="bg-gray-50 dark:bg-gray-800/30">
+        <tr className="bg-gray-50 dark:bg-[#1a1e28]/30">
           <td colSpan={6} className="p-4">
             <div className="text-xs text-gray-400 dark:text-gray-500 mb-2">输入: {exec.prompt}</div>
             <pre className="text-xs text-gray-500 dark:text-gray-400 whitespace-pre-wrap font-mono max-h-40 overflow-y-auto">
@@ -656,7 +656,7 @@ function ConfigTab({ detail, onUpdate }: ConfigTabProps) {
 
   return (
     <div className="h-full flex flex-col">
-      <div className="flex items-center justify-between px-4 py-2 border-b border-gray-200 dark:border-gray-700">
+      <div className="flex items-center justify-between px-4 py-2 border-b border-gray-200 dark:border-white/[0.06]">
         <span className="text-xs text-gray-400 dark:text-gray-500">
           {dirty ? '未保存' : '已保存'}
         </span>
@@ -687,7 +687,7 @@ function ConfigTab({ detail, onUpdate }: ConfigTabProps) {
               setName(e.target.value)
               markDirty()
             }}
-            className="w-full bg-white border border-gray-300 dark:bg-gray-800 dark:border-gray-600 rounded-lg px-3 py-2 text-sm
+            className="w-full bg-white border border-gray-300 dark:bg-[#1a1e28] dark:border-white/[0.08] rounded-lg px-3 py-2 text-sm
               focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow"
           />
         </div>
@@ -708,7 +708,7 @@ function ConfigTab({ detail, onUpdate }: ConfigTabProps) {
               markDirty()
             }}
             rows={3}
-            className="w-full bg-white border border-gray-300 dark:bg-gray-800 dark:border-gray-600 rounded-lg px-3 py-2 text-sm resize-none
+            className="w-full bg-white border border-gray-300 dark:bg-[#1a1e28] dark:border-white/[0.08] rounded-lg px-3 py-2 text-sm resize-none
               focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow"
           />
         </div>
@@ -728,7 +728,7 @@ function ConfigTab({ detail, onUpdate }: ConfigTabProps) {
               className={`flex-1 px-3 py-2 rounded-lg text-sm transition-colors border ${
                 modelTier === 'low_cost'
                   ? 'bg-blue-600 text-white border-blue-600'
-                  : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-blue-400'
+                  : 'bg-white dark:bg-[#1a1e28] text-gray-600 dark:text-gray-300 border-gray-300 dark:border-white/[0.08] hover:border-blue-400'
               }`}
             >
               低成本
@@ -742,7 +742,7 @@ function ConfigTab({ detail, onUpdate }: ConfigTabProps) {
               className={`flex-1 px-3 py-2 rounded-lg text-sm transition-colors border ${
                 modelTier === 'high_quality'
                   ? 'bg-blue-600 text-white border-blue-600'
-                  : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-blue-400'
+                  : 'bg-white dark:bg-[#1a1e28] text-gray-600 dark:text-gray-300 border-gray-300 dark:border-white/[0.08] hover:border-blue-400'
               }`}
             >
               高质量
@@ -795,7 +795,7 @@ function ConfigTab({ detail, onUpdate }: ConfigTabProps) {
         </div>
 
         {/* 只读信息 */}
-        <div className="border-t border-gray-200 dark:border-gray-700 pt-4 space-y-2">
+        <div className="border-t border-gray-200 dark:border-white/[0.06] pt-4 space-y-2">
           <h4 className="text-xs text-gray-400 dark:text-gray-500 font-medium">只读信息</h4>
           <div className="grid grid-cols-2 gap-2 text-xs">
             <div className="text-gray-500 dark:text-gray-400">ID</div>

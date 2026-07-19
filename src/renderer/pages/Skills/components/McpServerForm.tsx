@@ -136,7 +136,7 @@ export function McpServerForm({ initial, mode, onSubmit, onCancel }: McpServerFo
       <form
         onSubmit={handleSubmit}
         onClick={(e) => e.stopPropagation()}
-        className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-lg max-h-[90vh] overflow-auto"
+        className="bg-white dark:bg-[#1a1e28] rounded-lg p-6 w-full max-w-lg max-h-[90vh] overflow-auto"
       >
         <h2 id={titleId} className="text-lg font-medium mb-4 text-gray-900 dark:text-gray-100">
           {isEdit ? t('page.mcp.edit') : t('page.mcp.add')}
@@ -149,7 +149,7 @@ export function McpServerForm({ initial, mode, onSubmit, onCancel }: McpServerFo
               value={draft.id}
               onChange={(e) => update({ id: e.target.value })}
               disabled={isEdit}
-              className="w-full px-2 py-1 border rounded dark:bg-gray-700 dark:border-gray-600 disabled:opacity-50"
+              className="w-full px-2 py-1 border rounded dark:bg-gray-700 dark:border-white/[0.08] disabled:opacity-50"
             />
           </FormField>
 
@@ -158,7 +158,7 @@ export function McpServerForm({ initial, mode, onSubmit, onCancel }: McpServerFo
               type="text"
               value={draft.name}
               onChange={(e) => update({ name: e.target.value })}
-              className="w-full px-2 py-1 border rounded dark:bg-gray-700 dark:border-gray-600"
+              className="w-full px-2 py-1 border rounded dark:bg-gray-700 dark:border-white/[0.08]"
             />
           </FormField>
 
@@ -167,7 +167,7 @@ export function McpServerForm({ initial, mode, onSubmit, onCancel }: McpServerFo
               type="text"
               value={draft.description}
               onChange={(e) => update({ description: e.target.value })}
-              className="w-full px-2 py-1 border rounded dark:bg-gray-700 dark:border-gray-600"
+              className="w-full px-2 py-1 border rounded dark:bg-gray-700 dark:border-white/[0.08]"
             />
           </FormField>
 
@@ -175,7 +175,7 @@ export function McpServerForm({ initial, mode, onSubmit, onCancel }: McpServerFo
             <select
               value={draft.transport}
               onChange={(e) => update({ transport: e.target.value as McpTransport })}
-              className="w-full px-2 py-1 border rounded dark:bg-gray-700 dark:border-gray-600"
+              className="w-full px-2 py-1 border rounded dark:bg-gray-700 dark:border-white/[0.08]"
             >
               <option value="stdio">{t('page.mcp.transport.stdio')}</option>
               <option value="sse">{t('page.mcp.transport.sse')}</option>
@@ -191,7 +191,7 @@ export function McpServerForm({ initial, mode, onSubmit, onCancel }: McpServerFo
                   value={draft.command}
                   onChange={(e) => update({ command: e.target.value })}
                   placeholder="npx"
-                  className="w-full px-2 py-1 border rounded font-mono dark:bg-gray-700 dark:border-gray-600"
+                  className="w-full px-2 py-1 border rounded font-mono dark:bg-gray-700 dark:border-white/[0.08]"
                 />
               </FormField>
               <FormField label={t('page.mcp.field.args')} hint={t('page.mcp.hint.args')}>
@@ -200,7 +200,7 @@ export function McpServerForm({ initial, mode, onSubmit, onCancel }: McpServerFo
                   onChange={(e) => update({ args: e.target.value })}
                   placeholder={'-y\n@modelcontextprotocol/server-filesystem'}
                   rows={2}
-                  className="w-full px-2 py-1 border rounded font-mono text-sm dark:bg-gray-700 dark:border-gray-600"
+                  className="w-full px-2 py-1 border rounded font-mono text-sm dark:bg-gray-700 dark:border-white/[0.08]"
                 />
               </FormField>
               <FormField label={t('page.mcp.field.env')} hint={t('page.mcp.hint.env')}>
@@ -210,7 +210,7 @@ export function McpServerForm({ initial, mode, onSubmit, onCancel }: McpServerFo
                   // biome-ignore lint/suspicious/noTemplateCurlyInString: 占位符由后端 deepInterpolate 处理
                   placeholder={'USER_DOCS=${env.USERPROFILE}/Documents'}
                   rows={2}
-                  className="w-full px-2 py-1 border rounded font-mono text-sm dark:bg-gray-700 dark:border-gray-600"
+                  className="w-full px-2 py-1 border rounded font-mono text-sm dark:bg-gray-700 dark:border-white/[0.08]"
                 />
               </FormField>
             </>
@@ -222,7 +222,7 @@ export function McpServerForm({ initial, mode, onSubmit, onCancel }: McpServerFo
                   value={draft.url}
                   onChange={(e) => update({ url: e.target.value })}
                   placeholder="https://example.com/sse"
-                  className="w-full px-2 py-1 border rounded font-mono dark:bg-gray-700 dark:border-gray-600"
+                  className="w-full px-2 py-1 border rounded font-mono dark:bg-gray-700 dark:border-white/[0.08]"
                 />
               </FormField>
               <FormField label={t('page.mcp.field.headers')} hint={t('page.mcp.hint.headers')}>
@@ -231,7 +231,7 @@ export function McpServerForm({ initial, mode, onSubmit, onCancel }: McpServerFo
                   onChange={(e) => update({ headers: e.target.value })}
                   placeholder={'Authorization: Bearer xxx'}
                   rows={2}
-                  className="w-full px-2 py-1 border rounded font-mono text-sm dark:bg-gray-700 dark:border-gray-600"
+                  className="w-full px-2 py-1 border rounded font-mono text-sm dark:bg-gray-700 dark:border-white/[0.08]"
                 />
               </FormField>
             </>
@@ -252,7 +252,7 @@ export function McpServerForm({ initial, mode, onSubmit, onCancel }: McpServerFo
             type="button"
             onClick={onCancel}
             disabled={submitting}
-            className="px-4 py-1.5 text-sm rounded border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-4 py-1.5 text-sm rounded border border-gray-300 dark:border-white/[0.08] hover:bg-gray-100 dark:hover:bg-white/[0.06] disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {t('common.cancel')}
           </button>

@@ -307,9 +307,9 @@ export function StudentProfile({ student, onClose, onRefresh }: StudentProfilePr
   // tabs 已提升为模块级常量 STUDENT_PROFILE_TABS
 
   return (
-    <div className="h-full flex flex-col bg-white dark:bg-gray-900">
+    <div className="h-full flex flex-col bg-white dark:bg-[#0f1117]">
       {/* 头部 */}
-      <div className="p-4 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-gray-50 to-blue-50 dark:from-gray-800 dark:to-gray-800/80">
+      <div className="p-4 border-b border-gray-200 dark:border-white/[0.06] bg-gradient-to-r from-gray-50 to-blue-50 dark:from-gray-800 dark:to-gray-800/80">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-lg shadow-lg">
@@ -354,7 +354,7 @@ export function StudentProfile({ student, onClose, onRefresh }: StudentProfilePr
               loadAllData()
               onRefresh()
             }}
-            className="bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-600 px-3 py-1.5 rounded-lg text-xs transition-colors shadow-sm"
+            className="bg-white dark:bg-gray-700 border border-gray-200 dark:border-white/[0.08] hover:bg-gray-100 dark:hover:bg-gray-600 px-3 py-1.5 rounded-lg text-xs transition-colors shadow-sm"
           >
             🔄 刷新
           </button>
@@ -388,7 +388,7 @@ export function StudentProfile({ student, onClose, onRefresh }: StudentProfilePr
       )}
 
       {/* 选项卡导航 */}
-      <div className="flex border-b border-gray-200 dark:border-gray-700 px-4 bg-gray-50/50 dark:bg-gray-800/50">
+      <div className="flex border-b border-gray-200 dark:border-white/[0.06] px-4 bg-gray-50/50 dark:bg-[#1a1e28]/50">
         {STUDENT_PROFILE_TABS.map((tab) => (
           <button
             type="button"
@@ -507,7 +507,7 @@ function OverviewTab({
       </div>
 
       {scoreTimeline.dates.length > 1 && (
-        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 shadow-sm">
+        <div className="bg-white dark:bg-[#1a1e28] rounded-xl border border-gray-200 dark:border-white/[0.06] p-4 shadow-sm">
           <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
             📈 分数变化趋势
           </h4>
@@ -552,7 +552,7 @@ function OverviewTab({
         </div>
       )}
 
-      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 shadow-sm">
+      <div className="bg-white dark:bg-[#1a1e28] rounded-xl border border-gray-200 dark:border-white/[0.06] p-4 shadow-sm">
         <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">基本信息</h4>
         <div className="grid grid-cols-2 gap-2 text-sm">
           <InfoRow label="状态" value={score?.status ?? 'Active'} />
@@ -567,7 +567,7 @@ function OverviewTab({
         </div>
       </div>
 
-      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 shadow-sm">
+      <div className="bg-white dark:bg-[#1a1e28] rounded-xl border border-gray-200 dark:border-white/[0.06] p-4 shadow-sm">
         <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">📋 最近事件</h4>
         {recentEvents.length === 0 ? (
           <div className="text-gray-400 dark:text-gray-500 text-sm py-4 text-center">暂无事件</div>
@@ -1050,20 +1050,20 @@ function EventsTab({
           value={searchQuery}
           onChange={(e) => handleSearchChange(e.target.value)}
           placeholder="搜索事件..."
-          className="flex-1 min-w-[140px] bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-blue-500 dark:focus:border-blue-400 placeholder:text-gray-400 dark:placeholder:text-gray-500"
+          className="flex-1 min-w-[140px] bg-gray-50 dark:bg-[#0f1117] border border-gray-300 dark:border-white/[0.08] rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-blue-500 dark:focus:border-blue-400 placeholder:text-gray-400 dark:placeholder:text-gray-500"
         />
         <input
           type="date"
           value={dateStart}
           onChange={(e) => handleDateChange(e.target.value, dateEnd)}
-          className="bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-blue-500 dark:focus:border-blue-400 text-gray-700 dark:text-gray-300"
+          className="bg-gray-50 dark:bg-[#0f1117] border border-gray-300 dark:border-white/[0.08] rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-blue-500 dark:focus:border-blue-400 text-gray-700 dark:text-gray-300"
         />
         <span className="text-xs text-gray-400 dark:text-gray-500">至</span>
         <input
           type="date"
           value={dateEnd}
           onChange={(e) => handleDateChange(dateStart, e.target.value)}
-          className="bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-blue-500 dark:focus:border-blue-400 text-gray-700 dark:text-gray-300"
+          className="bg-gray-50 dark:bg-[#0f1117] border border-gray-300 dark:border-white/[0.08] rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-blue-500 dark:focus:border-blue-400 text-gray-700 dark:text-gray-300"
         />
         {isSearchMode && (
           <button
@@ -1361,7 +1361,7 @@ function AcademicsTab({ studentName, isDark }: { studentName: string; isDark: bo
           return (
             <div
               key={exam.id}
-              className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 shadow-sm"
+              className="bg-white dark:bg-[#1a1e28] rounded-xl border border-gray-200 dark:border-white/[0.06] p-4 shadow-sm"
             >
               <h5 className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-3 flex items-center justify-between">
                 <span>{exam.name}</span>
@@ -1391,7 +1391,7 @@ function AcademicsTab({ studentName, isDark }: { studentName: string; isDark: bo
                 ))}
               </div>
               {examGrades.some((g) => g.score != null) && (
-                <div className="mt-3 pt-2 border-t border-gray-100 dark:border-gray-700 text-xs text-gray-500 dark:text-gray-400 flex justify-between">
+                <div className="mt-3 pt-2 border-t border-gray-100 dark:border-white/[0.06] text-xs text-gray-500 dark:text-gray-400 flex justify-between">
                   <span>平均分</span>
                   <span className="font-mono font-bold text-blue-600 dark:text-blue-400">
                     {avg.toFixed(1)}
@@ -1405,7 +1405,7 @@ function AcademicsTab({ studentName, isDark }: { studentName: string; isDark: bo
 
       {/* 成绩趋势图 */}
       {trendData && trendData.series.length > 0 && (
-        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 shadow-sm">
+        <div className="bg-white dark:bg-[#1a1e28] rounded-xl border border-gray-200 dark:border-white/[0.06] p-4 shadow-sm">
           <h5 className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-3">📈 成绩趋势</h5>
           <ReactEChartsCore
             echarts={echarts}
@@ -1448,7 +1448,7 @@ function AcademicsTab({ studentName, isDark }: { studentName: string; isDark: bo
 
       {/* 偏科分析 */}
       {subjectAnalysis.all.length > 0 && (
-        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 shadow-sm">
+        <div className="bg-white dark:bg-[#1a1e28] rounded-xl border border-gray-200 dark:border-white/[0.06] p-4 shadow-sm">
           <h5 className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-3">📊 偏科分析</h5>
           <div className="grid grid-cols-2 gap-4 mb-3">
             {subjectAnalysis.strongest && (
@@ -1519,7 +1519,7 @@ function AcademicsTab({ studentName, isDark }: { studentName: string; isDark: bo
 
       {/* 考试对比 */}
       {sortedExams.length >= 2 && (
-        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 shadow-sm">
+        <div className="bg-white dark:bg-[#1a1e28] rounded-xl border border-gray-200 dark:border-white/[0.06] p-4 shadow-sm">
           <h5 className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-3">📈 考试对比</h5>
 
           {/* 对比选择器 */}
@@ -1528,8 +1528,8 @@ function AcademicsTab({ studentName, isDark }: { studentName: string; isDark: bo
               value={compareExamAId}
               onChange={(e) => setCompareExamAId(e.target.value)}
               className={cn(
-                'text-xs rounded-lg border border-gray-300 dark:border-gray-600',
-                'bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 px-2 py-1',
+                'text-xs rounded-lg border border-gray-300 dark:border-white/[0.08]',
+                'bg-white dark:bg-[#0f1117] text-gray-700 dark:text-gray-300 px-2 py-1',
               )}
             >
               <option value="">选择考试 A</option>
@@ -1544,8 +1544,8 @@ function AcademicsTab({ studentName, isDark }: { studentName: string; isDark: bo
               value={compareExamBId}
               onChange={(e) => setCompareExamBId(e.target.value)}
               className={cn(
-                'text-xs rounded-lg border border-gray-300 dark:border-gray-600',
-                'bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 px-2 py-1',
+                'text-xs rounded-lg border border-gray-300 dark:border-white/[0.08]',
+                'bg-white dark:bg-[#0f1117] text-gray-700 dark:text-gray-300 px-2 py-1',
               )}
             >
               <option value="">选择考试 B</option>
@@ -1571,7 +1571,7 @@ function AcademicsTab({ studentName, isDark }: { studentName: string; isDark: bo
                 {comparison.subjects.map((s) => (
                   <div
                     key={s.subjectId}
-                    className="grid grid-cols-12 gap-2 text-xs items-center px-1 py-1 rounded hover:bg-gray-50 dark:hover:bg-gray-700/30"
+                    className="grid grid-cols-12 gap-2 text-xs items-center px-1 py-1 rounded hover:bg-gray-50 dark:hover:bg-white/[0.04]"
                   >
                     <div className="col-span-3 text-gray-700 dark:text-gray-300">
                       {s.subjectName}
@@ -1601,7 +1601,7 @@ function AcademicsTab({ studentName, isDark }: { studentName: string; isDark: bo
 
               {/* 总分行 */}
               {comparison.totalScoreDelta !== null && (
-                <div className="flex items-center justify-between pt-2 border-t border-gray-100 dark:border-gray-700 text-sm">
+                <div className="flex items-center justify-between pt-2 border-t border-gray-100 dark:border-white/[0.06] text-sm">
                   <span className="text-gray-600 dark:text-gray-300 font-medium">总分</span>
                   <div className="flex items-center gap-2">
                     <span className="font-mono text-gray-700 dark:text-gray-200">
@@ -1617,7 +1617,7 @@ function AcademicsTab({ studentName, isDark }: { studentName: string; isDark: bo
               )}
 
               {/* 汇总 + 操行分 */}
-              <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-gray-100 dark:border-gray-700 text-xs">
+              <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-gray-100 dark:border-white/[0.06] text-xs">
                 <span className="text-gray-500 dark:text-gray-400">
                   进步{' '}
                   <span className="text-green-600 dark:text-green-400 font-bold">
@@ -1804,7 +1804,7 @@ function AIAnalysisTab({
         </div>
       )}
 
-      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 shadow-sm">
+      <div className="bg-white dark:bg-[#1a1e28] rounded-xl border border-gray-200 dark:border-white/[0.06] p-4 shadow-sm">
         <h5 className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">
           选择分析 Agent
         </h5>
@@ -1830,7 +1830,7 @@ function AIAnalysisTab({
                   'flex items-center gap-3 p-2.5 rounded-lg cursor-pointer transition-colors ' +
                   (selectedAgents.has(agent.id)
                     ? 'bg-blue-500/10 border border-blue-500/30'
-                    : 'hover:bg-gray-50 dark:hover:bg-gray-700/50 border border-transparent')
+                    : 'hover:bg-gray-50 dark:hover:bg-white/[0.06] border border-transparent')
                 }
               >
                 <input
@@ -1872,9 +1872,9 @@ function AIAnalysisTab({
           {sections.map((section) => (
             <div
               key={section.title}
-              className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden"
+              className="bg-white dark:bg-[#1a1e28] rounded-xl border border-gray-200 dark:border-white/[0.06] shadow-sm overflow-hidden"
             >
-              <div className="px-4 py-2.5 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 border-b border-gray-100 dark:border-gray-700">
+              <div className="px-4 py-2.5 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 border-b border-gray-100 dark:border-white/[0.06]">
                 <h5 className="text-xs font-semibold text-gray-700 dark:text-gray-200">
                   {section.title}
                 </h5>
@@ -1889,7 +1889,7 @@ function AIAnalysisTab({
         </div>
       )}
 
-      <div className="bg-gradient-to-br from-gray-50 to-blue-50 dark:from-gray-800/50 dark:to-blue-900/10 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
+      <div className="bg-gradient-to-br from-gray-50 to-blue-50 dark:from-gray-800/50 dark:to-blue-900/10 rounded-xl border border-gray-200 dark:border-white/[0.06] p-4">
         <h5 className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">
           📋 分析维度建议
         </h5>
@@ -1955,7 +1955,7 @@ function AddEventInline({
   }
 
   return (
-    <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/10 dark:to-purple-900/10">
+    <div className="px-4 py-3 border-b border-gray-200 dark:border-white/[0.06] bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/10 dark:to-purple-900/10">
       <div className="grid grid-cols-3 gap-2 mb-2">
         <select
           value={reasonCode}
@@ -1964,7 +1964,7 @@ function AddEventInline({
             const code = reasonCodes.find((c) => c.code === e.target.value)
             if (code?.score_delta != null) setDelta(String(code.score_delta))
           }}
-          className="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg px-2 py-2 text-sm col-span-2 focus:outline-none focus:border-blue-500"
+          className="bg-white dark:bg-[#0f1117] border border-gray-300 dark:border-white/[0.08] rounded-lg px-2 py-2 text-sm col-span-2 focus:outline-none focus:border-blue-500"
         >
           <option value="">选择原因码...</option>
           {reasonCodes.map((c) => (
@@ -1980,7 +1980,7 @@ function AddEventInline({
           onChange={(e) => setDelta(e.target.value)}
           placeholder="分数"
           step="0.5"
-          className="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg px-2 py-2 text-sm focus:outline-none focus:border-blue-500"
+          className="bg-white dark:bg-[#0f1117] border border-gray-300 dark:border-white/[0.08] rounded-lg px-2 py-2 text-sm focus:outline-none focus:border-blue-500"
         />
       </div>
       <input
@@ -1988,7 +1988,7 @@ function AddEventInline({
         value={note}
         onChange={(e) => setNote(e.target.value)}
         placeholder="备注（可选）"
-        className="w-full bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg px-2 py-2 text-sm mb-2 focus:outline-none focus:border-blue-500"
+        className="w-full bg-white dark:bg-[#0f1117] border border-gray-300 dark:border-white/[0.08] rounded-lg px-2 py-2 text-sm mb-2 focus:outline-none focus:border-blue-500"
       />
       <div className="flex gap-2">
         <button
@@ -2050,7 +2050,7 @@ function InfoRow({
   highlight?: string
 }) {
   return (
-    <div className="flex items-center justify-between py-1.5 border-b border-gray-50 dark:border-gray-700/50 last:border-0">
+    <div className="flex items-center justify-between py-1.5 border-b border-gray-50 dark:border-white/[0.06] last:border-0">
       <span className="text-gray-500 dark:text-gray-400 text-xs">{label}</span>
       <span className={`font-medium text-sm ${highlight ?? ''}`}>{String(value)}</span>
     </div>
@@ -2067,8 +2067,8 @@ function ProfileSection({
   children: React.ReactNode
 }) {
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
-      <div className="px-4 py-2.5 bg-gray-50 dark:bg-gray-800/80 border-b border-gray-100 dark:border-gray-700 flex items-center gap-2">
+    <div className="bg-white dark:bg-[#1a1e28] rounded-xl border border-gray-200 dark:border-white/[0.06] shadow-sm overflow-hidden">
+      <div className="px-4 py-2.5 bg-gray-50 dark:bg-[#1a1e28]/80 border-b border-gray-100 dark:border-white/[0.06] flex items-center gap-2">
         <span>{icon}</span>
         <h5 className="text-xs font-semibold text-gray-600 dark:text-gray-300">{title}</h5>
       </div>
@@ -2097,7 +2097,7 @@ function ProfileField({
   spanFull?: boolean
 }) {
   const baseClass =
-    'w-full bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 transition-colors'
+    'w-full bg-gray-50 dark:bg-[#0f1117] border border-gray-300 dark:border-white/[0.08] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 transition-colors'
   return (
     <div className={spanFull ? 'col-span-2' : ''}>
       {label && (
@@ -2146,7 +2146,7 @@ function ProfileField({
 function EventMiniCard({ event }: { event: EAAHistoryEvent }) {
   const isBonus = event.score_delta > 0
   return (
-    <div className="flex items-center justify-between text-sm p-2.5 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-100 dark:border-gray-700/50">
+    <div className="flex items-center justify-between text-sm p-2.5 bg-gray-50 dark:bg-[#1a1e28]/50 rounded-lg border border-gray-100 dark:border-white/[0.06]">
       <div className="flex items-center gap-2 min-w-0">
         <span className={`font-mono font-bold ${isBonus ? 'text-green-500' : 'text-red-500'}`}>
           {isBonus ? '+' : ''}
@@ -2186,8 +2186,8 @@ function EventCard({
       className={
         'rounded-xl border p-3.5 transition-all ' +
         (event.reverted
-          ? 'bg-gray-50 dark:bg-gray-800/50 opacity-60 border-gray-100 dark:border-gray-700'
-          : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md')
+          ? 'bg-gray-50 dark:bg-[#1a1e28]/50 opacity-60 border-gray-100 dark:border-white/[0.06]'
+          : 'bg-white dark:bg-[#1a1e28] border-gray-200 dark:border-white/[0.06] shadow-sm hover:shadow-md')
       }
     >
       <div
@@ -2224,7 +2224,7 @@ function EventCard({
         </div>
       </div>
       {expanded && (
-        <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700 text-xs space-y-1.5">
+        <div className="mt-3 pt-3 border-t border-gray-100 dark:border-white/[0.06] text-xs space-y-1.5">
           {event.note && <div className="text-gray-600 dark:text-gray-300">📝 {event.note}</div>}
           <div className="flex gap-4 text-gray-500 dark:text-gray-400">
             <span>

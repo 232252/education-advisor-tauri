@@ -175,8 +175,14 @@ export const addEventTool: AgentTool<typeof addEventParams> = {
     const values: string[] = [params.student_name, params.reason_code]
     const flags: string[] = []
     if (params.delta !== undefined) flags.push('--delta', String(params.delta))
-    if (params.note) flags.push('--note', params.note)
-    if (params.tags) flags.push('--tags', params.tags)
+    if (params.note) {
+      sanitizeArg(params.note)
+      flags.push('--note', params.note)
+    }
+    if (params.tags) {
+      sanitizeArg(params.tags)
+      flags.push('--tags', params.tags)
+    }
     const result = await safeExecute('add', values, flags)
     if (!result.success) {
       throw new Error(`添加事件失败: ${getErrorMessage(result)}`)
@@ -357,6 +363,9 @@ export const rangeTool: AgentTool<typeof rangeParams> = {
 // 导出：按能力分组的工具集
 // =============================================================
 
+// biome-ignore lint/suspicious/noExplicitAny: 异构工具集合，TSchema 约束不兼容 unknown
+type AnyAgentTool = AgentTool<any>
+
 /** 全部 EAA 工具 */
 export const allEAATools: AnyAgentTool[] = [
   queryScoreTool,
@@ -371,9 +380,6 @@ export const allEAATools: AnyAgentTool[] = [
   addStudentTool,
   rangeTool,
 ]
-
-// biome-ignore lint/suspicious/noExplicitAny: 异构工具集合，TSchema 约束不兼容 unknown
-type AnyAgentTool = AgentTool<any>
 
 /** 按 capability 名称匹配工具 */
 export function getToolsByCapability(capabilities: string[]): AnyAgentTool[] {

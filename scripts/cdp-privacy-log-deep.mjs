@@ -145,11 +145,12 @@ async function main() {
     record('privacy.list', false, String(err.message || err))
   }
 
-  // 1.3 anonymize — 多输入类型
-  // 注意: 隐私引擎只脱敏 **已注册的 PII 实体** (通过 privacy.add 注册),
-  //       不是正则模式匹配。未注册 PII 时, anonymize 原样返回文本 (success=true)。
-  //       下方先测试 "无注册 PII 时的安全行为", 再在 1.3b 中测试完整 init→add→anonymize 流程。
-  //       重要: 使用唯一 PII 值 (带时间戳), 避免与之前测试注册的 PII (张三/13800138000) 冲突
+  // 1.3 anonymize — 多输入类型 (lock 状态下的安全拒绝行为)
+  // 注意(R37-1 修复后契约): 隐私引擎在 lock 状态下 anonymize 直接拒绝
+  //   {success:false, data:"隐私引擎已锁定，请先输入密码解锁后再脱敏"}
+  //   这是有意的防泄露设计——避免静默返回未脱敏原文让调用方误以为已脱敏。
+  //   完整脱敏流程在 1.3b 中测试 (init→add→anonymize→deanonymize)。
+  //   此处只验证 lock 状态下拒绝行为是否一致稳定。
   const uniqTs = Date.now()
   const uniqName = `测试人_${uniqTs}`
   const uniqPhone = `139${uniqTs.toString().slice(-8)}`
@@ -165,10 +166,16 @@ async function main() {
       const r = await callIpc(`const res = await api.privacy.anonymize(${JSON.stringify(c.text)}); return res;`)
       const success = r?.success
       const data = typeof r === 'string' ? r : r?.data
-      // 无注册 PII 时: success=true, data 为字符串, 原样返回 (不崩溃, 不篡改)
-      const ok = r !== undefined && !r?.__error && success === true && typeof data === 'string' && data === c.text
+      // 契约按 status 分支:
+      //  - 解锁态 (statusUnlocked=true): 未注册 PII 原样返回 success=true data===text
+      //  - 锁定态 (statusUnlocked=false): 拒绝 success=false data 含"锁定"
+      const ok = r !== undefined && !r?.__error && (
+        statusUnlocked
+          ? (success === true && typeof data === 'string' && data === c.text)
+          : (success === false && typeof data === 'string' && data.includes('锁定'))
+      )
       record(`privacy.anonymize (${c.label})`, ok,
-        `success=${success} data="${String(data ?? '').substring(0, 50)}"${r?.__error ? ' err=' + r.__error : ''}`)
+        `success=${success} data="${String(data ?? '').substring(0, 50)}" (status=${statusUnlocked ? 'unlocked' : 'locked'})${r?.__error ? ' err=' + r.__error : ''}`)
     } catch (err) {
       record(`privacy.anonymize (${c.label})`, false, String(err.message || err))
     }

@@ -200,3 +200,22 @@ sidecar/test-round*.mjs
 # cycle11 测试脚本
 sidecar/test-mcp-full-chain.mjs
 sidecar/test-r13-edges.mjs
+
+# R19-R60 测试脚本(临时探测/CDP 测试/清理工具)
+scripts/_tmp_*.mjs
+scripts/_probe_*.mjs
+scripts/r4*.mjs
+scripts/r5*.mjs
+scripts/_cdp_lib.mjs
+scripts/cleanup_test_data.mjs
+docs/R36-ipc-contract.json
+scripts/_analyze_names.mjs
+scripts/_cleanup_r47.mjs
+scripts/_diff_channels.mjs
+scripts/_diff_preload_bridge.mjs
+scripts/_enable_mcp.mjs
+scripts/_i18n_audit.mjs
+scripts/_list_real_candidates.mjs
+# 旧 eaa.exe 备份
+resources/eaa-binaries/win32-x64/*.bak.*
+scripts/r60_watchdog_test.mjs

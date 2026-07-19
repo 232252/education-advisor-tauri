@@ -241,8 +241,8 @@ export function SkillsTab() {
     <section className="h-full flex" aria-label={t('page.skills.listTitle')} onKeyDown={handleKeyDown}>
       <h1 style={SR_ONLY_STYLE}>{t('page.skills.title')}</h1>
       {/* 左侧技能列表 */}
-      <div className="w-72 flex-shrink-0 border-r border-gray-200 dark:border-gray-700 flex flex-col bg-gray-50/30 dark:bg-gray-800/30">
-        <div className="p-3 border-b border-gray-200 dark:border-gray-700 space-y-2">
+      <div className="w-72 flex-shrink-0 border-r border-gray-200 dark:border-white/[0.06] flex flex-col bg-gray-50/30 dark:bg-[#1a1e28]/30">
+        <div className="p-3 border-b border-gray-200 dark:border-white/[0.06] space-y-2">
           <div className="flex items-center justify-between">
             <h2 className="font-semibold text-sm text-gray-700 dark:text-gray-200">
               {t('page.skills.listTitle')}
@@ -295,7 +295,7 @@ export function SkillsTab() {
 
           {/* 新建技能表单 */}
           {showNewForm && (
-            <div className="space-y-2 bg-white dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-700">
+            <div className="space-y-2 bg-white dark:bg-[#1a1e28] rounded-lg p-3 border border-gray-200 dark:border-white/[0.06]">
               <input
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
@@ -303,20 +303,20 @@ export function SkillsTab() {
                   if (e.key === 'Enter') handleCreate()
                 }}
                 placeholder={t('page.skills.namePlaceholder')}
-                className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-600 rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow"
+                className="w-full bg-gray-50 dark:bg-[#0f1117] border border-gray-200 dark:border-white/[0.08] rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow"
               />
               <input
                 value={newDesc}
                 onChange={(e) => setNewDesc(e.target.value)}
                 placeholder={t('page.skills.descPlaceholder')}
-                className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-600 rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow"
+                className="w-full bg-gray-50 dark:bg-[#0f1117] border border-gray-200 dark:border-white/[0.08] rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow"
               />
               <textarea
                 value={newContent}
                 onChange={(e) => setNewContent(e.target.value)}
                 placeholder={t('page.skills.contentPlaceholder')}
                 rows={4}
-                className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-600 rounded px-2 py-1.5 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow resize-none"
+                className="w-full bg-gray-50 dark:bg-[#0f1117] border border-gray-200 dark:border-white/[0.08] rounded px-2 py-1.5 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow resize-none"
               />
               <button
                 type="button"
@@ -355,7 +355,7 @@ export function SkillsTab() {
                 className={`group relative rounded-xl transition-all duration-150 cursor-pointer border ${
                   selected?.name === s.name
                     ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-300/50 dark:border-blue-500/30 shadow-sm'
-                    : 'hover:bg-gray-100 dark:hover:bg-gray-700/50 border-transparent hover:border-gray-200 dark:hover:border-gray-600'
+                    : 'hover:bg-gray-100 dark:hover:bg-white/[0.04] border-transparent hover:border-gray-200 dark:hover:border-gray-600'
                 }`}
               >
                 <button
@@ -421,7 +421,7 @@ export function SkillsTab() {
         {selected ? (
           <>
             {/* 编辑器头部 */}
-            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/50">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-white/[0.06] bg-gray-50/50 dark:bg-[#1a1e28]/50">
               <div className="flex items-center gap-3 min-w-0">
                 {editingName && selected.source === 'user' ? (
                   <input
@@ -448,7 +448,7 @@ export function SkillsTab() {
                       }
                       if (e.key === 'Escape') setEditingName(false)
                     }}
-                    className="text-lg font-semibold bg-white dark:bg-gray-900 border border-blue-300 dark:border-blue-500 rounded px-2 py-0.5 min-w-[120px] focus:outline-none"
+                    className="text-lg font-semibold bg-white dark:bg-[#0f1117] border border-blue-300 dark:border-blue-500 rounded px-2 py-0.5 min-w-[120px] focus:outline-none"
                   />
                 ) : (
                   <button
@@ -493,7 +493,7 @@ export function SkillsTab() {
                   <button
                     type="button"
                     onClick={() => handleDelete(selected.name)}
-                    className="text-xs bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 hover:bg-red-50 hover:text-red-600 hover:border-red-300 dark:hover:bg-red-900/30 dark:hover:text-red-400 dark:hover:border-red-700 px-3 py-1.5 rounded-lg transition-colors"
+                    className="text-xs bg-white dark:bg-gray-700 border border-gray-200 dark:border-white/[0.08] hover:bg-red-50 hover:text-red-600 hover:border-red-300 dark:hover:bg-red-900/30 dark:hover:text-red-400 dark:hover:border-red-700 px-3 py-1.5 rounded-lg transition-colors"
                   >
                     {t('page.skills.deleteWithIcon')}
                   </button>
@@ -524,7 +524,7 @@ export function SkillsTab() {
                 setEditContent(e.target.value)
                 setDirty(true)
               }}
-              className="flex-1 bg-white text-gray-700 dark:bg-gray-900 dark:text-gray-300 p-5 text-sm font-mono resize-none
+              className="flex-1 bg-white text-gray-700 dark:bg-[#0f1117] dark:text-gray-300 p-5 text-sm font-mono resize-none
                 focus:outline-none placeholder:text-gray-400 dark:placeholder:text-gray-600 leading-relaxed"
               spellCheck={false}
               placeholder={t('page.skills.editorPlaceholder')}
@@ -532,7 +532,7 @@ export function SkillsTab() {
             />
 
             {/* 底部状态栏 */}
-            <div className="px-4 py-1.5 border-t border-gray-100 dark:border-gray-800 text-[10px] text-gray-400 dark:text-gray-600 flex items-center justify-between bg-gray-50/50 dark:bg-gray-800/50">
+            <div className="px-4 py-1.5 border-t border-gray-100 dark:border-gray-800 text-[10px] text-gray-400 dark:text-gray-600 flex items-center justify-between bg-gray-50/50 dark:bg-[#1a1e28]/50">
               <span>
                 {t('page.skills.statusLines')
                   .replace('{lines}', String(editContent.split('\n').length))

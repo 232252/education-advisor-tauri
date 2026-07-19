@@ -108,7 +108,7 @@ function PluginCard({
         type="button"
         onClick={handleGo}
         disabled={disabled}
-        className="self-start mt-1 px-2.5 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed text-gray-700 dark:text-gray-300"
+        className="self-start mt-1 px-2.5 py-1 text-xs rounded border border-gray-300 dark:border-white/[0.08] hover:bg-gray-100 dark:hover:bg-white/[0.06] disabled:opacity-50 disabled:cursor-not-allowed text-gray-700 dark:text-gray-300"
       >
         {manageLabel}
       </button>
@@ -267,7 +267,7 @@ export function PluginsTab() {
   return (
     <section className="h-full flex flex-col overflow-auto">
       {/* 顶部标题区 */}
-      <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
+      <div className="px-4 py-3 border-b border-gray-200 dark:border-white/[0.06] flex-shrink-0">
         <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
           {t('page.skills.plugins.title')}
         </h2>
@@ -278,7 +278,7 @@ export function PluginsTab() {
           <button
             type="button"
             onClick={loadAll}
-            className="px-2.5 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
+            className="px-2.5 py-1 text-xs rounded border border-gray-300 dark:border-white/[0.08] hover:bg-gray-100 dark:hover:bg-white/[0.06] text-gray-700 dark:text-gray-300"
           >
             ⟳ {t('page.skills.plugins.action.refresh')}
           </button>

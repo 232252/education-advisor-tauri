@@ -76,7 +76,7 @@ export function ConfirmDialog({
       }}
     >
       <div
-        className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-96 max-w-[90vw] p-5"
+        className="bg-white dark:bg-[#1a1e28] rounded-lg shadow-xl w-96 max-w-[90vw] p-5"
         role="alertdialog"
         aria-modal="true"
         aria-labelledby="confirm-dialog-title"

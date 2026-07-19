@@ -15,9 +15,13 @@ import cron from 'node-cron'
 import * as IPC from '../../shared/ipc-channels'
 import type { CronLogEntry, CronTask } from '../../shared/types'
 import { log } from '../utils/logger'
+// R57-3 H1 修复: 引入 atomicWrite,用于用户任务持久化(原子写 tmp+rename)
+import { atomicWrite } from '../utils/atomic-write'
 import { syncBitableNow } from './feishu-service'
 import { keystoreService } from './keystore-service'
 import { settingsService } from './settings-service'
+// R57-3 H4 修复: import strictValidateCron,用于 registerBitableSync 校验 cron 表达式
+import { strictValidateCron } from '../ipc/cron-handlers'
 
 class CronService {
   private static readonly MAX_USER_TASKS = 100
@@ -37,6 +41,15 @@ class CronService {
   /** H-2.3 修复: per-task 执行锁,防止 runNow 与 cron 定时同时触发同一任务造成竞态 */
   private runningTasks: Set<string> = new Set()
 
+  // R57-3 H1 修复: 用户任务持久化路径
+  /** 用户任务持久化文件路径 (原子写,应用重启后恢复) */
+  private userTasksFilePath: string
+  // R57-3 H3 修复: 并发上限控制
+  /** 最大并发执行任务数 (从 settings.general.maxConcurrentCronTasks 读取,默认 5) */
+  private maxConcurrentTasks = 5
+  /** 当前正在执行的任务数 */
+  private runningCount = 0
+
   /** 延迟注入，避免循环依赖 */
   private agentRunner:
     | ((agentId: string, prompt: string, win: BrowserWindow) => Promise<void>)
@@ -44,6 +57,17 @@ class CronService {
 
   constructor() {
     this.logFilePath = path.join(app.getPath('userData'), 'cron-logs.jsonl')
+    // R57-3 H1 修复: 用户任务持久化文件路径
+    this.userTasksFilePath = path.join(app.getPath('userData'), 'cron.user.json')
+    // R57-3 H3 修复: 从 settings 读取并发上限,默认 5
+    try {
+      const maxConcurrent = settingsService.getSettings().general?.maxConcurrentCronTasks
+      if (typeof maxConcurrent === 'number' && maxConcurrent > 0) {
+        this.maxConcurrentTasks = maxConcurrent
+      }
+    } catch {
+      // 读取失败保持默认值 5
+    }
   }
 
   setMainWindow(win: BrowserWindow) {
@@ -81,6 +105,8 @@ class CronService {
     const fullTask: CronTask = { ...task, id }
     this.tasks.set(id, fullTask)
     this.schedule(id, fullTask)
+    // R57-3 H1 修复: 用户任务变更后持久化到磁盘
+    this.persistUserTasks()
     return id
   }
 
@@ -92,6 +118,9 @@ class CronService {
     this.unschedule(id)
     Object.assign(task, patch)
     this.schedule(id, task)
+
+    // R57-3 H1 修复: 用户任务变更后持久化到磁盘
+    this.persistUserTasks()
 
     return { success: true }
   }
@@ -105,6 +134,8 @@ class CronService {
     this.unschedule(id)
     this.tasks.delete(id)
     this.nextRunAt.delete(id)
+    // R57-3 H1 修复: 用户任务变更后持久化到磁盘
+    this.persistUserTasks()
     return { success: true }
   }
 
@@ -120,6 +151,9 @@ class CronService {
     } else {
       this.unschedule(id)
     }
+
+    // R57-3 H1 修复: 用户任务变更后持久化到磁盘
+    this.persistUserTasks()
 
     return { success: true }
   }
@@ -149,14 +183,25 @@ class CronService {
       // syncInterval 可能是 cron 表达式(包含空格)或分钟数
       let expr: string
       if (typeof intervalRaw === 'string' && intervalRaw.trim().split(/\s+/).length >= 5) {
-        // 已经是完整的 cron 表达式（5 字段），直接使用
-        expr = intervalRaw
+        // R57-3 H4 修复: 已经是完整的 cron 表达式（5 字段）,但必须通过 strictValidateCron 校验
+        // 之前此处直接使用,跳过了严格校验,可能导致无效表达式(如 hour=25)进入调度器
+        const validation = strictValidateCron(intervalRaw)
+        if (!validation.ok) {
+          log('warn', 'cron', `bitableSync syncInterval "${intervalRaw}" 校验失败: ${validation.error}, fallback 到默认 60 分钟`)
+          expr = '0 */1 * * *' // 默认每 60 分钟
+        } else {
+          expr = intervalRaw
+        }
       } else {
         // 视为分钟数，转换为 cron 表达式
         // R8 / 1B 修复: 之前 ≥24h 的 interval 被 Math.min(23, hours) 静默截断到 23h,
         // 导致用户配 5 天实际变成 23h,且无任何信号。改用"每 N 天"语法 0 0 */N * *
         const minutes = typeof intervalRaw === 'number' ? intervalRaw : Number(intervalRaw) || 360
-        if (minutes < 60) {
+        // R57-3 H4 修复: 分钟数加下限校验,最小 1 分钟,不合法则 fallback 到默认 60 分钟
+        if (minutes < 1) {
+          log('warn', 'cron', `bitableSync syncInterval 分钟数 ${minutes} < 1, fallback 到默认 60 分钟`)
+          expr = '0 */1 * * *'
+        } else if (minutes < 60) {
           expr = `*/${Math.max(1, Math.round(minutes))} * * * *`
         } else if (minutes < 24 * 60) {
           const hours = Math.max(1, Math.round(minutes / 60))
@@ -235,8 +280,13 @@ class CronService {
     }
   }
 
-  /** 启动时从磁盘恢复历史日志 */
+  /** 启动时从磁盘恢复历史日志
+   *  R57-3 H1 修复: 同时恢复持久化的用户任务(在系统任务注册之前) */
   async loadPersistedLogs(): Promise<void> {
+    // R57-3 H1 修复: 在系统任务(registerBitableSync/syncAgentSchedules)注册之前,
+    // 先恢复用户持久化任务,避免与系统任务重建冲突
+    await this.loadPersistedUserTasks()
+
     try {
       await fsp.access(this.logFilePath, fs.constants.F_OK)
     } catch {
@@ -377,11 +427,40 @@ class CronService {
   }
 
   /** 执行任务 — Critical 2.2 修复: __feishu__ 路由到 executeBitableSync 而非 agentRunner
-   *  High 2.3 修复: per-task 锁防止 runNow + cron 定时并发执行同一任务 */
+   *  High 2.3 修复: per-task 锁防止 runNow + cron 定时并发执行同一任务
+   *  R57-3 H2 修复: agentRunner 加超时,默认 5 分钟,防止 LLM 挂起数小时
+   *  R57-3 H3 修复: 并发上限控制,超过 maxConcurrentTasks 则跳过执行 */
   private async executeTask(taskId: string) {
     const task = this.tasks.get(taskId)
     if (!task) return
     if (!this.mainWindow) return
+
+    // R57-3 H3 修复: 并发上限检查,超过则跳过执行并记录 skipped_concurrent_limit
+    if (this.runningCount >= this.maxConcurrentTasks) {
+      log('warn', 'cron', `Task ${taskId} skipped: concurrent limit reached (${this.runningCount}/${this.maxConcurrentTasks})`)
+      task.lastStatus = 'skipped_concurrent_limit'
+      this.pushLog({
+        taskId,
+        agentId: task.agentId,
+        timestamp: Date.now(),
+        durationMs: 0,
+        status: 'skipped_concurrent_limit',
+        error: `并发上限已达 (${this.runningCount}/${this.maxConcurrentTasks})`,
+      })
+      // 即使跳过也发送状态更新,让前端知道
+      if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+        try {
+          this.mainWindow.webContents.send(IPC.IPC_CRON_STATUS_UPDATE, {
+            taskId,
+            lastRunAt: task.lastRunAt,
+            lastStatus: task.lastStatus,
+          })
+        } catch {
+          // 窗口可能在发送过程中被销毁，忽略
+        }
+      }
+      return
+    }
 
     // High 2.3 修复: per-task 锁,避免 runNow + cron 同时触发同一任务
     if (this.runningTasks.has(taskId)) {
@@ -389,9 +468,23 @@ class CronService {
       return
     }
     this.runningTasks.add(taskId)
+    // R57-3 H3 修复: 递增并发计数
+    this.runningCount++
 
     const timestamp = Date.now()
     const startTime = Date.now()
+
+    // R57-3 H2 修复: 从 settings 读取超时分钟数,默认 5 分钟
+    let timeoutMins = 5
+    try {
+      const configured = settingsService.getSettings().general?.agentTimeoutMins
+      if (typeof configured === 'number' && configured > 0) {
+        timeoutMins = configured
+      }
+    } catch {
+      // 读取失败保持默认 5 分钟
+    }
+    const timeoutMs = timeoutMins * 60 * 1000
 
     try {
       // Critical 2.2 修复: __feishu__ 任务路由到 executeBitableSync
@@ -424,17 +517,47 @@ class CronService {
           })
         }
       } else if (this.agentRunner) {
-        await this.agentRunner(task.agentId, task.prompt, this.mainWindow)
-        task.lastRunAt = timestamp
-        task.lastStatus = 'success'
-
-        this.pushLog({
-          taskId,
-          agentId: task.agentId,
-          timestamp,
-          durationMs: Date.now() - startTime,
-          status: 'success',
+        // R57-3 H2 修复: agentRunner 加超时,Promise.race 竞速
+        // 超时后记录 lastStatus: 'timeout',不调用 agent.abort(agentRunner 可能不接受)
+        const agentPromise = this.agentRunner(task.agentId, task.prompt, this.mainWindow)
+        const timeoutPromise = new Promise<never>((_resolve, reject) => {
+          setTimeout(() => {
+            reject(new Error(`Agent execution timed out after ${timeoutMins}min`))
+          }, timeoutMs)
         })
+
+        try {
+          await Promise.race([agentPromise, timeoutPromise])
+          task.lastRunAt = timestamp
+          task.lastStatus = 'success'
+
+          this.pushLog({
+            taskId,
+            agentId: task.agentId,
+            timestamp,
+            durationMs: Date.now() - startTime,
+            status: 'success',
+          })
+        } catch (raceErr: unknown) {
+          // 判断是否是超时
+          const isTimeout = raceErr instanceof Error && raceErr.message.includes('timed out')
+          if (isTimeout) {
+            log('warn', 'cron', `Agent execution timed out after ${timeoutMins}min for task ${taskId}`)
+            task.lastRunAt = timestamp
+            task.lastStatus = 'timeout'
+            this.pushLog({
+              taskId,
+              agentId: task.agentId,
+              timestamp,
+              durationMs: Date.now() - startTime,
+              status: 'timeout',
+              error: raceErr instanceof Error ? raceErr.message : String(raceErr),
+            })
+          } else {
+            // 非超时错误,按普通 error 处理
+            throw raceErr
+          }
+        }
       } else {
         console.warn(`[CronService] Agent runner not set, skipping task ${taskId}`)
       }
@@ -453,6 +576,8 @@ class CronService {
     } finally {
       // High 2.3: 释放 per-task 锁
       this.runningTasks.delete(taskId)
+      // R57-3 H3 修复: 递减并发计数
+      this.runningCount = Math.max(0, this.runningCount - 1)
       // 不管成功失败都发送状态更新（P1-10：被中止的 agent 也算完成了）
       // 防御: 检查窗口是否已销毁，避免未处理异常
       if (this.mainWindow && !this.mainWindow.isDestroyed()) {
@@ -466,6 +591,81 @@ class CronService {
           // 窗口可能在发送过程中被销毁，忽略
         }
       }
+    }
+  }
+
+  // ===========================================================
+  // R57-3 H1 修复: 用户任务持久化 (persistTasks + loadPersistedTasks)
+  // 应用重启后用户创建的任务全丢失,因为 this.tasks 纯内存。
+  // 持久化策略: 只持久化用户任务(id 不以 agent-schedule- 开头且不等于 feishu-bitable-sync),
+  // 系统任务由 registerBitableSync / syncAgentSchedules 重建。
+  // 使用原子写(tmp + rename),读时容错(JSON 解析失败不崩,只 log warn)。
+  // ===========================================================
+
+  /** R57-3 H1 修复: 将用户任务持久化到 {userData}/cron.user.json (原子写: atomicWrite helper)
+   *  只持久化 id 不以 agent-schedule- 开头且不等于 feishu-bitable-sync 的任务,
+   *  系统任务由 registerBitableSync / syncAgentSchedules 启动时重建。
+   *  持久化时剥离运行时状态字段(nextRunAt / lastStatus),下次启动重新计算。 */
+  private persistUserTasks(): void {
+    try {
+      // 只收集用户任务,排除系统任务
+      const userTasks: CronTask[] = []
+      for (const [id, task] of this.tasks) {
+        if (!id.startsWith('agent-schedule-') && id !== 'feishu-bitable-sync') {
+          // 持久化时剥离运行时状态字段,避免恢复时残留过期状态
+          const { lastRunAt: _lr, lastStatus: _ls, nextRunAt: _nr, ...rest } = task
+          userTasks.push(rest as CronTask)
+        }
+      }
+      const json = JSON.stringify(userTasks, null, 2)
+      // 原子写: atomicWrite(tmp + renameWithRetry),防止写一半断电导致文件损坏
+      void atomicWrite(this.userTasksFilePath, json, 'utf-8')
+    } catch (err) {
+      // 持久化失败不阻塞主流程,仅 log warn
+      log('warn', 'cron', `Failed to persist user tasks: ${err instanceof Error ? err.message : String(err)}`)
+    }
+  }
+
+  /** R57-3 H1 修复: 从 {userData}/cron.user.json 恢复用户任务
+   *  应用启动时调用(在 registerBitableSync / syncAgentSchedules 之前,避免与系统任务重建冲突)。
+   *  恢复时 nextRunAt 设为 undefined(由 schedule() 重新计算),lastStatus 设为 'pending'。
+   *  失败仅 log warn 不抛出。 */
+  private async loadPersistedUserTasks(): Promise<void> {
+    try {
+      const content = await fsp.readFile(this.userTasksFilePath, 'utf-8')
+      const parsed = JSON.parse(content)
+      if (!Array.isArray(parsed)) {
+        log('warn', 'cron', 'cron.user.json is not an array, skipping load')
+        return
+      }
+      let restored = 0
+      for (const raw of parsed) {
+        if (!raw || typeof raw !== 'object' || typeof raw.id !== 'string') continue
+        // 只恢复用户任务,跳过系统任务(防止旧文件中残留的系统任务被重复注册)
+        if (raw.id.startsWith('agent-schedule-') || raw.id === 'feishu-bitable-sync') continue
+        // R57-3 H1 修复: 恢复时重置运行时状态
+        // nextRunAt 由 schedule() 重新计算; lastStatus 设为 'pending'
+        const task: CronTask = {
+          ...(raw as CronTask),
+          nextRunAt: undefined,
+          lastStatus: 'pending',
+        }
+        this.tasks.set(task.id, task)
+        this.schedule(task.id, task)
+        restored++
+      }
+      if (restored > 0) {
+        log('info', 'cron', `R57-3 H1: Restored ${restored} user tasks from cron.user.json`)
+      }
+    } catch (err) {
+      // 文件不存在或 JSON 解析失败: 不崩,只 log warn
+      // 文件不存在是正常情况(首次使用),不记 warn
+      const errMsg = err instanceof Error ? err.message : String(err)
+      if (errMsg.includes('ENOENT')) {
+        // 首次使用,无持久化文件,正常情况
+        return
+      }
+      log('warn', 'cron', `R57-3 H1: Failed to load persisted user tasks: ${errMsg}`)
     }
   }
 

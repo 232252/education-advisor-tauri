@@ -210,7 +210,16 @@ pub fn cmd_history(name: &str, output: OutputMode) -> Result<(), AppError> {
 pub fn cmd_ranking(n: usize, output: OutputMode) -> Result<(), AppError> {
     // v3.1.4: 用 LightContext 避免全量读 events, ranking 不需要事件详情
     let ctx = LightContext::load()?;
-    let mut sorted: Vec<_> = ctx.scores.iter().collect();
+    // v3.2.4 fix: 排行榜默认排除软删(Deleted)学生, 否则历史测试数据/已毕业学生会一直占据榜首。
+    // (Active/Transferred/Suspended 都保留,只有 Deleted 排除。)
+    let sorted: Vec<_> = ctx.scores.iter()
+        .filter(|(eid, _)| {
+            ctx.entities.entities.get(eid.as_str())
+                .map(|e| !matches!(e.status, EntityStatus::Deleted))
+                .unwrap_or(true)
+        })
+        .collect();
+    let mut sorted = sorted;
     sorted.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
     let take_n = n.min(sorted.len());
     match output {
@@ -218,11 +227,13 @@ pub fn cmd_ranking(n: usize, output: OutputMode) -> Result<(), AppError> {
             let ranking: Vec<serde_json::Value> = sorted.iter().take(take_n).enumerate().map(|(i, (eid, score))| {
                 let name = ctx.id_to_name.get(eid.as_str()).map(|s| s.as_str()).unwrap_or("?");
                 // 包含 class_id 以便前端能按班级过滤排行榜
-                let class_id = ctx.entities.entities.get(eid.as_str())
-                    .and_then(|e| e.class_id.clone());
+                let entity = ctx.entities.entities.get(eid.as_str());
+                let class_id = entity.and_then(|e| e.class_id.clone());
+                let status = entity.map(|e| format!("{:?}", e.status)).unwrap_or_else(|| "Unknown".to_string());
                 serde_json::json!({
                     "rank": i + 1, "name": name, "entity_id": eid, "class_id": class_id,
                     "score": score, "delta": **score - BASE_SCORE, "risk": risk_level(**score),
+                    "status": status,
                 })
             }).collect();
             print_json(&serde_json::json!({ "ranking": ranking, "total": sorted.len() }));
@@ -685,7 +696,25 @@ pub fn cmd_add_student(name: &str) -> Result<(), AppError> {
     let _lock = FileLock::acquire()?;
     let mut entities = load_entities()?;
     let mut index = load_name_index()?;
-    if index.contains_key(name) { return Err(AppError::Validation(format!("学生 {} 已存在", name))); }
+    // R53-2 修复: 区分 Active 和 Deleted。Active 时报错(原行为);Deleted 时复活。
+    // 之前不区分,导致用户删除一个学生后无法用同名重新添加。
+    if let Some(existing_eid) = index.get(name).cloned() {
+        let is_deleted = entities.entities.get(&existing_eid)
+            .map(|e| matches!(e.status, EntityStatus::Deleted))
+            .unwrap_or(false);
+        if !is_deleted {
+            return Err(AppError::Validation(format!("学生 {} 已存在", name)));
+        }
+        // 复活: 把 status 改回 Active,清删除标记,保留 entity_id 和分数(分数在 scores.cache 里)
+        if let Some(ent) = entities.entities.get_mut(&existing_eid) {
+            ent.status = EntityStatus::Active;
+            ent.metadata.remove("deleted_at");
+            ent.metadata.remove("delete_reason");
+        }
+        save_entities(&entities)?;
+        println!("✓ 学生已恢复: {} ({}) (从软删状态复活)", name, existing_eid);
+        return Ok(());
+    }
     let entity_id = format!("ent_{}", generate_event_id().trim_start_matches("evt_"));
     let now = chrono::Local::now().format("%Y-%m-%dT%H:%M:%S%:z").to_string();
     let entity = Entity {

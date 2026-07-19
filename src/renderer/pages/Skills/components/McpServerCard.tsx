@@ -57,7 +57,7 @@ export function McpServerCard({
       : t('page.mcp.status.disconnected')
 
   return (
-    <div className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800">
+    <div className="p-4 border border-gray-200 dark:border-white/[0.06] rounded-lg bg-white dark:bg-[#1a1e28]">
       {/* 头部:名称 + 来源 badge */}
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
@@ -152,7 +152,7 @@ export function McpServerCard({
         <button
           type="button"
           onClick={onTest}
-          className="px-3 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700"
+          className="px-3 py-1 text-xs rounded border border-gray-300 dark:border-white/[0.08] hover:bg-gray-100 dark:hover:bg-white/[0.06]"
         >
           {t('page.mcp.test')}
         </button>
@@ -160,7 +160,7 @@ export function McpServerCard({
           <button
             type="button"
             onClick={onDisconnect}
-            className="px-3 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700"
+            className="px-3 py-1 text-xs rounded border border-gray-300 dark:border-white/[0.08] hover:bg-gray-100 dark:hover:bg-white/[0.06]"
           >
             {t('page.mcp.disconnect')}
           </button>
@@ -176,7 +176,7 @@ export function McpServerCard({
         <button
           type="button"
           onClick={onEdit}
-          className="px-3 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700"
+          className="px-3 py-1 text-xs rounded border border-gray-300 dark:border-white/[0.08] hover:bg-gray-100 dark:hover:bg-white/[0.06]"
         >
           {t('page.mcp.edit')}
         </button>

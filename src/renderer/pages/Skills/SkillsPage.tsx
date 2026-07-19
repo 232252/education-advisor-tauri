@@ -41,7 +41,7 @@ export function SkillsPage() {
         role="tablist"
         aria-label={t('page.skills.title')}
         onKeyDown={handleTabKeyDown}
-        className="flex border-b border-gray-200 dark:border-gray-700 flex-shrink-0"
+        className="flex border-b border-gray-200 dark:border-white/[0.06] flex-shrink-0"
       >
         {tabs.map((tb) => (
           <button

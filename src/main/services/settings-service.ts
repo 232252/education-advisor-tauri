@@ -29,6 +29,9 @@ const DEFAULT_SETTINGS: UnifiedSettings = {
     closeBehavior: 'ask',
     // H-4 修复: cron 调度时区默认值
     timezone: 'Asia/Shanghai',
+    // R57-3 H3 修复: cron 资源限制配置(可被用户修改)
+    agentTimeoutMins: 5, // agent 执行超时(分钟),-1 表示不限
+    maxConcurrentCronTasks: 5, // cron 任务最大并发数
   },
   models: {
     defaultProvider: '',
@@ -227,6 +230,26 @@ class SettingsService {
       const depth = SettingsService._getObjectDepth(value)
       if (depth > 10) {
         throw new Error(`Object depth too deep for ${dotPath}: ${depth} (max 10)`)
+      }
+    }
+
+    // R57-3 H4 SSRF 纵深防御: updateUrl 协议白名单
+    // 只允许 https://github.com/<owner>/<repo> 格式,拒绝 http/file/javascript 等协议
+    // 边界:
+    //   - 空值('')允许(清空更新源),不算错
+    //   - 'https://github.com/x/y' OK
+    //   - 'http://evil.com' 拒绝(非 https)
+    //   - 'file:///etc/passwd' 拒绝(非 https)
+    //   - 'javascript:alert(1)' 拒绝(非 https)
+    //   - 'https://evil.com' 拒绝(不含 github.com)
+    if (dotPath === 'general.updateUrl') {
+      if (typeof value === 'string' && value.length > 0) {
+        if (!value.startsWith('https://')) {
+          throw new Error('updateUrl 必须使用 https 协议')
+        }
+        if (!value.includes('github.com/')) {
+          throw new Error('updateUrl 必须是 https://github.com/<owner>/<repo> 格式')
+        }
       }
     }
 

@@ -156,9 +156,9 @@ export function LocalModelsSection() {
   const available = status?.available ?? false
 
   return (
-    <div className="bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-gray-800 dark:to-gray-800/50 border border-indigo-200 dark:border-gray-700 rounded-xl overflow-hidden mb-6">
+    <div className="bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-gray-800 dark:to-gray-800/50 border border-indigo-200 dark:border-white/[0.06] rounded-xl overflow-hidden mb-6">
       {/* 标题栏 */}
-      <div className="px-5 py-4 border-b border-indigo-200 dark:border-gray-700/60 flex items-center justify-between">
+      <div className="px-5 py-4 border-b border-indigo-200 dark:border-white/[0.06]/60 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span className="text-lg">🖥️</span>
           <h2 className="text-sm font-semibold text-gray-800 dark:text-gray-100">本地模型</h2>
@@ -183,7 +183,7 @@ export function LocalModelsSection() {
             <button
               type="button"
               onClick={() => getAPI().ollama.stopServe()}
-              className="text-[10px] px-2 py-1 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors"
+              className="text-[10px] px-2 py-1 rounded-lg border border-gray-300 dark:border-white/[0.08] text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/[0.04] transition-colors"
             >
               停止
             </button>
@@ -203,7 +203,7 @@ export function LocalModelsSection() {
       <div className="p-5 space-y-4">
         {/* 未安装提示 */}
         {!available && (
-          <div className="text-xs text-gray-500 dark:text-gray-400 bg-white/60 dark:bg-gray-800/40 rounded-lg p-3 leading-relaxed">
+          <div className="text-xs text-gray-500 dark:text-gray-400 bg-white/60 dark:bg-[#1a1e28]/40 rounded-lg p-3 leading-relaxed">
             <div className="font-medium text-gray-700 dark:text-gray-300 mb-1">未检测到 Ollama</div>
             本地模型功能需要先安装 Ollama（免费、开源）:
             <ol className="list-decimal ml-4 mt-1 space-y-0.5">
@@ -240,7 +240,7 @@ export function LocalModelsSection() {
               return (
                 <div
                   key={m.tag}
-                  className="bg-white/80 dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700/60 rounded-lg p-3"
+                  className="bg-white/80 dark:bg-[#1a1e28]/60 border border-gray-200 dark:border-white/[0.06]/60 rounded-lg p-3"
                 >
                   <div className="flex items-start justify-between mb-1">
                     <div>
@@ -339,7 +339,7 @@ export function LocalModelsSection() {
               {installed.map((m) => (
                 <div
                   key={m.name}
-                  className="flex items-center justify-between bg-white/60 dark:bg-gray-800/40 rounded-lg px-3 py-2"
+                  className="flex items-center justify-between bg-white/60 dark:bg-[#1a1e28]/40 rounded-lg px-3 py-2"
                 >
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-gray-700 dark:text-gray-200 font-mono">

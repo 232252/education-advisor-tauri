@@ -152,7 +152,7 @@ export const ModelSelector = memo(function ModelSelector({
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-1.5 bg-white border border-gray-300 dark:bg-gray-800 dark:border-gray-600 rounded-lg px-3 py-1.5
+        className="flex items-center gap-1.5 bg-white border border-gray-300 dark:bg-[#1a1e28] dark:border-white/[0.08] rounded-lg px-3 py-1.5
                    text-xs text-gray-600 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-500 transition-colors max-w-[280px] truncate"
       >
         <svg
@@ -187,13 +187,13 @@ export const ModelSelector = memo(function ModelSelector({
 
       {open && (
         <div
-          className="absolute top-full left-0 mt-2 w-[480px] max-h-[400px] bg-white border border-gray-300 dark:bg-gray-800 dark:border-gray-600
+          className="absolute top-full left-0 mt-2 w-[480px] max-h-[400px] bg-white border border-gray-300 dark:bg-[#1a1e28] dark:border-white/[0.08]
                         rounded-xl shadow-2xl overflow-hidden z-50"
         >
           <div className="flex h-[400px]">
             {/* 左侧 Provider 列表 */}
-            <div className="w-[180px] border-r border-gray-200 dark:border-gray-700 overflow-y-auto">
-              <div className="px-3 py-2 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider border-b border-gray-200 dark:border-gray-700">
+            <div className="w-[180px] border-r border-gray-200 dark:border-white/[0.06] overflow-y-auto">
+              <div className="px-3 py-2 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider border-b border-gray-200 dark:border-white/[0.06]">
                 Providers
               </div>
               {providers.length === 0 && (
@@ -209,7 +209,7 @@ export const ModelSelector = memo(function ModelSelector({
                   className={`w-full text-left px-3 py-2 text-sm transition-colors ${
                     selectedProvider === p.id
                       ? 'bg-blue-600/20 text-blue-600 dark:text-blue-400 border-l-2 border-blue-500'
-                      : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                      : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/[0.04]'
                   }`}
                 >
                   <div className="flex items-center gap-2">
@@ -227,7 +227,7 @@ export const ModelSelector = memo(function ModelSelector({
 
             {/* 右侧 Model 列表 */}
             <div className="flex-1 overflow-y-auto">
-              <div className="px-3 py-2 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider border-b border-gray-200 dark:border-gray-700">
+              <div className="px-3 py-2 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider border-b border-gray-200 dark:border-white/[0.06]">
                 Models
               </div>
               {loading ? (
@@ -240,10 +240,10 @@ export const ModelSelector = memo(function ModelSelector({
                     type="button"
                     key={m.id}
                     onClick={() => handleModelClick(selectedProvider, m.id)}
-                    className={`w-full text-left px-3 py-2 transition-colors border-b border-gray-100 dark:border-gray-700/50 ${
+                    className={`w-full text-left px-3 py-2 transition-colors border-b border-gray-100 dark:border-white/[0.06] ${
                       selectedModel === m.id
                         ? 'bg-blue-600/20 text-blue-600 dark:text-blue-400'
-                        : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/50'
+                        : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/[0.04]'
                     }`}
                   >
                     <div className="flex items-center justify-between">

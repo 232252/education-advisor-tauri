@@ -253,7 +253,7 @@ export function PrivacyPage() {
               value={initPassword}
               onChange={(e) => setInitPassword(e.target.value)}
               placeholder="设置隐私密码（至少 4 位）..."
-              className="flex-1 bg-white border border-gray-300 dark:bg-gray-900 dark:border-gray-600 rounded-lg px-3 py-2 text-sm
+              className="flex-1 bg-white border border-gray-300 dark:bg-[#0f1117] dark:border-white/[0.08] rounded-lg px-3 py-2 text-sm
                          focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow"
               onKeyDown={(e) => {
                 if (e.key === 'Enter') handleInit()
@@ -272,7 +272,7 @@ export function PrivacyPage() {
       )}
 
       {/* 密码与加载 */}
-      <div className="bg-gray-50 border border-gray-200 dark:bg-gray-800 dark:border-gray-700 rounded-xl p-5">
+      <div className="bg-gray-50 border border-gray-200 dark:bg-[#1a1e28] dark:border-white/[0.06] rounded-xl p-5">
         <h2 className="font-semibold mb-3">加密映射表</h2>
         <div className="flex gap-3 items-center">
           <input
@@ -280,7 +280,7 @@ export function PrivacyPage() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="输入隐私密码..."
-            className="flex-1 bg-white border border-gray-300 dark:bg-gray-900 dark:border-gray-600 rounded-lg px-3 py-2 text-sm
+            className="flex-1 bg-white border border-gray-300 dark:bg-[#0f1117] dark:border-white/[0.08] rounded-lg px-3 py-2 text-sm
                        focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow"
           />
           <button
@@ -308,7 +308,7 @@ export function PrivacyPage() {
 
       {/* 添加实体 */}
       {isLoaded && (
-        <div className="bg-gray-50 border border-gray-200 dark:bg-gray-800 dark:border-gray-700 rounded-xl p-5">
+        <div className="bg-gray-50 border border-gray-200 dark:bg-[#1a1e28] dark:border-white/[0.06] rounded-xl p-5">
           <div className="flex items-center justify-between mb-3">
             <h2 className="font-semibold">添加实体</h2>
             <button
@@ -332,7 +332,7 @@ export function PrivacyPage() {
                   id="new-entity-type"
                   value={newEntityType}
                   onChange={(e) => setNewEntityType(e.target.value)}
-                  className="w-full bg-white border border-gray-300 dark:bg-gray-900 dark:border-gray-600 rounded-lg px-3 py-2 text-sm
+                  className="w-full bg-white border border-gray-300 dark:bg-[#0f1117] dark:border-white/[0.08] rounded-lg px-3 py-2 text-sm
                              focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow"
                 >
                   <option value="person">人物 (学生/教师/家长)</option>
@@ -357,7 +357,7 @@ export function PrivacyPage() {
                   value={newEntityName}
                   onChange={(e) => setNewEntityName(e.target.value)}
                   placeholder="输入实体名称 (如:张三)..."
-                  className="w-full bg-white border border-gray-300 dark:bg-gray-900 dark:border-gray-600 rounded-lg px-3 py-2 text-sm
+                  className="w-full bg-white border border-gray-300 dark:bg-[#0f1117] dark:border-white/[0.08] rounded-lg px-3 py-2 text-sm
                              focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow"
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && !adding) handleAddEntity()
@@ -380,11 +380,11 @@ export function PrivacyPage() {
 
       {/* 映射表 */}
       {isLoaded && mappings.length > 0 && (
-        <div className="bg-gray-50 border border-gray-200 dark:bg-gray-800 dark:border-gray-700 rounded-xl p-5">
+        <div className="bg-gray-50 border border-gray-200 dark:bg-[#1a1e28] dark:border-white/[0.06] rounded-xl p-5">
           <h2 className="font-semibold mb-3">映射表</h2>
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400">
+              <tr className="border-b border-gray-200 dark:border-white/[0.06] text-gray-500 dark:text-gray-400">
                 <th className="text-left py-2 px-3">类型</th>
                 <th className="text-left py-2 px-3">化名</th>
                 <th className="text-left py-2 px-3">真名</th>
@@ -415,14 +415,14 @@ export function PrivacyPage() {
       )}
 
       {/* 脱敏预览 */}
-      <div className="bg-gray-50 border border-gray-200 dark:bg-gray-800 dark:border-gray-700 rounded-xl p-5">
+      <div className="bg-gray-50 border border-gray-200 dark:bg-[#1a1e28] dark:border-white/[0.06] rounded-xl p-5">
         <h2 className="font-semibold mb-3">脱敏预览</h2>
         <textarea
           value={previewInput}
           onChange={(e) => setPreviewInput(e.target.value)}
           placeholder="输入包含学生姓名的文本，查看脱敏效果..."
           rows={3}
-          className="w-full bg-white border border-gray-300 dark:bg-gray-900 dark:border-gray-600 rounded-lg px-3 py-2 text-sm
+          className="w-full bg-white border border-gray-300 dark:bg-[#0f1117] dark:border-white/[0.08] rounded-lg px-3 py-2 text-sm
                      focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow resize-none mb-3"
         />
         <button
@@ -433,7 +433,7 @@ export function PrivacyPage() {
           测试脱敏
         </button>
         {previewResult && (
-          <pre className="mt-3 bg-gray-100 dark:bg-gray-900 rounded-lg p-3 text-sm font-mono text-gray-600 dark:text-gray-300 overflow-x-auto">
+          <pre className="mt-3 bg-gray-100 dark:bg-[#0f1117] rounded-lg p-3 text-sm font-mono text-gray-600 dark:text-gray-300 overflow-x-auto">
             {previewResult}
           </pre>
         )}

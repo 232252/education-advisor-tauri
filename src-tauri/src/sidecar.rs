@@ -17,7 +17,7 @@ use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Write};
 use std::process::{Child, Command, Stdio};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, Weak};
 
 /// BufReader 缓冲区大小: 64KB (默认 8KB 太小, 高并发下频繁分配)
 const READER_CAPACITY: usize = 64 * 1024;
@@ -61,13 +61,26 @@ struct WireMessage {
     args: Option<Value>,
 }
 
+/// Parameters needed to re-spawn the sidecar (used by watchdog)
+struct SpawnConfig {
+    script: String,
+    app_data_dir: String,
+    resource_dir: String,
+}
+
 pub struct SidecarHandle {
     child: Mutex<Option<Child>>,
-    stdin: Mutex<std::process::ChildStdin>,
+    stdin: Mutex<Option<std::process::ChildStdin>>,
     pending: Pending,
     next_id: AtomicU64,
     /// M-7-6 修复: shutdown 幂等标志,防止重复调用导致额外延迟和重复 kill
     shutdown_done: AtomicBool,
+    /// Spawn parameters kept for watchdog respawn
+    spawn_config: SpawnConfig,
+    /// AppHandle for re-starting the stdout reader thread on respawn
+    app_handle: AppHandle,
+    /// Timestamps (Instant) of recent respawns, used for rate-limiting
+    respawn_timestamps: Mutex<Vec<std::time::Instant>>,
 }
 
 impl SidecarHandle {
@@ -139,10 +152,17 @@ let pending: Pending = Arc::new(Mutex::new(HashMap::with_capacity(64)));
 
         Ok(Self {
             child: Mutex::new(Some(child)),
-            stdin: Mutex::new(stdin),
+            stdin: Mutex::new(Some(stdin)),
             pending,
             next_id: AtomicU64::new(1),
             shutdown_done: AtomicBool::new(false),
+            spawn_config: SpawnConfig {
+                script: script.to_string(),
+                app_data_dir: app_data_dir.to_string(),
+                resource_dir: resource_dir.to_string(),
+            },
+            app_handle: app,
+            respawn_timestamps: Mutex::new(Vec::new()),
         })
     }
 
@@ -191,12 +211,192 @@ let pending: Pending = Arc::new(Mutex::new(HashMap::with_capacity(64)));
         let mut s = serde_json::to_string(value).map_err(|e| e.to_string())?;
         s.push('\n');
         // L-7-8 修复: stdin.lock() 从 poisoned mutex 恢复,与 lock_pending 保持一致
-        let mut stdin = match self.stdin.lock() {
+        let mut stdin_opt = match self.stdin.lock() {
             Ok(g) => g,
             Err(p) => p.into_inner(),
         };
+        let stdin = match stdin_opt.as_mut() {
+            Some(s) => s,
+            None => return Err("sidecar stdin not available (process not running)".into()),
+        };
         stdin.write_all(s.as_bytes()).map_err(|e| e.to_string())?;
         stdin.flush().map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
+    /// 启动 watchdog 线程: 周期检查 sidecar 是否存活,崩溃则自动重启
+    /// 调用方持有 Arc<SidecarHandle>, watchdog 持有 Weak 避免阻止 Drop
+    pub fn start_watchdog(self: &Arc<Self>) {
+        let weak = Arc::downgrade(self);
+        std::thread::spawn(move || {
+            eprintln!("[sidecar-watchdog] started");
+            loop {
+                std::thread::sleep(std::time::Duration::from_secs(2));
+
+                let handle = match weak.upgrade() {
+                    Some(h) => h,
+                    None => {
+                        // Arc 已释放,SidecarHandle 被 Drop,退出 watchdog
+                        eprintln!("[sidecar-watchdog] handle dropped, exiting");
+                        break;
+                    }
+                };
+
+                // 若是主动 shutdown 则退出 watchdog
+                if handle.shutdown_done.load(Ordering::SeqCst) {
+                    eprintln!("[sidecar-watchdog] shutdown flag set, exiting");
+                    break;
+                }
+
+                // 检查 child 是否还活着
+                let exit_status = {
+                    let mut guard = match handle.child.lock() {
+                        Ok(g) => g,
+                        Err(p) => p.into_inner(),
+                    };
+                    match guard.as_mut() {
+                        Some(child) => child.try_wait().ok().flatten(),
+                        None => {
+                            // child 已被 take (shutdown/Drop),退出
+                            break;
+                        }
+                    }
+                };
+
+                if let Some(status) = exit_status {
+                    eprintln!(
+                        "[sidecar-watchdog] sidecar exited unexpectedly (code={:?}), attempting respawn",
+                        status.code()
+                    );
+                    // 等待 1 秒,避免崩溃循环的快速重启
+                    std::thread::sleep(std::time::Duration::from_secs(1));
+
+                    // 再次检查 shutdown 标志 (在 sleep 期间可能被设置)
+                    if handle.shutdown_done.load(Ordering::SeqCst) {
+                        eprintln!("[sidecar-watchdog] shutdown during respawn wait, giving up");
+                        break;
+                    }
+
+                    // 速率限制: 每分钟最多 3 次
+                    if !handle.check_respawn_rate_limit() {
+                        eprintln!("[sidecar-watchdog] giving up, exceeded 3 respawns/min");
+                        break;
+                    }
+
+                    if let Err(e) = handle.do_respawn() {
+                        eprintln!("[sidecar-watchdog] respawn failed: {e}");
+                        // respawn 失败不 panic,下一轮 2 秒后会再检查
+                        // 但如果 child 是 None (被 take),说明已 shutdown,退出
+                    }
+                }
+            }
+            eprintln!("[sidecar-watchdog] thread exiting");
+        });
+    }
+
+    /// 检查 respawn 速率限制,返回 true 表示允许 respawn
+    /// 滑动窗口: 保留最近 1 分钟内的 respawn 时间戳,超过 3 个则拒绝
+    fn check_respawn_rate_limit(&self) -> bool {
+        let mut timestamps = match self.respawn_timestamps.lock() {
+            Ok(g) => g,
+            Err(p) => p.into_inner(),
+        };
+        let now = std::time::Instant::now();
+        let cutoff = now - std::time::Duration::from_secs(60);
+        timestamps.retain(|t| *t > cutoff);
+        timestamps.len() < 3
+    }
+
+    /// 重新 spawn sidecar 子进程,替换 child/stdin,重启 stdout reader
+    fn do_respawn(&self) -> Result<(), String> {
+        let node = which_node()?;
+
+        let mut cmd = Command::new(node);
+        cmd.arg(&self.spawn_config.script);
+        cmd.env("EDU_APP_DATA_DIR", &self.spawn_config.app_data_dir);
+        cmd.env("EDU_RESOURCE_DIR", &self.spawn_config.resource_dir);
+        cmd.env("EDU_IS_PACKAGED", if is_packaged() { "1" } else { "0" });
+        if let Ok(v) = std::env::var("DEBUG") {
+            cmd.env("DEBUG", v);
+        }
+        cmd.stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::inherit());
+
+        let mut child = cmd.spawn().map_err(|e| format!("respawn sidecar: {e}"))?;
+
+        let new_stdin = child
+            .stdin
+            .take()
+            .ok_or_else(|| "no sidecar stdin on respawn".to_string())?;
+        let stdout = child
+            .stdout
+            .take()
+            .ok_or_else(|| "no sidecar stdout on respawn".to_string())?;
+
+        // 替换 child 和 stdin
+        {
+            let mut child_guard = match self.child.lock() {
+                Ok(g) => g,
+                Err(p) => p.into_inner(),
+            };
+            // 旧 child 已退出,无需 kill/wait
+            *child_guard = Some(child);
+        }
+        {
+            let mut stdin_guard = match self.stdin.lock() {
+                Ok(g) => g,
+                Err(p) => p.into_inner(),
+            };
+            *stdin_guard = Some(new_stdin);
+        }
+
+        // 清空 pending map (旧请求全部作废)
+        {
+            let mut p = lock_pending(&self.pending);
+            // 对每个 pending 发送错误,让等待的 request 返回
+            for (_, tx) in p.drain() {
+                let _ = tx.send(RpcResult::Err("sidecar crashed, request lost".into()));
+            }
+        }
+
+        // 启动新的 stdout reader 线程
+        let pending_reader = self.pending.clone();
+        let app_reader = self.app_handle.clone();
+        std::thread::spawn(move || {
+            let reader = BufReader::with_capacity(READER_CAPACITY, stdout);
+            for line in reader.lines() {
+                match line {
+                    Ok(text) => {
+                        if text.trim().is_empty() {
+                            continue;
+                        }
+                        match serde_json::from_str::<WireMessage>(&text) {
+                            Ok(msg) => handle_wire_message(msg, &pending_reader, &app_reader),
+                            Err(e) => {
+                                eprintln!("[sidecar:txt] {text}   (note: non-JSON, {e})");
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("[sidecar-stdout] read error: {e}");
+                        break;
+                    }
+                }
+            }
+            eprintln!("[sidecar-stdout] reader thread exiting (respawn)");
+        });
+
+        // 记录 respawn 时间戳
+        {
+            let mut timestamps = match self.respawn_timestamps.lock() {
+                Ok(g) => g,
+                Err(p) => p.into_inner(),
+            };
+            timestamps.push(std::time::Instant::now());
+        }
+
+        eprintln!("[sidecar-watchdog] respawned sidecar successfully");
         Ok(())
     }
 

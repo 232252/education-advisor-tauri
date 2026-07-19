@@ -111,7 +111,7 @@ export function ComboBox({
         }}
         onFocus={() => setOpen(true)}
         onKeyDown={onKeyDown}
-        className="w-full px-3 py-1.5 pr-8 text-sm rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+        className="w-full px-3 py-1.5 pr-8 text-sm rounded border border-gray-300 dark:border-white/[0.08] bg-white dark:bg-[#1e222c] focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
       />
       {/* 下拉箭头按钮 */}
       <button
@@ -136,7 +136,7 @@ export function ComboBox({
       </button>
 
       {open && !disabled && (
-        <div className="absolute top-full left-0 mt-1 w-full max-h-60 overflow-y-auto bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded shadow-lg z-50">
+        <div className="absolute top-full left-0 mt-1 w-full max-h-60 overflow-y-auto bg-white dark:bg-[#1a1e28] border border-gray-200 dark:border-white/[0.08] rounded shadow-lg z-50">
           {visible.length === 0 ? (
             <div className="px-3 py-2 text-xs text-gray-400 dark:text-gray-500">
               {t('page.classes.combobox.noMatch', '无匹配项')}
@@ -151,7 +151,7 @@ export function ComboBox({
                 className={`w-full text-left px-3 py-1.5 text-sm transition-colors ${
                   i === highlight
                     ? 'bg-blue-600/15 text-blue-600 dark:text-blue-400'
-                    : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                    : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/[0.04]'
                 }`}
               >
                 {item}

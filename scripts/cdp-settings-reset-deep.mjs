@@ -137,7 +137,7 @@ async function main() {
 
   // 默认值表 (与 settings-service.ts DEFAULT_SETTINGS 一致)
   const DEFAULTS = {
-    'general.theme': 'dark',
+    'general.theme': 'light',
     'general.language': 'zh-CN',
     'general.logLevel': 'info',
     'general.autoUpdate': true,
@@ -230,13 +230,13 @@ async function main() {
 
   // ========== 1. Reset 指定字段 (参数被忽略 → 全量重置) ==========
   console.log('\n━━━ 1. Reset 指定字段 (参数被忽略 → 全量重置) ━━━')
-  await test('reset("general.theme") 后 theme 回到默认 dark', async () => {
+  await test('reset("general.theme") 后 theme 回到默认 light', async () => {
     try {
       await setSetting('general.theme', 'light')
       const res = await resetSettings('general.theme')
       const after = await getSettings()
-      const ok = isAccepted(res) && getByPath(after, 'general.theme') === 'dark'
-      record('reset("general.theme") 后 theme 回到默认 dark', ok,
+      const ok = isAccepted(res) && getByPath(after, 'general.theme') === 'light'
+      record('reset("general.theme") 后 theme 回到默认 light', ok,
         `res.success=${res?.success} theme=${JSON.stringify(getByPath(after, 'general.theme'))}`)
     } finally { await restoreAll() }
   })
@@ -248,7 +248,7 @@ async function main() {
       const res = await resetSettings('general.theme')
       const after = await getSettings()
       // 证明 arg 被忽略: language 也被重置 (而非仅 theme)
-      const bothReset = getByPath(after, 'general.theme') === 'dark' && getByPath(after, 'general.language') === 'zh-CN'
+      const bothReset = getByPath(after, 'general.theme') === 'light' && getByPath(after, 'general.language') === 'zh-CN'
       record('reset("general.theme") 参数被忽略 — 同时重置了 language',
         isAccepted(res) && bothReset,
         `theme=${getByPath(after, 'general.theme')} language=${getByPath(after, 'general.language')}`)
@@ -388,7 +388,7 @@ async function main() {
       const res = await resetSettings('nonexistent.path')
       const after = await getSettings()
       // 不存在路径不会报错, 且仍触发了全量重置 (theme 回默认)
-      const ok = isAccepted(res) && getByPath(after, 'general.theme') === 'dark'
+      const ok = isAccepted(res) && getByPath(after, 'general.theme') === 'light'
       record('reset("nonexistent.path") 不拒绝 — success:true', ok,
         `res.success=${res?.success} theme=${getByPath(after, 'general.theme')}`)
     } finally { await restoreAll() }
@@ -399,7 +399,7 @@ async function main() {
       await setSetting('general.theme', 'light')
       const res = await resetSettings('')
       const after = await getSettings()
-      const ok = isAccepted(res) && getByPath(after, 'general.theme') === 'dark'
+      const ok = isAccepted(res) && getByPath(after, 'general.theme') === 'light'
       record('reset("") 空字符串 — 不拒绝, 全量重置', ok,
         `res.success=${res?.success} theme=${getByPath(after, 'general.theme')}`)
     } finally { await restoreAll() }
@@ -410,7 +410,7 @@ async function main() {
       await setSetting('general.theme', 'light')
       const res = await resetSettings('general.nonexistent')
       const after = await getSettings()
-      const ok = isAccepted(res) && getByPath(after, 'general.theme') === 'dark'
+      const ok = isAccepted(res) && getByPath(after, 'general.theme') === 'light'
       record('reset("general.nonexistent") 不存在嵌套路径 — 不拒绝', ok,
         `res.success=${res?.success} theme=${getByPath(after, 'general.theme')}`)
     } finally { await restoreAll() }
@@ -427,25 +427,25 @@ async function main() {
 
   // ========== 6. Set 与 Reset 循环 ==========
   console.log('\n━━━ 6. Set 与 Reset 循环 ━━━')
-  await test('set theme=dark → reset → 仍为 dark (默认)', async () => {
+  await test('set theme=dark → reset → 回到默认 light', async () => {
     try {
       await setSetting('general.theme', 'dark')
       const before = getByPath(await getSettings(), 'general.theme')
       await resetSettings()
       const after = getByPath(await getSettings(), 'general.theme')
-      const ok = before === 'dark' && after === 'dark'
-      record('set theme=dark → reset → 仍为 dark (默认)', ok, `before=${before} after=${after}`)
+      const ok = before === 'dark' && after === 'light'
+      record('set theme=dark → reset → 回到默认 light', ok, `before=${before} after=${after}`)
     } finally { await restoreAll() }
   })
 
-  await test('set theme=light → reset → 回到 dark', async () => {
+  await test('set theme=light → reset → 仍为 light (默认)', async () => {
     try {
       await setSetting('general.theme', 'light')
       const before = getByPath(await getSettings(), 'general.theme')
       await resetSettings()
       const after = getByPath(await getSettings(), 'general.theme')
-      const ok = before === 'light' && after === 'dark'
-      record('set theme=light → reset → 回到 dark', ok, `before=${before} after=${after}`)
+      const ok = before === 'light' && after === 'light'
+      record('set theme=light → reset → 仍为 light (默认)', ok, `before=${before} after=${after}`)
     } finally { await restoreAll() }
   })
 
@@ -457,7 +457,7 @@ async function main() {
       await setSetting('general.theme', 'light')
       await resetSettings()
       const r2 = getByPath(await getSettings(), 'general.theme')
-      const ok = r1 === 'dark' && r2 === 'dark'
+      const ok = r1 === 'light' && r2 === 'light'
       record('双重 set-reset 循环 (light→reset→light→reset)', ok, `r1=${r1} r2=${r2}`)
     } finally { await restoreAll() }
   })
@@ -471,7 +471,7 @@ async function main() {
       const v2 = getByPath(await getSettings(), 'general.theme')
       await setSetting('general.theme', 'system')
       const v3 = getByPath(await getSettings(), 'general.theme')
-      const ok = v1 === 'light' && v2 === 'dark' && v3 === 'system'
+      const ok = v1 === 'light' && v2 === 'light' && v3 === 'system'
       record('set-reset-set 循环后值正确', ok, `v1=${v1} v2=${v2} v3=${v3}`)
     } finally { await restoreAll() }
   })
@@ -526,7 +526,7 @@ async function main() {
       const a = await getSettings()
       await sleep(300)
       const b = await getSettings()
-      const ok = getByPath(a, 'general.theme') === 'dark' && deepEqual(a, b)
+      const ok = getByPath(a, 'general.theme') === 'light' && deepEqual(a, b)
       record('reset 后多次 get 一致 (内存状态稳定)', ok,
         `a.theme=${getByPath(a, 'general.theme')} b.theme=${getByPath(b, 'general.theme')} equal=${deepEqual(a, b)}`)
     } finally { await restoreAll() }
@@ -612,7 +612,7 @@ async function main() {
       const results = await Promise.all([resetSettings(), resetSettings(), resetSettings()])
       const allOk = results.every((r) => isAccepted(r))
       const after = await getSettings()
-      const isDefault = getByPath(after, 'general.theme') === 'dark'
+      const isDefault = getByPath(after, 'general.theme') === 'light'
       record('并发 reset() 3 次 — 全部 success', allOk && isDefault,
         `allOk=${allOk} theme=${getByPath(after, 'general.theme')}`)
     } finally { await restoreAll() }
@@ -683,7 +683,7 @@ async function main() {
       const r1 = getByPath(await getSettings(), 'general.theme')
       await resetSettings()
       const r2 = getByPath(await getSettings(), 'general.theme')
-      const ok = r1 === 'dark' && r2 === 'dark'
+      const ok = r1 === 'light' && r2 === 'light'
       record('双重 reset — 状态保持默认', ok, `r1=${r1} r2=${r2}`)
     } finally { await restoreAll() }
   })
@@ -693,7 +693,7 @@ async function main() {
       const longPath = 'a'.repeat(500) + '.' + 'b'.repeat(500)
       const res = await resetSettings(longPath)
       const after = await getSettings()
-      const ok = isAccepted(res) && getByPath(after, 'general.theme') === 'dark'
+      const ok = isAccepted(res) && getByPath(after, 'general.theme') === 'light'
       record('reset 超长 dotPath (参数忽略) — success', ok,
         `res.success=${res?.success} theme=${getByPath(after, 'general.theme')}`)
     } finally { await restoreAll() }
@@ -703,7 +703,7 @@ async function main() {
     try {
       const res = await resetSettings('general.theme!@#$%^&*()')
       const after = await getSettings()
-      const ok = isAccepted(res) && getByPath(after, 'general.theme') === 'dark'
+      const ok = isAccepted(res) && getByPath(after, 'general.theme') === 'light'
       record('reset 特殊字符 dotPath (参数忽略) — success', ok,
         `res.success=${res?.success} theme=${getByPath(after, 'general.theme')}`)
     } finally { await restoreAll() }

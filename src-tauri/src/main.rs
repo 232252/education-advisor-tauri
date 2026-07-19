@@ -107,6 +107,9 @@ fn main() {
             .expect("failed to spawn Node sidecar");
             let sidecar = Arc::new(sidecar);
 
+            // 启动 watchdog: 崩溃自动重启 (需在 Arc::new 之后调用)
+            sidecar.start_watchdog();
+
             // 把 sidecar 句柄存到应用状态里，供 ipc_invoke 命令使用
             app.manage(sidecar);
 

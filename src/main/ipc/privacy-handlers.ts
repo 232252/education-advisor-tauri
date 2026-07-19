@@ -108,16 +108,23 @@ export function registerPrivacyHandlers(_win: BrowserWindow) {
   // ----- list: 列出已注册实体（密码走 EAA_PRIVACY_PASSWORD 环境变量,内存中已缓存） -----
   // 兼容旧调用：如果渲染进程仍传密码,则更新内存中的密码；否则使用已缓存的
   // 修复: 统一用 validatePassword 校验,避免弱密码静默通过(原仅检查 length>=4)
+  // R37-1 修复: lock 状态下(无密码且未传新密码)不允许 list，避免泄露实体映射
   ipcMain.handle(IPC.IPC_PRIVACY_LIST, async (_e, password?: string) => {
     if (password !== undefined && password !== null) {
       const pwd = validatePassword(password)
       eaaBridge.setPrivacyPassword(pwd)
+    }
+    if (!eaaBridge.hasPrivacyPassword()) {
+      return { success: false, data: '隐私引擎已锁定，请先输入密码解锁后再列出实体' }
     }
     return eaaBridge.execute({ command: 'privacy', args: ['list'], jsonOutput: true })
   })
 
   // ----- add: 添加隐私实体（使用内存中已缓存的密码） -----
   ipcMain.handle(IPC.IPC_PRIVACY_ADD, async (_e, entityType: string, text: string) => {
+    if (!eaaBridge.hasPrivacyPassword()) {
+      return { success: false, data: '隐私引擎已锁定，请先输入密码解锁后再添加实体' }
+    }
     const safeType = sanitizeEnum(entityType, ENTITY_TYPES, 'entityType')
     const safeText = sanitize(text, 'text')
     return eaaBridge.execute({
@@ -127,35 +134,76 @@ export function registerPrivacyHandlers(_win: BrowserWindow) {
   })
 
   // ----- anonymize: 文本脱敏（使用内存中已缓存的密码） -----
+  // R37-1 修复: lock 状态下不允许 anonymize，避免静默泄露原文
+  // R41-1 修复: try-catch 兜底，把 EAA CLI 的 throw（如 "text too long"）转结构化错误
+  // R41-2 修复: sanitize() 对超长输入也同步 throw，需把 sanitize 调用一并纳入 try 块
   ipcMain.handle(IPC.IPC_PRIVACY_ANONYMIZE, async (_e, text: string) => {
-    const safeText = sanitize(text, 'text')
-    return eaaBridge.execute({ command: 'privacy', args: ['anonymize', safeText] })
+    if (!eaaBridge.hasPrivacyPassword()) {
+      return { success: false, data: '隐私引擎已锁定，请先输入密码解锁后再脱敏' }
+    }
+    try {
+      const safeText = sanitize(text, 'text')
+      return await eaaBridge.execute({ command: 'privacy', args: ['anonymize', safeText] })
+    } catch (err) {
+      return { success: false, data: err instanceof Error ? err.message : 'anonymize 失败' }
+    }
   })
 
   // ----- deanonymize: 文本反脱敏（需要环境变量中的密码,内存中已缓存） -----
+  // R37-1 修复: lock 状态下不允许 deanonymize
+  // R41-1 修复: try-catch �兜底，转结构化错误
   ipcMain.handle(IPC.IPC_PRIVACY_DEANONYMIZE, async (_e, text: string) => {
-    const safeText = sanitize(text, 'text')
-    return eaaBridge.execute({ command: 'privacy', args: ['deanonymize', safeText] })
+    if (!eaaBridge.hasPrivacyPassword()) {
+      return { success: false, data: '隐私引擎已锁定，请先输入密码解锁后再反脱敏' }
+    }
+    try {
+      const safeText = sanitize(text, 'text')
+      return await eaaBridge.execute({ command: 'privacy', args: ['deanonymize', safeText] })
+    } catch (err) {
+      return { success: false, data: err instanceof Error ? err.message : 'deanonymize 失败' }
+    }
   })
 
   // ----- filter: 按接收者过滤（使用内存中已缓存的密码） -----
+  // R37-1 修复: lock 状态下不允许 filter
+  // R41-1 修复: try-catch 兜底，转结构化错误
   ipcMain.handle(IPC.IPC_PRIVACY_FILTER, async (_e, receiver: string, text: string) => {
-    const safeReceiver = sanitizeEnum(receiver, RECEIVER_TYPES, 'receiver')
-    const safeText = sanitize(text, 'text')
-    return eaaBridge.execute({
-      command: 'privacy',
-      args: ['filter', '--receiver', safeReceiver, safeText],
-    })
+    if (!eaaBridge.hasPrivacyPassword()) {
+      return { success: false, data: '隐私引擎已锁定，请先输入密码解锁后再过滤' }
+    }
+    try {
+      const safeReceiver = sanitizeEnum(receiver, RECEIVER_TYPES, 'receiver')
+      const safeText = sanitize(text, 'text')
+      return await eaaBridge.execute({
+        command: 'privacy',
+        args: ['filter', '--receiver', safeReceiver, safeText],
+      })
+    } catch (err) {
+      return { success: false, data: err instanceof Error ? err.message : 'filter 失败' }
+    }
   })
 
   // ----- dry-run: 预览脱敏效果（使用内存中已缓存的密码） -----
+  // R37-1 修复: lock 状态下不允许 dry-run
+  // R41-1 修复: try-catch 兜底，转结构化错误
   ipcMain.handle(IPC.IPC_PRIVACY_DRYRUN, async (_e, text: string) => {
-    const safeText = sanitize(text, 'text')
-    return eaaBridge.execute({ command: 'privacy', args: ['dry-run', safeText] })
+    if (!eaaBridge.hasPrivacyPassword()) {
+      return { success: false, data: '隐私引擎已锁定，请先输入密码解锁后再预览' }
+    }
+    try {
+      const safeText = sanitize(text, 'text')
+      return await eaaBridge.execute({ command: 'privacy', args: ['dry-run', safeText] })
+    } catch (err) {
+      return { success: false, data: err instanceof Error ? err.message : 'dry-run 失败' }
+    }
   })
 
   // ----- backup: 备份隐私库（使用内存中已缓存的密码） -----
+  // R37-1 修复: lock 状态下不允许 backup，避免泄露隐私库内容
   ipcMain.handle(IPC.IPC_PRIVACY_BACKUP, async (_e, destPath: string) => {
+    if (!eaaBridge.hasPrivacyPassword()) {
+      return { success: false, data: '隐私引擎已锁定，请先输入密码解锁后再备份' }
+    }
     const safePath = sanitize(destPath, 'destPath', 1024)
     if (safePath.includes('\0')) {
       throw new Error('destPath contains null bytes')
@@ -165,6 +213,23 @@ export function registerPrivacyHandlers(_win: BrowserWindow) {
       throw new Error('destPath cannot contain path traversal (..)')
     }
     return eaaBridge.execute({ command: 'privacy', args: ['backup', safePath] })
+  })
+
+  // ----- unlock: 解锁隐私引擎（重新输入密码，校验后缓存到内存） -----
+  // R37-2 修复: 新增 unlock handler，之前 lock 后无解锁路径，privacy.unlock() 返回空对象
+  // 解锁逻辑：校验密码长度格式后缓存到内存，真正校验密码正确性由后续 EAA CLI 命令执行
+  // （若密码错误，下一次 anonymize 等命令会返回 EAA CLI 的错误）
+  ipcMain.handle(IPC.IPC_PRIVACY_UNLOCK, async (_e, password: string) => {
+    try {
+      const pwd = validatePassword(password)
+      eaaBridge.setPrivacyPassword(pwd)
+      return { success: true, data: '隐私引擎已解锁' }
+    } catch (err) {
+      return {
+        success: false,
+        data: err instanceof Error ? err.message : '解锁失败，密码格式不合法',
+      }
+    }
   })
 
   // ----- lock: 锁定隐私引擎（清空内存中的密码,后续命令将无法使用隐私功能） -----

@@ -207,7 +207,7 @@ export function SchedulerPage() {
   return (
     <div className="h-full flex flex-col">
       {/* 头部 */}
-      <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+      <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-white/[0.06]">
         <h1 className="text-xl font-bold">{t('page.scheduler.title')}</h1>
         <div className="flex gap-3">
           <button
@@ -252,7 +252,7 @@ export function SchedulerPage() {
       ) : (
         <div className="flex-1 flex overflow-hidden">
           {/* 左侧：任务列表 */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-2 border-r border-gray-200 dark:border-gray-700">
+          <div className="flex-1 overflow-y-auto p-4 space-y-2 border-r border-gray-200 dark:border-white/[0.06]">
             {tasks.length === 0 ? (
               <div className="text-center text-gray-400 dark:text-gray-500 py-8 text-sm">
                 暂无定时任务
@@ -283,7 +283,7 @@ export function SchedulerPage() {
 
           {/* 右侧：执行日志 */}
           <div className="w-96 overflow-y-auto">
-            <div className="p-3 border-b border-gray-200 dark:border-gray-700">
+            <div className="p-3 border-b border-gray-200 dark:border-white/[0.06]">
               <h3 className="text-sm font-medium text-gray-600 dark:text-gray-300">
                 {selectedTaskId ? '任务执行日志' : '全部执行日志'}
               </h3>
@@ -398,8 +398,8 @@ const TaskCard = memo(function TaskCard({
           onSelect()
         }
       }}
-      className={`bg-gray-50 border rounded-xl px-4 py-3 cursor-pointer transition-colors dark:bg-gray-800
-        ${selected ? 'border-blue-500' : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'}`}
+      className={`bg-gray-50 border rounded-xl px-4 py-3 cursor-pointer transition-colors dark:bg-[#1a1e28]
+        ${selected ? 'border-blue-500' : 'border-gray-200 dark:border-white/[0.06] hover:border-gray-300 dark:hover:border-gray-600'}`}
     >
       <div className="flex items-center gap-3">
         {/* 开关 */}
@@ -490,9 +490,9 @@ const TaskCard = memo(function TaskCard({
 
       {/* 展开显示 prompt */}
       {selected && (
-        <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+        <div className="mt-3 pt-3 border-t border-gray-200 dark:border-white/[0.06]">
           <div className="text-xs text-gray-400 dark:text-gray-500 mb-1">执行指令:</div>
-          <div className="text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-900 rounded px-3 py-2 font-mono">
+          <div className="text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-[#0f1117] rounded px-3 py-2 font-mono">
             {task.prompt}
           </div>
         </div>
@@ -510,7 +510,7 @@ const LogEntry = memo(function LogEntry({ log }: { log: CronLogEntry }) {
   const timeStr = `${time.getHours()}:${String(time.getMinutes()).padStart(2, '0')}:${String(time.getSeconds()).padStart(2, '0')}`
 
   return (
-    <div className="flex items-center gap-2 text-xs py-1.5 px-2 rounded hover:bg-gray-100 dark:hover:bg-gray-800/50">
+    <div className="flex items-center gap-2 text-xs py-1.5 px-2 rounded hover:bg-gray-100 dark:hover:bg-white/[0.03]">
       <span
         className={`w-1.5 h-1.5 rounded-full flex-shrink-0
         ${
@@ -632,7 +632,7 @@ function NewTaskForm({ agents, editingTask, onCreate, onUpdate, onCancel }: NewT
   }
 
   return (
-    <div className="border-b border-gray-200 dark:border-gray-700 p-4 bg-gray-50 dark:bg-gray-800/50">
+    <div className="border-b border-gray-200 dark:border-white/[0.06] p-4 bg-gray-50 dark:bg-[#1a1e28]/50">
       <h3 className="text-sm font-medium mb-3">{isEditing ? '编辑定时任务' : '新建定时任务'}</h3>
 
       <div className="grid grid-cols-2 gap-3">
@@ -649,7 +649,7 @@ function NewTaskForm({ agents, editingTask, onCreate, onUpdate, onCancel }: NewT
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="例: 每日巡检"
-            className="w-full bg-white border border-gray-300 dark:bg-gray-900 dark:border-gray-600 rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow"
+            className="w-full bg-white border border-gray-300 dark:bg-[#0f1117] dark:border-white/[0.08] rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow"
           />
         </div>
 
@@ -665,7 +665,7 @@ function NewTaskForm({ agents, editingTask, onCreate, onUpdate, onCancel }: NewT
             id="task-agent"
             value={agentId}
             onChange={(e) => setAgentId(e.target.value)}
-            className="w-full bg-white border border-gray-300 dark:bg-gray-900 dark:border-gray-600 rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow"
+            className="w-full bg-white border border-gray-300 dark:bg-[#0f1117] dark:border-white/[0.08] rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow"
           >
             {agents.map((a) => (
               <option key={a.id} value={a.id}>
@@ -691,7 +691,7 @@ function NewTaskForm({ agents, editingTask, onCreate, onUpdate, onCancel }: NewT
             placeholder="* * * * *"
             aria-invalid={!isCronValid}
             className={`w-full bg-white border rounded px-3 py-1.5 text-sm font-mono focus:outline-none focus:ring-2 focus:border-transparent transition-shadow
-              ${isCronValid ? 'border-gray-300 dark:bg-gray-900 dark:border-gray-600 focus:ring-blue-500' : 'border-red-400 dark:border-red-500 dark:bg-gray-900 focus:ring-red-500'}`}
+              ${isCronValid ? 'border-gray-300 dark:bg-[#0f1117] dark:border-white/[0.08] focus:ring-blue-500' : 'border-red-400 dark:border-red-500 dark:bg-[#0f1117] focus:ring-red-500'}`}
           />
           <div className="flex gap-1 mt-1.5 flex-wrap">
             {presets.map((p) => (
@@ -759,7 +759,7 @@ function NewTaskForm({ agents, editingTask, onCreate, onUpdate, onCancel }: NewT
           onChange={(e) => setPrompt(e.target.value)}
           placeholder="Agent 每次执行时收到的指令..."
           rows={2}
-          className="w-full bg-white border border-gray-300 dark:bg-gray-900 dark:border-gray-600 rounded px-3 py-2 text-sm resize-none
+          className="w-full bg-white border border-gray-300 dark:bg-[#0f1117] dark:border-white/[0.08] rounded px-3 py-2 text-sm resize-none
             focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow"
         />
       </div>

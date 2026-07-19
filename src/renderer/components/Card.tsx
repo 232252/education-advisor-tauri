@@ -35,10 +35,10 @@ export function Card({
   return (
     <div
       className={cn(
-        'rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900',
+        'rounded-xl border border-gray-200/70 dark:border-white/[0.06] bg-white dark:bg-[#1a1e28] shadow-card',
         paddingMap[padding],
         interactive &&
-          'transition-all duration-200 hover:shadow-md hover:border-gray-300 dark:hover:border-gray-600 cursor-pointer',
+          'transition-all duration-200 hover:shadow-card-hover hover:border-gray-300/80 dark:hover:border-white/[0.1] cursor-pointer',
         onClick && 'cursor-pointer',
         className,
       )}
@@ -64,8 +64,10 @@ export function CardHeader({
   return (
     <div className={cn('flex items-center justify-between mb-4', className)}>
       <div>
-        <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">{title}</h3>
-        {subtitle && <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{subtitle}</p>}
+        <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-50 tracking-tight">
+          {title}
+        </h3>
+        {subtitle && <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{subtitle}</p>}
       </div>
       {action}
     </div>

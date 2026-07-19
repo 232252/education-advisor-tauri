@@ -356,8 +356,8 @@ export function McpTab() {
       ) : (
         <div className="flex-1 flex min-h-0">
           {/* 左侧服务器列表 */}
-          <div className="w-72 flex-shrink-0 border-r border-gray-200 dark:border-gray-700 flex flex-col bg-gray-50/30 dark:bg-gray-800/30">
-            <div className="p-3 border-b border-gray-200 dark:border-gray-700 space-y-2">
+          <div className="w-72 flex-shrink-0 border-r border-gray-200 dark:border-white/[0.06] flex flex-col bg-gray-50/30 dark:bg-[#1a1e28]/30">
+            <div className="p-3 border-b border-gray-200 dark:border-white/[0.06] space-y-2">
               <button
                 type="button"
                 onClick={() => {
@@ -372,7 +372,7 @@ export function McpTab() {
               <button
                 type="button"
                 onClick={() => setShowPresets(true)}
-                className="w-full px-3 py-1.5 text-sm rounded border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700"
+                className="w-full px-3 py-1.5 text-sm rounded border border-gray-300 dark:border-white/[0.08] hover:bg-gray-100 dark:hover:bg-white/[0.06]"
               >
                 ⚡ {t('page.mcp.addFromTemplate')}
               </button>
@@ -393,7 +393,7 @@ export function McpTab() {
                       <button
                         type="button"
                         onClick={() => setSelectedId(s.id)}
-                        className={`w-full text-left px-3 py-2 text-sm border-b border-gray-100 dark:border-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700/50 ${
+                        className={`w-full text-left px-3 py-2 text-sm border-b border-gray-100 dark:border-white/[0.04] hover:bg-gray-100 dark:hover:bg-white/[0.04] ${
                           selectedId === s.id ? 'bg-blue-50 dark:bg-blue-900/20' : ''
                         }`}
                       >

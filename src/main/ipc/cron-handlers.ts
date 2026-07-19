@@ -22,7 +22,9 @@ const CRON_FIELD_RANGES = [
 // node-cron 不支持宏表达式 (@daily/@hourly 等),
 // cron.validate('@daily') 返回 false, cron.schedule 会抛错,
 // 因此严格拒绝所有 @ 开头的表达式,避免误导用户。
-function strictValidateCron(expr: string): { ok: boolean; error?: string } {
+// R57-3 H4 修复: strictValidateCron 导出,供 cron-service.ts 的 registerBitableSync 使用
+// 之前 registerBitableSync 直接把 syncInterval 当 cron 表达式用,跳过了严格校验
+export function strictValidateCron(expr: string): { ok: boolean; error?: string } {
   if (!expr || typeof expr !== 'string') return { ok: false, error: '表达式不能为空' }
   const macroKey = expr.trim().toLowerCase()
   if (macroKey.startsWith('@')) {
@@ -253,6 +255,11 @@ export function registerCronHandlers(win: BrowserWindow) {
   // 启动时从磁盘恢复历史日志（P1-9 持久化日志的配套）
   cronService.loadPersistedLogs().catch((err) => {
     console.warn('[Cron] Failed to load persisted logs:', err)
+  })
+
+  // R57-3 H1 修复: 启动时从磁盘恢复用户任务(应用重启后用户创建的任务全丢失)
+  cronService.loadPersistedUserTasks().catch((err) => {
+    console.warn('[Cron] Failed to load persisted user tasks:', err)
   })
 
   ipcMain.handle(IPC.IPC_CRON_LIST, async () => {

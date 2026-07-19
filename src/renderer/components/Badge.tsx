@@ -19,7 +19,7 @@ const variantMap = {
   success: 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400',
   warning: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400',
   danger: 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400',
-  neutral: 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400',
+  neutral: 'bg-gray-100 dark:bg-[#1a1e28] text-gray-600 dark:text-gray-400',
 }
 
 // P3 优化: 提升到模块级,避免每次渲染分配新对象

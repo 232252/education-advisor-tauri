@@ -159,6 +159,7 @@ export function registerSysHandlers(win: BrowserWindow) {
       '.txt',
       '.md',
       '.json',
+      '.jsonl',
       '.yaml',
       '.yml',
       '.csv',
@@ -204,6 +205,7 @@ export function registerSysHandlers(win: BrowserWindow) {
         '.txt': 'text/plain',
         '.md': 'text/markdown',
         '.json': 'application/json',
+        '.jsonl': 'application/jsonl',
         '.yaml': 'text/yaml',
         '.yml': 'text/yaml',
         '.csv': 'text/csv',
@@ -233,7 +235,11 @@ export function registerSysHandlers(win: BrowserWindow) {
         '.webp': 'image/webp',
       }
       const mimeType = MIME_MAP[ext] || 'application/octet-stream'
-      const isText = mimeType.startsWith('text/') || mimeType === 'application/json'
+      // .jsonl 是 application/jsonl，但本质是逐行 JSON 的文本文件，需按文本处理
+      const isText =
+        mimeType.startsWith('text/') ||
+        mimeType === 'application/json' ||
+        mimeType === 'application/jsonl'
       const isBinary = !isText
       if (isBinary) {
         // 二进制文件:返回 base64 编码

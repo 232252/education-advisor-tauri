@@ -246,6 +246,8 @@ contextBridge.exposeInMainWorld('api', {
     backup: (destPath: string) => ipcRenderer.invoke(IPC.IPC_PRIVACY_BACKUP, destPath),
     // [w] 锁定(清空主进程内存中的密码,后续隐私操作需重新输入密码)
     lock: () => ipcRenderer.invoke(IPC.IPC_PRIVACY_LOCK),
+    // [r] 解锁(重新输入密码，校验格式后缓存到主进程内存，真正校验由后续 EAA CLI 命令执行)
+    unlock: (password: string) => ipcRenderer.invoke(IPC.IPC_PRIVACY_UNLOCK, password),
     // [r] 查询隐私引擎状态(是否已加载密码,不返回密码本身)
     status: () => ipcRenderer.invoke(IPC.IPC_PRIVACY_STATUS),
   },

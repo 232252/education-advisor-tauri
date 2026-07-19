@@ -272,9 +272,9 @@ export function ChatPage() {
     <div className="flex h-full">
       <h1 style={SR_ONLY_STYLE}>{t('page.chat.title')}</h1>
       {/* 左侧会话列表 */}
-      <div className="w-64 flex-shrink-0 border-r border-gray-200 dark:border-gray-700 flex flex-col bg-gray-50/50 dark:bg-gray-800/50">
+      <div className="w-64 flex-shrink-0 border-r border-gray-200 dark:border-white/[0.06] flex flex-col bg-gray-50/50 dark:bg-[#1a1e28]/50">
         {/* 顶部操作区 */}
-        <div className="p-3 border-b border-gray-200 dark:border-gray-700">
+        <div className="p-3 border-b border-gray-200 dark:border-white/[0.06]">
           <button
             type="button"
             onClick={() => createSession()}
@@ -300,7 +300,7 @@ export function ChatPage() {
                   ${
                     session.id === sessionId
                       ? 'bg-blue-50 dark:bg-blue-500/15 border border-blue-200/60 dark:border-blue-500/30 shadow-sm'
-                      : 'hover:bg-gray-100 dark:hover:bg-gray-700/50 border border-transparent'
+                      : 'hover:bg-gray-100 dark:hover:bg-white/[0.04] border border-transparent'
                   }`}
               >
                 <button
@@ -339,13 +339,13 @@ export function ChatPage() {
       {/* 主对话区域 */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* 顶部工具栏 — 纯 Agent 模式: Agent 选择器 + 模型配置 + 思考级别 常驻显示 */}
-        <div className="flex items-center justify-between px-6 py-2 border-b border-gray-200 dark:border-gray-700/50 flex-wrap gap-2">
+        <div className="flex items-center justify-between px-6 py-2 border-b border-gray-200 dark:border-white/[0.04] flex-wrap gap-2">
           <div className="flex items-center gap-3 flex-wrap">
             {/* Agent 选择器 — 常驻显示 */}
             <select
               value={selectedAgentId}
               onChange={(e) => setSelectedAgent(e.target.value)}
-              className="bg-white border border-gray-300 dark:bg-gray-800 dark:border-gray-600 rounded-lg px-3 py-1.5 text-xs text-gray-600 dark:text-gray-300
+              className="bg-white border border-gray-300 dark:bg-[#1a1e28] dark:border-white/[0.08] rounded-lg px-3 py-1.5 text-xs text-gray-600 dark:text-gray-300
                          focus:outline-none focus:border-purple-500 min-w-[160px]"
               title="选择 Agent"
             >
@@ -370,7 +370,7 @@ export function ChatPage() {
             <select
               value={thinkingLevel}
               onChange={handleThinkingLevelChange}
-              className="bg-white border border-gray-300 dark:bg-gray-800 dark:border-gray-600 rounded-lg px-2 py-1.5 text-xs text-gray-600 dark:text-gray-300
+              className="bg-white border border-gray-300 dark:bg-[#1a1e28] dark:border-white/[0.08] rounded-lg px-2 py-1.5 text-xs text-gray-600 dark:text-gray-300
                          focus:outline-none focus:border-blue-500"
               title="思考级别"
             >
@@ -405,7 +405,7 @@ export function ChatPage() {
           {messages.length === 0 && (
             <div className="flex items-center justify-center h-full text-gray-400 dark:text-gray-500">
               <div className="text-center animate-fade-in">
-                <div className="w-16 h-16 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center mx-auto mb-4">
+                <div className="w-16 h-16 rounded-full bg-gray-100 dark:bg-[#1a1e28] flex items-center justify-center mx-auto mb-4">
                   <span className="text-3xl">💬</span>
                 </div>
                 <div className="text-base font-medium text-gray-600 dark:text-gray-300">
@@ -434,7 +434,7 @@ export function ChatPage() {
                   ${
                     msg.role === 'user'
                       ? 'bg-blue-600 text-white rounded-br-md shadow-sm shadow-blue-500/10'
-                      : 'bg-gray-50 text-gray-800 dark:bg-gray-800/80 dark:text-gray-100 rounded-bl-md border border-gray-200/80 dark:border-gray-700/80'
+                      : 'bg-gray-50 text-gray-800 dark:bg-[#1a1e28]/80 dark:text-gray-100 rounded-bl-md border border-gray-200/80 dark:border-white/[0.05]'
                   }`}
               >
                 {/* 工具调用（放顶部） */}
@@ -470,7 +470,7 @@ export function ChatPage() {
                     <summary className="text-xs text-gray-500 dark:text-gray-400 cursor-pointer hover:text-gray-700 dark:hover:text-gray-300">
                       思考过程
                     </summary>
-                    <div className="mt-1 text-xs text-gray-400 dark:text-gray-500 whitespace-pre-wrap pl-2 border-l border-gray-300 dark:border-gray-700">
+                    <div className="mt-1 text-xs text-gray-400 dark:text-gray-500 whitespace-pre-wrap pl-2 border-l border-gray-300 dark:border-white/[0.06]">
                       {msg.thinking}
                     </div>
                   </details>
@@ -495,14 +495,14 @@ export function ChatPage() {
         </div>
 
         {/* 输入区 */}
-        <div className="border-t border-gray-200 dark:border-gray-700/80 px-6 py-4 bg-white/50 dark:bg-gray-900/50">
+        <div className="border-t border-gray-200 dark:border-white/[0.05] px-6 py-4 bg-white/50 dark:bg-[#0f1117]/50">
           {!canSend && (
             <div className="text-xs text-amber-500 dark:text-amber-400 mb-2 text-center">
               正在加载 Agent 列表...
             </div>
           )}
           <div className="flex gap-3">
-            <div className="flex-1 flex flex-col gap-2 bg-white border border-gray-300 dark:bg-gray-800 dark:border-gray-600 rounded-xl px-3 py-2 focus-within:border-blue-500 dark:focus-within:border-blue-400 transition-colors">
+            <div className="flex-1 flex flex-col gap-2 bg-white border border-gray-300 dark:bg-[#1a1e28] dark:border-white/[0.08] rounded-xl px-3 py-2 focus-within:border-blue-500 dark:focus-within:border-blue-400 transition-colors">
               {/* 已上传文件列表 */}
               {uploadedFiles.length > 0 && (
                 <div className="flex flex-wrap gap-1.5 mb-1">
@@ -700,7 +700,7 @@ const ContextStatusBar = memo(function ContextStatusBar({
   const barColor = pct < 60 ? 'bg-green-500' : pct < thresholdPct ? 'bg-yellow-500' : 'bg-red-500'
   const fmtK = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}K` : `${n}`)
   return (
-    <div className="px-6 py-2 border-b border-gray-200 dark:border-gray-700/50 bg-gray-50/50 dark:bg-gray-800/30">
+    <div className="px-6 py-2 border-b border-gray-200 dark:border-white/[0.04] bg-gray-50/50 dark:bg-[#1a1e28]/30">
       <div className="flex items-center gap-3 text-[11px] text-gray-500 dark:text-gray-400">
         <div className="flex items-center gap-1.5">
           <span className="font-medium text-gray-700 dark:text-gray-300">上下文</span>

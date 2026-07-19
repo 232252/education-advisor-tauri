@@ -358,7 +358,7 @@ export function ModelsPage() {
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="搜索 Provider..."
-            className="bg-white border border-gray-300 dark:bg-gray-800 dark:border-gray-600 rounded-lg px-3 py-2 text-sm w-64
+            className="bg-white border border-gray-300 dark:bg-[#1a1e28] dark:border-white/[0.08] rounded-lg px-3 py-2 text-sm w-64
                        focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow"
           />
           <button
@@ -460,7 +460,7 @@ export function ModelsPage() {
                 {hiddenProviders.map((p) => (
                   <div
                     key={p.id}
-                    className="flex items-center justify-between px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-800/50 opacity-60"
+                    className="flex items-center justify-between px-4 py-2 rounded-lg bg-gray-100 dark:bg-[#1a1e28]/50 opacity-60"
                   >
                     <div className="flex items-center gap-2">
                       <span className="text-sm text-gray-500 dark:text-gray-400">{p.name}</span>
@@ -540,15 +540,15 @@ const ProviderCard = memo(function ProviderCard({
 
   return (
     <div
-      className={`bg-gray-50 border rounded-xl transition-colors dark:bg-gray-800 ${
-        expanded ? 'border-blue-500/50' : 'border-gray-200 dark:border-gray-700'
+      className={`bg-gray-50 border rounded-xl transition-colors dark:bg-[#1a1e28] ${
+        expanded ? 'border-blue-500/50' : 'border-gray-200 dark:border-white/[0.06]'
       }`}
     >
       {/* 头部 — 点击展开 */}
       <button
         type="button"
         onClick={() => onExpand(p.id)}
-        className="w-full flex items-center justify-between p-4 text-left hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors rounded-t-xl"
+        className="w-full flex items-center justify-between p-4 text-left hover:bg-gray-100 dark:hover:bg-white/[0.04] transition-colors rounded-t-xl"
       >
         <div className="flex items-center gap-3">
           <span
@@ -585,7 +585,7 @@ const ProviderCard = memo(function ProviderCard({
 
       {/* 展开内容 */}
       {expanded && (
-        <div className="px-4 pb-4 border-t border-gray-200 dark:border-gray-700 pt-4 space-y-4">
+        <div className="px-4 pb-4 border-t border-gray-200 dark:border-white/[0.06] pt-4 space-y-4">
           {/* API Key 管理 */}
           <div className="space-y-2">
             <label
@@ -604,7 +604,7 @@ const ProviderCard = memo(function ProviderCard({
                 value={apiKeyInput}
                 onChange={(e) => onApiKeyChange(p.id, e.target.value)}
                 placeholder={p.hasApiKey ? '已保存（输入新值覆盖）' : '输入 API Key...'}
-                className="flex-1 bg-white border border-gray-300 dark:bg-gray-900 dark:border-gray-600 rounded-lg px-3 py-2 text-sm
+                className="flex-1 bg-white border border-gray-300 dark:bg-[#0f1117] dark:border-white/[0.08] rounded-lg px-3 py-2 text-sm
                            focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow"
               />
               <button
@@ -686,10 +686,10 @@ const ProviderCard = memo(function ProviderCard({
                 暂无模型
               </div>
             ) : (
-              <div className="bg-gray-100 dark:bg-gray-900 rounded-lg overflow-hidden">
+              <div className="bg-gray-100 dark:bg-[#0f1117] rounded-lg overflow-hidden">
                 <table className="w-full text-xs">
                   <thead>
-                    <tr className="border-b border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400">
+                    <tr className="border-b border-gray-200 dark:border-white/[0.06] text-gray-500 dark:text-gray-400">
                       <th className="text-left px-3 py-2 font-medium">模型</th>
                       <th className="text-left px-3 py-2 font-medium">API</th>
                       <th className="text-right px-3 py-2 font-medium">上下文</th>
@@ -770,7 +770,7 @@ const ProviderCard = memo(function ProviderCard({
                     }
                   }}
                   placeholder="输入自定义模型 ID..."
-                  className="flex-1 bg-white border border-gray-300 dark:bg-gray-900 dark:border-gray-600 rounded-lg px-3 py-1.5 text-xs
+                  className="flex-1 bg-white border border-gray-300 dark:bg-[#0f1117] dark:border-white/[0.08] rounded-lg px-3 py-1.5 text-xs
                              focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow"
                 />
                 <button
@@ -841,7 +841,7 @@ const ModelRow = memo(function ModelRow({
             <select
               value={editForm.api ?? ''}
               onChange={(e) => onEditFormChange({ ...editForm, api: e.target.value })}
-              className="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-1 py-0.5 text-[10px] font-mono w-full"
+              className="bg-white dark:bg-[#1a1e28] border border-gray-300 dark:border-white/[0.08] rounded px-1 py-0.5 text-[10px] font-mono w-full"
             >
               <option value="openai-completions">openai-completions</option>
               <option value="openai-responses">openai-responses</option>
@@ -855,7 +855,7 @@ const ModelRow = memo(function ModelRow({
               type="number"
               value={editForm.contextWindow ?? ''}
               onChange={(e) => onEditFormChange({ ...editForm, contextWindow: e.target.value })}
-              className="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-1 py-0.5 text-[10px] font-mono w-full text-right"
+              className="bg-white dark:bg-[#1a1e28] border border-gray-300 dark:border-white/[0.08] rounded px-1 py-0.5 text-[10px] font-mono w-full text-right"
             />
           </td>
           <td className="px-3 py-2">
@@ -863,7 +863,7 @@ const ModelRow = memo(function ModelRow({
               type="number"
               value={editForm.maxOutputTokens ?? ''}
               onChange={(e) => onEditFormChange({ ...editForm, maxOutputTokens: e.target.value })}
-              className="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-1 py-0.5 text-[10px] font-mono w-full text-right"
+              className="bg-white dark:bg-[#1a1e28] border border-gray-300 dark:border-white/[0.08] rounded px-1 py-0.5 text-[10px] font-mono w-full text-right"
             />
           </td>
           <td className="px-3 py-2">
@@ -872,7 +872,7 @@ const ModelRow = memo(function ModelRow({
               step="0.0000001"
               value={editForm.costPerInputToken ?? ''}
               onChange={(e) => onEditFormChange({ ...editForm, costPerInputToken: e.target.value })}
-              className="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-1 py-0.5 text-[10px] font-mono w-full text-right"
+              className="bg-white dark:bg-[#1a1e28] border border-gray-300 dark:border-white/[0.08] rounded px-1 py-0.5 text-[10px] font-mono w-full text-right"
             />
           </td>
           <td className="px-3 py-2">
@@ -883,14 +883,14 @@ const ModelRow = memo(function ModelRow({
               onChange={(e) =>
                 onEditFormChange({ ...editForm, costPerOutputToken: e.target.value })
               }
-              className="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-1 py-0.5 text-[10px] font-mono w-full text-right"
+              className="bg-white dark:bg-[#1a1e28] border border-gray-300 dark:border-white/[0.08] rounded px-1 py-0.5 text-[10px] font-mono w-full text-right"
             />
           </td>
           <td className="px-3 py-2 text-center">
             <select
               value={editForm.supportsReasoning ?? 'false'}
               onChange={(e) => onEditFormChange({ ...editForm, supportsReasoning: e.target.value })}
-              className="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-1 py-0.5 text-[10px] w-full"
+              className="bg-white dark:bg-[#1a1e28] border border-gray-300 dark:border-white/[0.08] rounded px-1 py-0.5 text-[10px] w-full"
             >
               <option value="true">R</option>
               <option value="false">-</option>
@@ -927,7 +927,7 @@ const ModelRow = memo(function ModelRow({
                 value={editForm.baseUrl ?? ''}
                 onChange={(e) => onEditFormChange({ ...editForm, baseUrl: e.target.value })}
                 placeholder="留空使用 Provider 默认值"
-                className="flex-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-2 py-0.5 text-[10px] font-mono"
+                className="flex-1 bg-white dark:bg-[#1a1e28] border border-gray-300 dark:border-white/[0.08] rounded px-2 py-0.5 text-[10px] font-mono"
               />
             </div>
           </td>
@@ -938,7 +938,7 @@ const ModelRow = memo(function ModelRow({
 
   // 显示模式
   return (
-    <tr className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-200/50 dark:hover:bg-gray-800/50 transition-colors">
+    <tr className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-200/50 dark:hover:bg-white/[0.03] transition-colors">
       <td className="px-3 py-2">
         <div className="font-medium text-gray-700 dark:text-gray-200">{m.name}</div>
         <div className="text-gray-400 dark:text-gray-500 font-mono text-[10px]">{m.id}</div>
@@ -1171,7 +1171,7 @@ const DefaultModelConfig = memo(function DefaultModelConfig({
   const lqModelInfo = currentModels.find((m) => m.id === lowCostModel)
 
   return (
-    <div className="bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-5">
+    <div className="bg-gray-50 dark:bg-[#1a1e28] border border-gray-200 dark:border-white/[0.06] rounded-xl p-5">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <h2 className="font-semibold text-lg">默认模型配置</h2>
@@ -1195,7 +1195,7 @@ const DefaultModelConfig = memo(function DefaultModelConfig({
           <select
             value={defaultProvider}
             onChange={(e) => handleProviderChange(e.target.value)}
-            className="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm w-80
+            className="bg-white dark:bg-[#0f1117] border border-gray-300 dark:border-white/[0.08] rounded-lg px-3 py-2 text-sm w-80
                        focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow"
           >
             <option value="">请选择...</option>
@@ -1243,7 +1243,7 @@ const DefaultModelConfig = memo(function DefaultModelConfig({
                   value={hqDropdownValue}
                   onChange={(e) => handleHQDropdown(e.target.value)}
                   disabled={currentModels.length === 0}
-                  className="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm w-80
+                  className="bg-white dark:bg-[#0f1117] border border-gray-300 dark:border-white/[0.08] rounded-lg px-3 py-2 text-sm w-80
                              focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow disabled:opacity-50"
                 >
                   <option value="">请选择...</option>
@@ -1278,7 +1278,7 @@ const DefaultModelConfig = memo(function DefaultModelConfig({
                     }
                   }}
                   placeholder="例如 gpt-4-turbo-preview"
-                  className="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-1.5 text-xs w-80
+                  className="bg-white dark:bg-[#0f1117] border border-gray-300 dark:border-white/[0.08] rounded-lg px-3 py-1.5 text-xs w-80
                              focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow"
                 />
               </div>
@@ -1300,7 +1300,7 @@ const DefaultModelConfig = memo(function DefaultModelConfig({
                   value={lqDropdownValue}
                   onChange={(e) => handleLQDropdown(e.target.value)}
                   disabled={currentModels.length === 0}
-                  className="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm w-80
+                  className="bg-white dark:bg-[#0f1117] border border-gray-300 dark:border-white/[0.08] rounded-lg px-3 py-2 text-sm w-80
                              focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow disabled:opacity-50"
                 >
                   <option value="">请选择...</option>
@@ -1334,7 +1334,7 @@ const DefaultModelConfig = memo(function DefaultModelConfig({
                     }
                   }}
                   placeholder="例如 gpt-3.5-turbo"
-                  className="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-1.5 text-xs w-80
+                  className="bg-white dark:bg-[#0f1117] border border-gray-300 dark:border-white/[0.08] rounded-lg px-3 py-1.5 text-xs w-80
                              focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow"
                 />
               </div>

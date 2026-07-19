@@ -9,45 +9,45 @@
 /* 主题色彩变量 */
 :root {
   --bg-primary: #ffffff;
-  --bg-secondary: #f3f4f6;
-  --bg-tertiary: #e5e7eb;
+  --bg-secondary: #f8f9fb;
+  --bg-tertiary: #eef0f4;
   --bg-elevated: #ffffff;
-  --text-primary: #111827;
-  --text-secondary: #4b5563;
-  --text-muted: #9ca3af;
-  --border-color: #e5e7eb;
-  --border-subtle: #f3f4f6;
-  --accent-color: #3b82f6;
-  --accent-hover: #2563eb;
-  --accent-muted: rgba(59, 130, 246, 0.1);
-  --scrollbar-thumb: #d1d5db;
-  --scrollbar-thumb-hover: #9ca3af;
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
-  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.04);
-  --prose-pre-bg: #f1f5f9;
-  --prose-pre-border: #e2e8f0;
+  --text-primary: #1a1d26;
+  --text-secondary: #4a5068;
+  --text-muted: #9aa0b4;
+  --border-color: #e8eaf0;
+  --border-subtle: #f2f3f7;
+  --accent-color: #4f7df9;
+  --accent-hover: #3b6ae8;
+  --accent-muted: rgba(79, 125, 249, 0.08);
+  --scrollbar-thumb: #cdd1dc;
+  --scrollbar-thumb-hover: #a8adbf;
+  --shadow-sm: 0 1px 2px rgba(26, 29, 38, 0.04), 0 1px 3px rgba(26, 29, 38, 0.03);
+  --shadow-md: 0 4px 8px -2px rgba(26, 29, 38, 0.06), 0 2px 4px -2px rgba(26, 29, 38, 0.04);
+  --shadow-lg: 0 12px 20px -4px rgba(26, 29, 38, 0.08), 0 4px 8px -4px rgba(26, 29, 38, 0.04);
+  --prose-pre-bg: #f6f7fa;
+  --prose-pre-border: #e8eaf0;
 }
 .dark {
-  --bg-primary: #111827;
-  --bg-secondary: #1f2937;
-  --bg-tertiary: #374151;
-  --bg-elevated: #1a2236;
-  --text-primary: #f3f4f6;
-  --text-secondary: #d1d5db;
-  --text-muted: #6b7280;
-  --border-color: #374151;
-  --border-subtle: #1f2937;
-  --accent-color: #60a5fa;
-  --accent-hover: #3b82f6;
-  --accent-muted: rgba(96, 165, 250, 0.12);
-  --scrollbar-thumb: #4b5563;
-  --scrollbar-thumb-hover: #6b7280;
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -2px rgba(0, 0, 0, 0.2);
-  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.35), 0 4px 6px -4px rgba(0, 0, 0, 0.2);
-  --prose-pre-bg: #1e293b;
-  --prose-pre-border: #334155;
+  --bg-primary: #0f1117;
+  --bg-secondary: #161920;
+  --bg-tertiary: #1e222c;
+  --bg-elevated: #1a1e28;
+  --text-primary: #eef0f6;
+  --text-secondary: #b4bac8;
+  --text-muted: #5c6378;
+  --border-color: rgba(255, 255, 255, 0.07);
+  --border-subtle: rgba(255, 255, 255, 0.04);
+  --accent-color: #6b9bff;
+  --accent-hover: #4f7df9;
+  --accent-muted: rgba(107, 155, 255, 0.1);
+  --scrollbar-thumb: #2a2f3c;
+  --scrollbar-thumb-hover: #3a4050;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3), 0 1px 3px rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 4px 8px -2px rgba(0, 0, 0, 0.4), 0 2px 4px -2px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 12px 20px -4px rgba(0, 0, 0, 0.5), 0 4px 8px -4px rgba(0, 0, 0, 0.3);
+  --prose-pre-bg: #1a1e28;
+  --prose-pre-border: rgba(255, 255, 255, 0.08);
 }
 
 /* 自定义滚动条 */
@@ -79,10 +79,11 @@
 
 /* 全局字体 */
 body {
-  font-family: "Inter", "Microsoft YaHei", -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family: "Inter", "SF Pro Display", "Microsoft YaHei", -apple-system, BlinkMacSystemFont, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow: hidden; /* Electron 窗口不需要 body 滚动 */
+  text-rendering: optimizeLegibility;
 }
 
 /* ─── 动画关键帧 ─── */
@@ -152,10 +153,10 @@ body {
 
 /* ─── 文本选择 ─── */
 ::selection {
-  background: rgba(59, 130, 246, 0.2);
+  background: rgba(79, 125, 249, 0.18);
 }
 .dark ::selection {
-  background: rgba(96, 165, 250, 0.25);
+  background: rgba(107, 155, 255, 0.22);
 }
 
 /* ─── 全局过渡 ─── */

@@ -286,7 +286,7 @@ export function ContextMenu() {
   return (
     <div
       ref={menuRef}
-      className="fixed z-[80] min-w-[160px] py-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl select-none"
+      className="fixed z-[80] min-w-[160px] py-1 bg-white dark:bg-[#1a1e28] border border-gray-200 dark:border-white/[0.06] rounded-lg shadow-xl select-none"
       style={{ left: adjustedX, top: adjustedY, width: menuWidth }}
       role="menu"
     >
@@ -305,7 +305,7 @@ export function ContextMenu() {
                 ? 'text-gray-300 dark:text-gray-600 cursor-not-allowed'
                 : isDanger
                   ? 'text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 cursor-pointer'
-                  : 'text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700/60 cursor-pointer'
+                  : 'text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-white/[0.04] cursor-pointer'
             }`}
           >
             {item.label}

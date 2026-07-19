@@ -82,7 +82,7 @@ import { eaaBridge } from '../main/services/eaa-bridge'
 import { feishuBotService } from '../main/services/feishu-bot-service'
 import { keystoreService } from '../main/services/keystore-service'
 import { settingsService } from '../main/services/settings-service'
-import { BrowserWindow, getHandler, listChannels } from './electron-shim'
+import { BrowserWindow, getHandler, listChannels, mainWebContents } from './electron-shim'
 
 // ============================================================
 // stdio JSON-RPC 写入 (用劫持前的原始 stdout.write，绕过 console 包装)
@@ -283,8 +283,10 @@ function startRequestLoop(): void {
     }
 
     // 调用 handler (Electron handler 签名: (_event, ...args) => Promise<any>)
+    // R57 修复: event.sender 必须是有 send 方法的 webContents,否则 handler 内
+    // e.sender.send() throw TypeError 被 catch 吞掉,事件推送静默失败。
     Promise.resolve()
-      .then(() => handler({}, ...(Array.isArray(args) ? args : [])))
+      .then(() => handler({ sender: mainWebContents }, ...(Array.isArray(args) ? args : [])))
       .then(
         (data) => writeLine({ id, type: 'result', ok: true, data }),
         (err: unknown) => {

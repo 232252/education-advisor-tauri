@@ -371,10 +371,10 @@ export function AcademicsPage() {
   }
 
   return (
-    <div className="flex h-full bg-gray-50 dark:bg-gray-900">
+    <div className="flex h-full bg-gray-50 dark:bg-[#0f1117]">
       {/* ===== 左侧: 学生列表 ===== */}
-      <aside className="w-64 flex-shrink-0 border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex flex-col">
-        <div className="p-3 border-b border-gray-200 dark:border-gray-700">
+      <aside className="w-64 flex-shrink-0 border-r border-gray-200 dark:border-white/[0.06] bg-white dark:bg-[#1a1e28] flex flex-col">
+        <div className="p-3 border-b border-gray-200 dark:border-white/[0.06]">
           <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2 flex items-center gap-1.5">
             <span>👥</span>
             <span>学生列表</span>
@@ -387,7 +387,7 @@ export function AcademicsPage() {
             <select
               value={classFilter}
               onChange={(e) => setClassFilter(e.target.value)}
-              className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:border-blue-500 dark:focus:border-blue-400"
+              className="w-full bg-gray-50 dark:bg-[#0f1117] border border-gray-200 dark:border-white/[0.06] rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:border-blue-500 dark:focus:border-blue-400"
               title="按班级筛选"
             >
               <option value="__ALL__">全部班级</option>
@@ -405,7 +405,7 @@ export function AcademicsPage() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="搜索学生..."
-                className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg pl-8 pr-3 py-1.5 text-sm focus:outline-none focus:border-blue-500 dark:focus:border-blue-400 placeholder:text-gray-400"
+                className="w-full bg-gray-50 dark:bg-[#0f1117] border border-gray-200 dark:border-white/[0.06] rounded-lg pl-8 pr-3 py-1.5 text-sm focus:outline-none focus:border-blue-500 dark:focus:border-blue-400 placeholder:text-gray-400"
               />
               <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs">
                 🔍
@@ -430,7 +430,7 @@ export function AcademicsPage() {
                     'w-full text-left px-3 py-2 flex items-center gap-2 text-sm transition-colors border-l-2',
                     selectedStudent === s.name
                       ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-500 text-blue-700 dark:text-blue-300 font-medium'
-                      : 'border-transparent hover:bg-gray-50 dark:hover:bg-gray-700/50 text-gray-700 dark:text-gray-300',
+                      : 'border-transparent hover:bg-gray-50 dark:hover:bg-white/[0.04] text-gray-700 dark:text-gray-300',
                   )}
                 >
                   <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
@@ -454,7 +454,7 @@ export function AcademicsPage() {
       {/* ===== 右侧: 学业详情 ===== */}
       <main className="flex-1 overflow-y-auto">
         {/* 头部 */}
-        <div className="sticky top-0 z-10 bg-white/80 dark:bg-gray-800/80 backdrop-blur border-b border-gray-200 dark:border-gray-700 px-6 py-4">
+        <div className="sticky top-0 z-10 bg-white/80 dark:bg-[#1a1e28]/80 backdrop-blur border-b border-gray-200 dark:border-white/[0.06] px-6 py-4">
           <div className="flex items-center justify-between flex-wrap gap-3">
             <div>
               <h1 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
@@ -469,7 +469,7 @@ export function AcademicsPage() {
               <select
                 value={semesterFilter}
                 onChange={(e) => setSemesterFilter(e.target.value)}
-                className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="bg-white dark:bg-[#1a1e28] border border-gray-200 dark:border-white/[0.06] rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 title="按学期筛选考试"
               >
                 <option value="__ALL__">全部学期</option>
@@ -482,7 +482,7 @@ export function AcademicsPage() {
               <button
                 type="button"
                 onClick={loadInitialData}
-                className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 px-3 py-1.5 rounded-lg text-sm transition-colors"
+                className="bg-white dark:bg-[#1a1e28] border border-gray-200 dark:border-white/[0.06] hover:bg-gray-50 dark:hover:bg-white/[0.06] px-3 py-1.5 rounded-lg text-sm transition-colors"
               >
                 🔄 刷新
               </button>
@@ -692,14 +692,14 @@ function CompareTab({ students, classList, subjects, exams, themeProps }: Compar
   return (
     <div className="space-y-4">
       {/* 选择器栏 */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
+      <div className="bg-white dark:bg-[#1a1e28] rounded-xl border border-gray-200 dark:border-white/[0.06] p-4">
         <div className="flex flex-wrap items-center gap-3">
           <select
             value={classFilter}
             onChange={(e) => setClassFilter(e.target.value)}
             className={cn(
-              'text-sm rounded-lg border border-gray-300 dark:border-gray-600',
-              'bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 px-3 py-1.5',
+              'text-sm rounded-lg border border-gray-300 dark:border-white/[0.08]',
+              'bg-white dark:bg-[#0f1117] text-gray-700 dark:text-gray-300 px-3 py-1.5',
             )}
           >
             <option value="__ALL__">全部班级</option>
@@ -715,8 +715,8 @@ function CompareTab({ students, classList, subjects, exams, themeProps }: Compar
             value={examAId}
             onChange={(e) => setExamAId(e.target.value)}
             className={cn(
-              'text-sm rounded-lg border border-gray-300 dark:border-gray-600',
-              'bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 px-3 py-1.5',
+              'text-sm rounded-lg border border-gray-300 dark:border-white/[0.08]',
+              'bg-white dark:bg-[#0f1117] text-gray-700 dark:text-gray-300 px-3 py-1.5',
             )}
           >
             <option value="">选择考试 A</option>
@@ -731,8 +731,8 @@ function CompareTab({ students, classList, subjects, exams, themeProps }: Compar
             value={examBId}
             onChange={(e) => setExamBId(e.target.value)}
             className={cn(
-              'text-sm rounded-lg border border-gray-300 dark:border-gray-600',
-              'bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 px-3 py-1.5',
+              'text-sm rounded-lg border border-gray-300 dark:border-white/[0.08]',
+              'bg-white dark:bg-[#0f1117] text-gray-700 dark:text-gray-300 px-3 py-1.5',
             )}
           >
             <option value="">选择考试 B</option>
@@ -767,14 +767,14 @@ function CompareTab({ students, classList, subjects, exams, themeProps }: Compar
           {/* 汇总卡片 */}
           {summary && (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-3">
+              <div className="bg-white dark:bg-[#1a1e28] rounded-xl border border-gray-200 dark:border-white/[0.06] p-3">
                 <div className="text-xs text-gray-400 mb-1">班级平均分变化</div>
                 <div className={cn('text-lg font-bold', deltaColor(summary.avgScoreDelta))}>
                   {summary.avgScoreDelta > 0 ? '+' : ''}
                   {summary.avgScoreDelta.toFixed(1)}
                 </div>
               </div>
-              <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-3">
+              <div className="bg-white dark:bg-[#1a1e28] rounded-xl border border-gray-200 dark:border-white/[0.06] p-3">
                 <div className="text-xs text-gray-400 mb-1">进步最多</div>
                 <div className="text-sm font-medium text-gray-700 dark:text-gray-200 truncate">
                   {summary.mostImprovedStudent ?? '-'}
@@ -783,7 +783,7 @@ function CompareTab({ students, classList, subjects, exams, themeProps }: Compar
                   <DeltaBadge delta={summary.mostImprovedDelta} suffix="分" />
                 )}
               </div>
-              <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-3">
+              <div className="bg-white dark:bg-[#1a1e28] rounded-xl border border-gray-200 dark:border-white/[0.06] p-3">
                 <div className="text-xs text-gray-400 mb-1">退步最多</div>
                 <div className="text-sm font-medium text-gray-700 dark:text-gray-200 truncate">
                   {summary.mostDeclinedStudent ?? '-'}
@@ -792,7 +792,7 @@ function CompareTab({ students, classList, subjects, exams, themeProps }: Compar
                   <DeltaBadge delta={summary.mostDeclinedDelta} suffix="分" />
                 )}
               </div>
-              <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-3">
+              <div className="bg-white dark:bg-[#1a1e28] rounded-xl border border-gray-200 dark:border-white/[0.06] p-3">
                 <div className="text-xs text-gray-400 mb-1">参与对比</div>
                 <div className="text-lg font-bold text-gray-700 dark:text-gray-200">
                   {summary.totalStudents}
@@ -803,7 +803,7 @@ function CompareTab({ students, classList, subjects, exams, themeProps }: Compar
 
           {/* 科目平均变化柱状图 */}
           {summary && summary.subjectDeltas.length > 0 && (
-            <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
+            <div className="bg-white dark:bg-[#1a1e28] rounded-xl border border-gray-200 dark:border-white/[0.06] p-4">
               <h5 className="text-sm font-medium text-gray-600 dark:text-gray-300 mb-3">
                 📊 各科目平均分变化
               </h5>
@@ -845,10 +845,10 @@ function CompareTab({ students, classList, subjects, exams, themeProps }: Compar
           )}
 
           {/* 学生对比表 */}
-          <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+          <div className="bg-white dark:bg-[#1a1e28] rounded-xl border border-gray-200 dark:border-white/[0.06] overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="bg-gray-50 dark:bg-gray-900/50 text-xs text-gray-500 dark:text-gray-400">
+                <thead className="bg-gray-50 dark:bg-[#0f1117]/50 text-xs text-gray-500 dark:text-gray-400">
                   <tr>
                     <th className="text-left px-3 py-2 font-medium">学生</th>
                     <th className="text-center px-3 py-2 font-medium">总分 A</th>
@@ -858,9 +858,9 @@ function CompareTab({ students, classList, subjects, exams, themeProps }: Compar
                     <th className="text-center px-3 py-2 font-medium">操行分变化</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                <tbody className="divide-y divide-gray-100 dark:divide-white/[0.06]">
                   {studentComparisons.map((sc) => (
-                    <tr key={sc.studentName} className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
+                    <tr key={sc.studentName} className="hover:bg-gray-50 dark:hover:bg-white/[0.03]">
                       <td className="px-3 py-2 text-gray-700 dark:text-gray-300">
                         {sc.studentName}
                       </td>
@@ -1199,7 +1199,7 @@ function OverviewTab({
         <div className="overflow-x-auto">
           <table className="w-full text-sm min-w-[640px]">
             <thead>
-              <tr className="text-left text-xs text-gray-400 dark:text-gray-500 border-b border-gray-200 dark:border-gray-700">
+              <tr className="text-left text-xs text-gray-400 dark:text-gray-500 border-b border-gray-200 dark:border-white/[0.06]">
                 <th className="py-2 px-3 font-medium">考试</th>
                 <th className="py-2 px-3 font-medium">类型</th>
                 <th className="py-2 px-3 font-medium">日期</th>
@@ -1216,7 +1216,7 @@ function OverviewTab({
               {gradeTableData.map(({ exam, scoresBySubject, classRank }) => (
                 <tr
                   key={exam.id}
-                  className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50"
+                  className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-white/[0.03]"
                 >
                   <td className="py-2 px-3 font-medium text-gray-700 dark:text-gray-200">
                     {exam.name}
@@ -1414,7 +1414,7 @@ function ExamManagementTab({ subjects, examTypes, exams, onRefresh }: ExamManage
                 value={formName}
                 onChange={(e) => setFormName(e.target.value)}
                 placeholder="如: 2025年期中考试"
-                className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
+                className="w-full bg-gray-50 dark:bg-[#0f1117] border border-gray-200 dark:border-white/[0.06] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
               />
             </div>
             <div>
@@ -1424,7 +1424,7 @@ function ExamManagementTab({ subjects, examTypes, exams, onRefresh }: ExamManage
               <select
                 value={formType}
                 onChange={(e) => setFormType(e.target.value as ExamType)}
-                className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
+                className="w-full bg-gray-50 dark:bg-[#0f1117] border border-gray-200 dark:border-white/[0.06] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
               >
                 {examTypes.map((et) => (
                   <option key={et.value} value={et.value}>
@@ -1441,7 +1441,7 @@ function ExamManagementTab({ subjects, examTypes, exams, onRefresh }: ExamManage
                 type="date"
                 value={formDate}
                 onChange={(e) => setFormDate(e.target.value)}
-                className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
+                className="w-full bg-gray-50 dark:bg-[#0f1117] border border-gray-200 dark:border-white/[0.06] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
               />
             </div>
             <div>
@@ -1451,7 +1451,7 @@ function ExamManagementTab({ subjects, examTypes, exams, onRefresh }: ExamManage
                 value={formSemester}
                 onChange={(e) => setFormSemester(e.target.value)}
                 placeholder="如: 2025-2026-1"
-                className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
+                className="w-full bg-gray-50 dark:bg-[#0f1117] border border-gray-200 dark:border-white/[0.06] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
               />
             </div>
             <div className="md:col-span-2">
@@ -1463,7 +1463,7 @@ function ExamManagementTab({ subjects, examTypes, exams, onRefresh }: ExamManage
                 value={formScope}
                 onChange={(e) => setFormScope(e.target.value)}
                 placeholder="如: 第一单元 ~ 第三单元"
-                className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
+                className="w-full bg-gray-50 dark:bg-[#0f1117] border border-gray-200 dark:border-white/[0.06] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
               />
             </div>
           </div>
@@ -1503,7 +1503,7 @@ function ExamManagementTab({ subjects, examTypes, exams, onRefresh }: ExamManage
                     'px-3 py-1.5 rounded-lg text-xs border transition-colors',
                     formSubjects.has(sub.id)
                       ? 'bg-blue-500 text-white border-blue-500'
-                      : 'bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:border-blue-400',
+                      : 'bg-white dark:bg-[#0f1117] text-gray-600 dark:text-gray-300 border-gray-200 dark:border-white/[0.06] hover:border-blue-400',
                   )}
                 >
                   {sub.name}
@@ -2066,7 +2066,7 @@ function GradeEntryTab({
               value={quickName}
               onChange={(e) => setQuickName(e.target.value)}
               placeholder="如: 第一次月考"
-              className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
+              className="w-full bg-gray-50 dark:bg-[#0f1117] border border-gray-200 dark:border-white/[0.06] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
             />
           </div>
           <div>
@@ -2074,7 +2074,7 @@ function GradeEntryTab({
             <select
               value={quickType}
               onChange={(e) => setQuickType(e.target.value as ExamType)}
-              className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
+              className="w-full bg-gray-50 dark:bg-[#0f1117] border border-gray-200 dark:border-white/[0.06] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
             >
               {examTypes.map((et) => (
                 <option key={et.value} value={et.value}>
@@ -2091,7 +2091,7 @@ function GradeEntryTab({
               type="date"
               value={quickDate}
               onChange={(e) => setQuickDate(e.target.value)}
-              className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
+              className="w-full bg-gray-50 dark:bg-[#0f1117] border border-gray-200 dark:border-white/[0.06] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
             />
           </div>
         </div>
@@ -2107,7 +2107,7 @@ function GradeEntryTab({
           <button
             type="button"
             onClick={() => setShowQuickCreate(false)}
-            className="bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400 px-4 py-2 rounded-lg text-sm transition-colors"
+            className="bg-gray-100 dark:bg-[#1a1e28] hover:bg-gray-200 dark:hover:bg-white/[0.06] text-gray-600 dark:text-gray-400 px-4 py-2 rounded-lg text-sm transition-colors"
           >
             取消
           </button>
@@ -2121,7 +2121,7 @@ function GradeEntryTab({
       {/* 模式切换 + AI 录入入口 */}
       <div className="flex items-center gap-2 flex-wrap">
         <span className="text-xs text-gray-500 dark:text-gray-400">录入模式:</span>
-        <div className="flex bg-gray-100 dark:bg-gray-800 rounded-lg p-0.5">
+        <div className="flex bg-gray-100 dark:bg-[#1a1e28] rounded-lg p-0.5">
           <button
             type="button"
             onClick={() => setMode('single-subject')}
@@ -2154,7 +2154,7 @@ function GradeEntryTab({
             'ml-auto px-3 py-1.5 rounded-md text-xs transition-colors border',
             showAIEntry
               ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 border-purple-300 dark:border-purple-700'
-              : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 border-transparent',
+              : 'bg-gray-100 dark:bg-[#1a1e28] text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-white/[0.06] border-transparent',
           )}
           title="粘贴成绩文本,AI 自动解析并填充"
         >
@@ -2188,7 +2188,7 @@ function GradeEntryTab({
             onChange={(e) => setAiInputText(e.target.value)}
             placeholder={'粘贴成绩文本,例如:\n张三 85\n李四 92\n王五 78分\n赵六 88 排名3'}
             rows={6}
-            className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-purple-500 font-mono"
+            className="w-full bg-gray-50 dark:bg-[#0f1117] border border-gray-200 dark:border-white/[0.06] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-purple-500 font-mono"
             disabled={aiParsing}
           />
           <div className="flex items-center gap-2 mt-2">
@@ -2228,7 +2228,7 @@ function GradeEntryTab({
                       setSelectedExamId(e.target.value)
                       setExamNameInput('')
                     }}
-                    className="flex-1 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
+                    className="flex-1 bg-gray-50 dark:bg-[#0f1117] border border-gray-200 dark:border-white/[0.06] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
                   >
                     <option value="">— 不选,直接录入 —</option>
                     {sortedExams.map((exam) => (
@@ -2246,7 +2246,7 @@ function GradeEntryTab({
                     }}
                     list="exam-name-suggestions"
                     placeholder="或输入新名称"
-                    className="flex-1 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
+                    className="flex-1 bg-gray-50 dark:bg-[#0f1117] border border-gray-200 dark:border-white/[0.06] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
                   />
                   <datalist id="exam-name-suggestions">
                     {sortedExams.map((exam) => (
@@ -2268,7 +2268,7 @@ function GradeEntryTab({
                   value={examNameInput}
                   onChange={(e) => setExamNameInput(e.target.value)}
                   placeholder="输入考试名称(可选),留空保存时自动创建"
-                  className="flex-1 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
+                  className="flex-1 bg-gray-50 dark:bg-[#0f1117] border border-gray-200 dark:border-white/[0.06] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
                 />
               )}
             </div>
@@ -2282,7 +2282,7 @@ function GradeEntryTab({
               <select
                 value={selectedSubjectId}
                 onChange={(e) => setSelectedSubjectId(e.target.value)}
-                className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
+                className="w-full bg-gray-50 dark:bg-[#0f1117] border border-gray-200 dark:border-white/[0.06] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
               >
                 <option value="">请选择科目...</option>
                 {subjects.map((sub) => (
@@ -2300,7 +2300,7 @@ function GradeEntryTab({
               <select
                 value={entryStudentName}
                 onChange={(e) => setEntryStudentName(e.target.value)}
-                className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
+                className="w-full bg-gray-50 dark:bg-[#0f1117] border border-gray-200 dark:border-white/[0.06] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
               >
                 <option value="">请选择学生...</option>
                 {students
@@ -2356,7 +2356,7 @@ function GradeEntryTab({
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="text-left text-xs text-gray-400 dark:text-gray-500 border-b border-gray-200 dark:border-gray-700">
+                  <tr className="text-left text-xs text-gray-400 dark:text-gray-500 border-b border-gray-200 dark:border-white/[0.06]">
                     <th className="py-2 px-3 font-medium">学生</th>
                     <th className="py-2 px-3 font-medium text-center">
                       成绩
@@ -2376,7 +2376,7 @@ function GradeEntryTab({
                       return (
                         <tr
                           key={s.entity_id}
-                          className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50"
+                          className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-white/[0.03]"
                         >
                           <td className="py-2 px-3 font-medium text-gray-700 dark:text-gray-200">
                             {s.name}
@@ -2390,7 +2390,7 @@ function GradeEntryTab({
                               min="0"
                               max={subjectMap[selectedSubjectId]?.fullMark}
                               step="0.5"
-                              className="w-20 text-center bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded px-2 py-1 text-sm focus:outline-none focus:border-blue-500"
+                              className="w-20 text-center bg-gray-50 dark:bg-[#0f1117] border border-gray-200 dark:border-white/[0.06] rounded px-2 py-1 text-sm focus:outline-none focus:border-blue-500"
                             />
                           </td>
                           <td className="py-2 px-3 text-center">
@@ -2400,7 +2400,7 @@ function GradeEntryTab({
                               onChange={(e) => updateSingleScore(s.name, 'rank', e.target.value)}
                               placeholder="-"
                               min="1"
-                              className="w-16 text-center bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded px-2 py-1 text-sm focus:outline-none focus:border-blue-500"
+                              className="w-16 text-center bg-gray-50 dark:bg-[#0f1117] border border-gray-200 dark:border-white/[0.06] rounded px-2 py-1 text-sm focus:outline-none focus:border-blue-500"
                             />
                           </td>
                         </tr>
@@ -2431,7 +2431,7 @@ function GradeEntryTab({
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-left text-xs text-gray-400 dark:text-gray-500 border-b border-gray-200 dark:border-gray-700">
+                <tr className="text-left text-xs text-gray-400 dark:text-gray-500 border-b border-gray-200 dark:border-white/[0.06]">
                   <th className="py-2 px-3 font-medium">科目</th>
                   <th className="py-2 px-3 font-medium text-center">满分</th>
                   <th className="py-2 px-3 font-medium text-center">成绩</th>
@@ -2444,7 +2444,7 @@ function GradeEntryTab({
                   return (
                     <tr
                       key={sub.id}
-                      className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50"
+                      className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-white/[0.03]"
                     >
                       <td className="py-2 px-3 font-medium text-gray-700 dark:text-gray-200">
                         {sub.name}
@@ -2462,7 +2462,7 @@ function GradeEntryTab({
                           min="0"
                           max={sub.fullMark}
                           step="0.5"
-                          className="w-20 text-center bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded px-2 py-1 text-sm focus:outline-none focus:border-blue-500"
+                          className="w-20 text-center bg-gray-50 dark:bg-[#0f1117] border border-gray-200 dark:border-white/[0.06] rounded px-2 py-1 text-sm focus:outline-none focus:border-blue-500"
                         />
                       </td>
                       <td className="py-2 px-3 text-center">
@@ -2472,7 +2472,7 @@ function GradeEntryTab({
                           onChange={(e) => updateAllScore(sub.id, 'rank', e.target.value)}
                           placeholder="-"
                           min="1"
-                          className="w-16 text-center bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded px-2 py-1 text-sm focus:outline-none focus:border-blue-500"
+                          className="w-16 text-center bg-gray-50 dark:bg-[#0f1117] border border-gray-200 dark:border-white/[0.06] rounded px-2 py-1 text-sm focus:outline-none focus:border-blue-500"
                         />
                       </td>
                     </tr>

@@ -32,7 +32,7 @@ export function riskBgColor(risk: EAARiskLevel | string): string {
     case '极高':
       return 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400'
     default:
-      return 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'
+      return 'bg-gray-50 dark:bg-white/[0.06] text-gray-600 dark:text-gray-400'
   }
 }
 
@@ -97,29 +97,29 @@ export function cn(...classes: (string | false | null | undefined)[]): string {
 
 /** 统一卡片样式 */
 export const CARD_BASE =
-  'rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900'
+  'rounded-xl border border-gray-200/70 dark:border-white/[0.06] bg-white dark:bg-[#1a1e28] shadow-card'
 
-export const CARD_INTERACTIVE = `${CARD_BASE} transition-all duration-200 hover:shadow-md`
+export const CARD_INTERACTIVE = `${CARD_BASE} transition-all duration-200 hover:shadow-card-hover hover:border-gray-300/80 dark:hover:border-white/[0.1]`
 
 /** 统一输入框样式 */
 export const INPUT_BASE =
-  'rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-gray-100 px-3 py-2 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+  'rounded-lg border border-gray-200 dark:border-white/[0.08] bg-white dark:bg-[#1e222c] text-sm text-gray-900 dark:text-gray-100 px-3 py-2 transition-all duration-200 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/60 focus:border-transparent'
 
 /** 统一按钮样式 */
 export function btnStyle(
   variant: 'primary' | 'secondary' | 'danger' | 'ghost' = 'primary',
 ): string {
   const base =
-    'inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-offset-1 dark:focus:ring-offset-gray-900 disabled:opacity-50 disabled:cursor-not-allowed'
+    'inline-flex items-center justify-center gap-1.5 px-3.5 py-2 text-sm font-medium rounded-lg transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 dark:focus-visible:ring-offset-[#0f1117] disabled:opacity-50 disabled:cursor-not-allowed'
   switch (variant) {
     case 'primary':
-      return `${base} bg-blue-600 hover:bg-blue-700 text-white focus:ring-blue-500 active:scale-[0.97]`
+      return `${base} bg-blue-600 hover:bg-blue-500 text-white shadow-sm shadow-blue-600/20 focus-visible:ring-blue-500 active:scale-[0.97]`
     case 'secondary':
-      return `${base} bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 focus:ring-gray-400 border border-gray-200 dark:border-gray-600`
+      return `${base} bg-gray-50 dark:bg-white/[0.05] hover:bg-gray-100 dark:hover:bg-white/[0.08] text-gray-700 dark:text-gray-300 focus-visible:ring-gray-400 border border-gray-200/80 dark:border-white/[0.08]`
     case 'danger':
-      return `${base} bg-red-600 hover:bg-red-700 text-white focus:ring-red-500 active:scale-[0.97]`
+      return `${base} bg-red-600 hover:bg-red-500 text-white shadow-sm shadow-red-600/20 focus-visible:ring-red-500 active:scale-[0.97]`
     case 'ghost':
-      return `${base} hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-400 focus:ring-gray-400`
+      return `${base} hover:bg-gray-100 dark:hover:bg-white/[0.06] text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 focus-visible:ring-gray-400`
   }
 }
 
@@ -130,14 +130,14 @@ export function badgeStyle(
   const base = 'inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full'
   switch (variant) {
     case 'info':
-      return `${base} bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400`
+      return `${base} bg-blue-50 dark:bg-blue-500/[0.12] text-blue-600 dark:text-blue-400`
     case 'success':
-      return `${base} bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400`
+      return `${base} bg-green-50 dark:bg-green-500/[0.12] text-green-600 dark:text-green-400`
     case 'warning':
-      return `${base} bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400`
+      return `${base} bg-amber-50 dark:bg-amber-500/[0.12] text-amber-600 dark:text-amber-400`
     case 'danger':
-      return `${base} bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400`
+      return `${base} bg-red-50 dark:bg-red-500/[0.12] text-red-600 dark:text-red-400`
     case 'neutral':
-      return `${base} bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400`
+      return `${base} bg-gray-50 dark:bg-white/[0.06] text-gray-500 dark:text-gray-400`
   }
 }

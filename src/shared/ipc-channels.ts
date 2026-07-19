@@ -79,6 +79,7 @@ export const IPC_PRIVACY_FILTER = 'privacy:filter'
 export const IPC_PRIVACY_DRYRUN = 'privacy:dryrun'
 export const IPC_PRIVACY_BACKUP = 'privacy:backup'
 export const IPC_PRIVACY_LOCK = 'privacy:lock'
+export const IPC_PRIVACY_UNLOCK = 'privacy:unlock'
 export const IPC_PRIVACY_STATUS = 'privacy:status'
 
 // ===== 定时任务 =====
