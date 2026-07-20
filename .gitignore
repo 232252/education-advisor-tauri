@@ -219,3 +219,6 @@ scripts/_list_real_candidates.mjs
 # 旧 eaa.exe 备份
 resources/eaa-binaries/win32-x64/*.bak.*
 scripts/r60_watchdog_test.mjs
+
+# WebView2 离线 bootstrapper (175KB,微软官方,不提交仓库)
+src-tauri/.tauri/

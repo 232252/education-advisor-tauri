@@ -1,7 +1,7 @@
 {
   "name": "education-advisor-tauri",
   "productName": "Education Advisor",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Education Advisor — Tauri 2 desktop edition of the multi-agent education management system. 18 specialized agents, privacy-preserving PII engine, cross-platform LLM orchestration, Rust data engine, all in a native Tauri shell with a Node.js sidecar.",
   "private": false,
   "type": "module",

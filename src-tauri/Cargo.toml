@@ -1,6 +1,6 @@
 [package]
 name = "education-advisor-tauri"
-version = "0.1.1"
+version = "0.1.2"
 description = "Education Advisor — Tauri desktop edition (migrated from Electron)"
 authors = ["Education Advisor AI Contributors"]
 license = "MIT"
